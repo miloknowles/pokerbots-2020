@@ -1,1 +1,1 @@
-# pokerbots-2020
+# MIT Pokerbots 2020
