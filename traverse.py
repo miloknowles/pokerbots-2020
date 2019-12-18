@@ -56,10 +56,10 @@ def traverse(game_state, events, emulator, traverse_player, p1_strategy, p2_stra
   is_terminal_node, winning_player, winning_stack = check_terminal_node(events)
   if is_terminal_node:
     payoff = (winning_stack - INITIAL_STACK)
-    return payoff if traverse_player == winning_player else -1 * payoff
+    return payoff if traverse_player == winning_player else (-1 * payoff)
 
-  # CASE 2: State is a chance node, simulate the event.
-  # NOTE(milo): The game engine takes care of this external sampling for us!
+  # CASE 2: State is a chance node, simulate the event. NOTE(milo): The game engine takes care of
+  # this external sampling for us!
 
   # CASE 3: Traversal player action node.
   is_player_node, uuid, evt = check_player_node(events)
