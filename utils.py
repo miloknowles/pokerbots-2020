@@ -1,4 +1,6 @@
 from collections import OrderedDict
+
+import torch
 import numpy as np
 
 
@@ -32,7 +34,7 @@ def encode_cards(card_iterable, rank_index=0):
   Encode card strings into their rank-major numerical order.
   i.e 2c 2d 2h 2s ... Ac Ad Ah As
   """
-  out = np.zeros(len(card_iterable))
+  out = torch.zeros(len(card_iterable))
   for i, c in enumerate(card_iterable):
     lower = c.lower()
     rank, suit = lower[rank_index], lower[(rank_index + 1) % 2]
@@ -50,7 +52,7 @@ def encode_cards_suit_rank(card_iterable):
 
 def apply_mask_and_normalize(probs, mask):
   p = probs * mask
-  p /= p.sum()
+  p = p / torch.sum(p)
   return p
 
 

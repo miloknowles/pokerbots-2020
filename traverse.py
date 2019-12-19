@@ -2,7 +2,6 @@ import torch
 import numpy as np
 from copy import deepcopy
 
-from memory import MemoryBuffer, InfoSet
 from utils import *
 from constants import Constants
 
@@ -51,11 +50,10 @@ def traverse(game_state, events, emulator, action_generator, infoset_generator, 
     # Do regret matching to get action probabilities.
     action_probs = traverse_player_strategy.get_action_probabilities(infoset)
     action_probs = apply_mask_and_normalize(action_probs, mask)
-    assert np.allclose(action_probs.sum(), 1.0)
+    assert torch.allclose(action_probs.sum(), torch.ones(1))
 
-    # strategy = np.ones(len(actions)) / len(actions) # Uniform strategy over samples for now.
-    values = np.zeros(len(actions))
-    instant_regrets = np.zeros(len(actions))
+    values = torch.zeros(len(actions))
+    instant_regrets = torch.zeros(len(actions))
 
     for i, a in enumerate(actions):
       if mask[i] == 0:
@@ -71,7 +69,8 @@ def traverse(game_state, events, emulator, action_generator, infoset_generator, 
       instant_regrets[i] = (values[i] - strategy_ev)
 
     # Add the instantaneous regrets to advantage memory for the traversing player.
-    # advantage_mem.add_weighted(infoset, instant_regrets, t)
+    if advantage_mem is not None:
+      advantage_mem.add_weighted(infoset, instant_regrets, t)
 
     return strategy_ev
 
@@ -85,11 +84,13 @@ def traverse(game_state, events, emulator, action_generator, infoset_generator, 
 
     action_probs = other_player_strategy.get_action_probabilities(infoset)
     action_probs = apply_mask_and_normalize(action_probs, mask)
-    assert np.allclose(action_probs.sum(), 1.0)
-    action, amount = actions[np.random.choice(len(actions), p=action_probs)]
+    assert torch.allclose(action_probs.sum(), torch.ones(1))
+
+    action, amount = actions[torch.multinomial(action_probs, 1).item()]
 
     # Add the action probabilities to the strategy buffer.
-    # strategy_mem.add_weighted(infoset, action_probs, t)
+    if strategy_mem is not None:
+      strategy_mem.add_weighted(infoset, action_probs, t)
 
     updated_state, new_events = emulator.apply_action(game_state, action, amount)
 

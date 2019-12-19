@@ -1,12 +1,14 @@
 from copy import deepcopy
 
+import torch
+
 from pypokerengine.api.emulator import Emulator
 
 from constants import Constants
 from utils import *
 from traverse import traverse
 from memory import InfoSet, MemoryBuffer
-from regret_matching_strategy import RegretMatchingStrategy
+from network_wrapper import NetworkWrapper
 
 
 def make_infoset(game_state, evt):
@@ -24,9 +26,11 @@ def make_infoset(game_state, evt):
   board_suit_rank = evt["round_state"]["community_card"]
 
   players = game_state["table"].seats.players
-  hole_suit_rank = [str(players[acting_player_idx].hole_card[0]), str(players[acting_player_idx].hole_card[1])]
+  hole_suit_rank = [
+    str(players[acting_player_idx].hole_card[0]),
+    str(players[acting_player_idx].hole_card[1])]
 
-  bet_history_vec = np.zeros(Constants.NUM_BETTING_ACTIONS)
+  bet_history_vec = torch.zeros(Constants.NUM_BETTING_ACTIONS)
   h = evt["round_state"]["action_histories"]
   
   # Always start out with SB + BB in the pot.
@@ -51,7 +55,7 @@ def generate_actions(valid_actions, pot_amount):
   """
   Using the valid_actions from the game engine, mask out and scale the entire set of actions.
   """
-  actions_mask = np.zeros(len(Constants.ALL_ACTIONS))
+  actions_mask = torch.zeros(len(Constants.ALL_ACTIONS))
   actions_scaled = deepcopy(Constants.ALL_ACTIONS)
 
   for item in valid_actions:
@@ -100,13 +104,17 @@ if __name__ == "__main__":
   initial_state = emulator.generate_initial_game_state(players_info)
   game_state, events = emulator.start_new_round(initial_state)
 
-  p1_strategy = RegretMatchingStrategy()
-  p2_strategy = RegretMatchingStrategy()
+  p1_strategy = NetworkWrapper(4, Constants.NUM_BETTING_ACTIONS, Constants.NUM_ACTIONS, 128)
+  p2_strategy = NetworkWrapper(4, Constants.NUM_BETTING_ACTIONS, Constants.NUM_ACTIONS, 128)
+
+  advantage_mem = MemoryBuffer(Constants.INFO_SET_SIZE, Constants.NUM_ACTIONS, max_size=1e6, store_weights=True)
+  strategy_mem = MemoryBuffer(Constants.INFO_SET_SIZE, Constants.NUM_ACTIONS, max_size=1e6, store_weights=True)
 
   evs = []
+  t = 0
   for _ in range(1):
     ev = traverse(game_state, events, emulator, generate_actions, make_infoset,
-                  Constants.PLAYER1_UID, p1_strategy, p2_strategy, None, None, 0)
+                  Constants.PLAYER1_UID, p1_strategy, p2_strategy, advantage_mem, strategy_mem, t)
     evs.append(ev)
 
   avg_ev = np.array(evs).mean()
