@@ -3,6 +3,10 @@ from sys import getsizeof
 import torch
 
 
+class InvalidBoardSizeException(Exception):
+  pass
+
+
 class InfoSet(object):
   def __init__(self, hole_cards, board_cards, bet_history_vec, player_position):
     """
@@ -17,6 +21,36 @@ class InfoSet(object):
     self.board_cards = board_cards
     self.bet_history_vec = bet_history_vec
     self.player_position = 0
+
+  def get_card_input_tensors(self):
+    """
+    The network expects (tuple of torch.Tensor):
+    Shape ((B x 2), (B x 3)[, (B x 1), (B x 1)]) # Hole, board [, turn, river]).
+    """
+    if len(self.board_cards) == 0:
+      return [self.hole_cards.unsqueeze(0).long(), -1*torch.ones(1, 3).long(),
+              -1*torch.ones(1, 1).long(), -1*torch.ones(1, 1).long()]
+    elif len(self.board_cards) == 3:
+      return [self.hole_cards.unsqueeze(0).long(), self.board_cards.unsqueeze(0).long(),
+             -1*torch.ones(1, 1).long(), -1*torch.ones(1, 1).long()]
+    elif len(self.board_cards) == 4:
+      return [self.hole_cards.unsqueeze(0).long(), self.board_cards[:3].unsqueeze(0).long(),
+              self.board_cards[3].view(1, 1).long(), -1*torch.ones(1, 1).long()]
+    elif len(self.board_cards) == 5:
+      return [self.hole_cards.unsqueeze(0).long(), self.board_cards[:3].unsqueeze(0).long(),
+              self.board_cards[3].view(1, 1).long(), self.board_cards[4].view(1, 1).long()]
+    else:
+      raise InvalidBoardSizeException()
+
+  def get_bet_input_tensors(self):
+    """
+    The network expects (torch.Tensor) with shape (B x num_betting_actions).
+    """
+    nbets = self.bet_history_vec.shape[0]
+    position_mask = torch.zeros(nbets)
+    position_mask[torch.arange(self.player_position, nbets, 2)] = 1
+    position_mask[torch.arange((self.player_position + 1) % 2, nbets, 2)] = -1
+    return self.bet_history_vec.unsqueeze(0), position_mask
   
   def pack(self):
     """

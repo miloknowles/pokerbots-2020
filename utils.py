@@ -52,7 +52,12 @@ def encode_cards_suit_rank(card_iterable):
 
 def apply_mask_and_normalize(probs, mask):
   p = probs * mask
+
+  # If all nonzero probability actions are masked out, choose a random one.
+  if p.sum() == 0:
+    p[np.random.randint(0, high=len(p))] = 1.0
   p = p / torch.sum(p)
+
   return p
 
 

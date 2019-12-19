@@ -35,11 +35,14 @@ def make_infoset(game_state, evt):
   
   # Always start out with SB + BB in the pot.
   pot_total = (3 * Constants.SMALL_BLIND_AMOUNT)
-  for street in ["preflop", "flop", "turn", "river"]:
+  for street_num, street in enumerate(["preflop", "flop", "turn", "river"]):
     if street in h:
       for i, action in enumerate(h[street]):
+        # Skip actions if they exceed the number of betting actions we consider.
+        if (street_num * Constants.STREET_OFFSET + i) >= len(bet_history_vec):
+          continue
         # Percentage of CURRENT pot.
-        bet_history_vec[Constants.STREET_OFFSET + i] = action["amount"] / pot_total
+        bet_history_vec[street_num * Constants.STREET_OFFSET + i] = action["amount"] / pot_total
         pot_total += action["amount"]
 
   infoset = InfoSet(
@@ -112,7 +115,7 @@ if __name__ == "__main__":
 
   evs = []
   t = 0
-  for _ in range(1):
+  for _ in range(100):
     ev = traverse(game_state, events, emulator, generate_actions, make_infoset,
                   Constants.PLAYER1_UID, p1_strategy, p2_strategy, advantage_mem, strategy_mem, t)
     evs.append(ev)

@@ -62,7 +62,7 @@ def traverse(game_state, events, emulator, action_generator, infoset_generator, 
       values[i] = traverse(updated_state, new_events, emulator, action_generator, infoset_generator, traverse_player,
                            p1_strategy, p2_strategy, advantage_mem, strategy_mem, t)
     
-    strategy_ev = (action_probs * values).sum()
+    strategy_ev = (action_probs * values).sum().item()
     for i in range(len(actions)):
       if mask[i] == 0:
         continue
