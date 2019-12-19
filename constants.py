@@ -1,0 +1,26 @@
+class Constants(object):
+  PLAYER1_UID = "P1"
+  PLAYER2_UID = "P2"
+  INITIAL_STACK = 100
+  SMALL_BLIND_AMOUNT = 1
+
+  STREET_OFFSET = 6
+  NUM_BETTING_ACTIONS = 24 # 4 streets, 6 betting actions per street.
+
+  ALL_ACTIONS = [
+    ["fold", 0],
+    ["call", -1],
+    ["raise", -1],
+    ["raise", -1],
+    ["raise", -1],
+    ["raise", -1],
+    ["raise", -1]
+  ]
+
+  ACTION_FOLD = 0
+  ACTION_CALL = 1
+  ACTION_MINRAISE = 2
+  ACTION_POTRAISE = 3
+  ACTION_TWOPOTRAISE = 4
+  ACTION_THREEPOTRAISE = 5
+  ACTION_MAXRAISE = 6

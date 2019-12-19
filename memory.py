@@ -3,26 +3,32 @@ import numpy as np
 
 
 class InfoSet(object):
-  def __init__(self, hole_cards, board_cards, bet_history_vec):
+  def __init__(self, hole_cards, board_cards, bet_history_vec, player_position):
     """
     hole_cards (np.array): The 0-51 encoding of each hole card.
     board_cards (np.array) : The 0-51 encoding of each of 3-5 board cards.
     bet_history_vec (np.array) : Betting actions, represented as a fraction of the pot size.
+    player_position (int) : 0 if the acting player is the SB and 1 if they are BB.
 
     The bet history has size (num_streets * num_actions_per_street) = 6 * 4 = 24.
     """
     self.hole_cards = hole_cards
     self.board_cards = board_cards
     self.bet_history_vec = bet_history_vec
+    self.player_position = 0
   
   def pack(self):
     """
     Packs the infoset into a compact numpy array of size:
-      (2 hole cards, 5 board cards, num_betting_actions)
+      (1 player position, 2 hole cards, 5 board cards, num_betting_actions)
     """
     board_cards_fixed_size = np.zeros(5)
     board_cards_fixed_size[:len(self.board_cards)] = self.board_cards
-    return np.concatenate([self.hole_cards, board_cards_fixed_size, self.bet_history_vec]).astype(np.float32)
+    return np.concatenate([
+      [self.player_position],
+      self.hole_cards,
+      board_cards_fixed_size,
+      self.bet_history_vec]).astype(np.float32)
     
 
 class MemoryBuffer(object):
@@ -52,3 +58,10 @@ class MemoryBuffer(object):
 
   def full(self):
     return self._next_index >= self._infosets.shape[0]
+
+  def size_mb(self):
+    total = self._infosets.nbytes
+    total += self._items.nbytes
+    if self._has_weights:
+      total += self._weights.nbytes
+    return total / 1e6

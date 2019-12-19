@@ -35,7 +35,7 @@ def encode_cards(card_iterable, rank_index=0):
   out = np.zeros(len(card_iterable))
   for i, c in enumerate(card_iterable):
     lower = c.lower()
-    rank, suit = lower[rank_index], lower[rank_index + 1 % 2]
+    rank, suit = lower[rank_index], lower[(rank_index + 1) % 2]
     out[i] = 4 * RANK_TO_VALUE[rank] + SUIT_TO_VALUE[suit]
   return out
 
@@ -46,3 +46,9 @@ def encode_cards_rank_suit(card_iterable):
 
 def encode_cards_suit_rank(card_iterable):
   return encode_cards(card_iterable, rank_index=1)
+
+
+def apply_mask_and_normalize(probs, mask):
+  p = probs * mask
+  p /= p.sum()
+  return p
