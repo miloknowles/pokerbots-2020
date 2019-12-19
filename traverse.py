@@ -24,94 +24,7 @@ def check_player_node(events):
     return False
 
 
-def sample_uniform_action(valid_actions):
-  item = valid_actions[np.random.randint(len(valid_actions))]
-  amount = item["amount"]
-
-  if type(amount) == dict:
-    random_amount = np.random.randint(amount["min"], high=amount["max"]+1)
-    return item["action"], random_amount
-  else:
-    return item["action"], item["amount"]
-
-
-def get_available_actions(valid_actions, pot_amount):
-  """
-  Using the valid_actions from the game engine, mask out and scale the entire set of actions.
-  """
-  actions_mask = np.zeros(len(Constants.ALL_ACTIONS))
-  actions_scaled = deepcopy(Constants.ALL_ACTIONS)
-
-  for item in valid_actions:
-    if item["action"] == "fold":
-      actions_mask[Constants.ACTION_FOLD] = 1
-
-    elif item["action"] == "call":
-      actions_mask[Constants.ACTION_CALL] = 1
-      actions_scaled[Constants.ACTION_CALL][1] = item["amount"]
-
-    elif item["action"] == "raise":
-      min_raise, max_raise = item["amount"]["min"], item["amount"]["max"]
-
-      actions_mask[Constants.ACTION_MINRAISE] = 1
-      actions_mask[Constants.ACTION_MAXRAISE] = 1
-      actions_scaled[Constants.ACTION_MINRAISE][1] = min_raise
-      actions_scaled[Constants.ACTION_MAXRAISE][1] = max_raise
-
-      if pot_amount <= max_raise:
-        actions_mask[Constants.ACTION_POTRAISE] = 1
-        actions_scaled[Constants.ACTION_POTRAISE][1] = pot_amount
-
-      if 2 * pot_amount <= max_raise:
-        actions_mask[Constants.ACTION_TWOPOTRAISE] = 1
-        actions_scaled[Constants.ACTION_TWOPOTRAISE][1] = 2 * pot_amount
-      
-      if 3 * pot_amount <= max_raise:
-        actions_mask[Constants.ACTION_THREEPOTRAISE] = 1
-        actions_scaled[Constants.ACTION_THREEPOTRAISE][1] = 3 * pot_amount
-
-  return actions_scaled, actions_mask
-
-
-def make_infoset(game_state, evt):
-  """
-  Make an infoset representation for the player about to act.
-  """
-  # NOTE(milo): Acting position is 0 if this player is the SB (first to act) and 1 if BB.
-  small_blind_player_idx = (evt["round_state"]["big_blind_pos"] + 1) % 2
-  acting_player_idx = int(evt["round_state"]["next_player"])
-
-  # This is 0 if the current acting player is the SB and 1 if BB.
-  acting_player_blind = 0 if small_blind_player_idx == acting_player_idx else 1
-
-  # NOTE(milo): PyPokerEngine encodes cards with rank-suit i.e CJ.
-  board_suit_rank = evt["round_state"]["community_card"]
-
-  players = game_state["table"].seats.players
-  hole_suit_rank = [str(players[acting_player_idx].hole_card[0]), str(players[acting_player_idx].hole_card[1])]
-
-  bet_history_vec = np.zeros(Constants.NUM_BETTING_ACTIONS)
-  h = evt["round_state"]["action_histories"]
-  
-  # Always start out with SB + BB in the pot.
-  pot_total = (3 * Constants.SMALL_BLIND_AMOUNT)
-  for street in ["preflop", "flop", "turn", "river"]:
-    if street in h:
-      for i, action in enumerate(h[street]):
-        # Percentage of CURRENT pot.
-        bet_history_vec[Constants.STREET_OFFSET + i] = action["amount"] / pot_total
-        pot_total += action["amount"]
-
-  infoset = InfoSet(
-    encode_cards_suit_rank(hole_suit_rank),
-    encode_cards_suit_rank(board_suit_rank),
-    bet_history_vec,
-    acting_player_idx)
-
-  return infoset
-
-
-def traverse(game_state, events, emulator, traverse_player, p1_strategy,
+def traverse(game_state, events, emulator, action_generator, infoset_generator, traverse_player, p1_strategy,
              p2_strategy, advantage_mem, strategy_mem, t):
   """
   Recursively traverse the game tree with external sampling.
@@ -130,10 +43,10 @@ def traverse(game_state, events, emulator, traverse_player, p1_strategy,
   is_player_node, uuid, evt = check_player_node(events)
 
   if is_player_node and uuid == traverse_player:
-    infoset = make_infoset(game_state, evt)
+    infoset = infoset_generator(game_state, evt)
 
     pot_size = evt["round_state"]["pot"]["main"]["amount"]
-    actions, mask = get_available_actions(evt["valid_actions"], pot_size)
+    actions, mask = action_generator(evt["valid_actions"], pot_size)
 
     # Do regret matching to get action probabilities.
     action_probs = traverse_player_strategy.get_action_probabilities(infoset)
@@ -148,8 +61,8 @@ def traverse(game_state, events, emulator, traverse_player, p1_strategy,
       if mask[i] == 0:
         continue
       updated_state, new_events = emulator.apply_action(game_state, a[0], a[1])
-      values[i] = traverse(updated_state, new_events, emulator, traverse_player, p1_strategy,
-                           p2_strategy, advantage_mem, strategy_mem, t)
+      values[i] = traverse(updated_state, new_events, emulator, action_generator, infoset_generator, traverse_player,
+                           p1_strategy, p2_strategy, advantage_mem, strategy_mem, t)
     
     strategy_ev = (action_probs * values).sum()
     for i in range(len(actions)):
@@ -164,11 +77,11 @@ def traverse(game_state, events, emulator, traverse_player, p1_strategy,
 
   # CASE 3: Other player action node.
   elif is_player_node and uuid != traverse_player:
-    infoset = make_infoset(game_state, evt)
+    infoset = infoset_generator(game_state, evt)
 
     # External sampling: choose a random action for the non-traversing player.
     pot_size = evt["round_state"]["pot"]["main"]["amount"]
-    actions, mask = get_available_actions(evt["valid_actions"], pot_size)
+    actions, mask = action_generator(evt["valid_actions"], pot_size)
 
     action_probs = other_player_strategy.get_action_probabilities(infoset)
     action_probs = apply_mask_and_normalize(action_probs, mask)
@@ -180,8 +93,8 @@ def traverse(game_state, events, emulator, traverse_player, p1_strategy,
 
     updated_state, new_events = emulator.apply_action(game_state, action, amount)
 
-    return traverse(updated_state, new_events, emulator, traverse_player, p1_strategy, p2_strategy,
-                    advantage_mem, strategy_mem, t)
+    return traverse(updated_state, new_events, emulator, action_generator, infoset_generator, traverse_player,
+                    p1_strategy, p2_strategy, advantage_mem, strategy_mem, t)
 
   else:
     raise NotImplementedError()

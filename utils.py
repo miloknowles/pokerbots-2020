@@ -52,3 +52,14 @@ def apply_mask_and_normalize(probs, mask):
   p = probs * mask
   p /= p.sum()
   return p
+
+
+def sample_uniform_action(valid_actions):
+  item = valid_actions[np.random.randint(len(valid_actions))]
+  amount = item["amount"]
+
+  if type(amount) == dict:
+    random_amount = np.random.randint(amount["min"], high=amount["max"]+1)
+    return item["action"], random_amount
+  else:
+    return item["action"], item["amount"]
