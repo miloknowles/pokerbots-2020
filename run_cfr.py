@@ -92,6 +92,78 @@ def generate_actions(valid_actions, pot_amount):
   return actions_scaled, actions_mask
 
 
+class DeepCFRParams(object):
+  NUM_CFR_ITERS = 100               # Exploitability seems to converge around 100 iters.
+  NUM_TRAVERSALS_PER_ITER = 1e5     # 100k seems to be the best in Brown et. al.
+  MEM_BUFFER_MAX_SIZE = 1e6         # Brown. et. al. use 40 million for all 3 buffers.
+  EMBED_DIM = 128                   # Seems like this gave the best performance.
+
+  SGD_ITERS = 32000                 # Same as Brown et. al.
+  SGD_LR = 1e-3                     # Same as Brown et. al.
+  SGD_BATCH_SIZE = 20000            # Same as Brown et. al.
+
+  DEVICE = torch.device("cuda")
+
+
+def run_deep_cfr(params):
+  advantage_mems = {
+    Constants.PLAYER1_UID: MemoryBuffer(Constants.INFO_SET_SIZE, Constants.NUM_ACTIONS, max_size=1e6, store_weights=True),
+    Constants.PLAYER2_UID: MemoryBuffer(Constants.INFO_SET_SIZE, Constants.NUM_ACTIONS, max_size=1e6, store_weights=True)
+  }
+
+  value_networks = {
+    Constants.PLAYER1_UID: NetworkWrapper(4, Constants.NUM_BETTING_ACTIONS, Constants.NUM_ACTIONS, params.EMBED_DIM),
+    Constants.PLAYER2_UID: NetworkWrapper(4, Constants.NUM_BETTING_ACTIONS, Constants.NUM_ACTIONS, params.EMBED_DIM)
+  }
+
+  strategy_mem = MemoryBuffer(Constants.INFO_SET_SIZE, Constants.NUM_ACTIONS, max_size=1e6, store_weights=True)
+
+  # Set up the game emulator.
+  emulator = Emulator()
+  emulator.set_game_rule(
+    player_num=1,
+    max_round=params.NUM_TRAVERSALS_PER_ITER,
+    small_blind_amount=Constants.SMALL_BLIND_AMOUNT,
+    ante_amount=0)
+
+  for t in range(params.NUM_CFR_ITERS):
+    for traverse_player in [Constants.PLAYER1_UID, Constants.PLAYER2_UID]:
+      for k in range(params.NUM_TRAVERSALS_PER_ITER):
+        # Make sure each player has a full starting stack at the beginning of the round.
+        players_info = {}
+        players_info[Constants.PLAYER1_UID] = {"name": Constants.PLAYER1_UID, "stack": Constants.INITIAL_STACK}
+        players_info[Constants.PLAYER2_UID] = {"name": Constants.PLAYER2_UID, "stack": Constants.INITIAL_STACK}
+      
+        initial_state = emulator.generate_initial_game_state(players_info)
+        game_state, events = emulator.start_new_round(initial_state)
+
+        # Collect training samples by traversing the game tree with external sampling.
+        traverse(game_state, events, emulator, generate_actions, make_infoset,
+                 traverse_player, value_networks[Constants.PLAYER1_UID],
+                 value_networks[Constants.PLAYER2_UID], advantage_mems[traverse_player],
+                 strategy_mem, t)
+  
+    # Train the advantage network from scratch using samples from the traverse player's buffer.
+    model_wrap = value_networks[traverse_player]
+    model_wrap.reset_network()
+
+    net = model_wrap._network
+    net.train()
+
+    optimizer = torch.optim.Adam(net.parameters(), lr=params.SGD_LR)
+
+    for batch_idx, (inputs, regrets) in enumerate(train_loader):
+      inputs, regrets = inputs.to(params.DEVICE), regrets.to(params.DEVICE)
+
+      optimizer.zero_grad()
+      output = net(inputs)
+
+      loss = torch.nn.functional.mse_loss(inputs, regrets)
+      loss.backward()
+
+      optimizer.step()
+
+
 if __name__ == "__main__":
   emulator = Emulator()
   emulator.set_game_rule(
