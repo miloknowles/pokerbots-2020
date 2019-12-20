@@ -1,13 +1,15 @@
 from copy import deepcopy
 
 import torch
+from torch.utils.data import DataLoader
+from tensorboardX import SummaryWriter
 
 from pypokerengine.api.emulator import Emulator
 
 from constants import Constants
 from utils import *
 from traverse import traverse
-from memory import InfoSet, MemoryBuffer
+from memory import InfoSet, MemoryBuffer, MemoryBufferDataset
 from network_wrapper import NetworkWrapper
 
 
@@ -93,6 +95,8 @@ def generate_actions(valid_actions, pot_amount):
 
 
 class DeepCFRParams(object):
+  EXPERIMENT_NAME = "deep_cfr_paper"
+
   NUM_CFR_ITERS = 100               # Exploitability seems to converge around 100 iters.
   NUM_TRAVERSALS_PER_ITER = 1e5     # 100k seems to be the best in Brown et. al.
   MEM_BUFFER_MAX_SIZE = 1e6         # Brown. et. al. use 40 million for all 3 buffers.
@@ -101,67 +105,153 @@ class DeepCFRParams(object):
   SGD_ITERS = 32000                 # Same as Brown et. al.
   SGD_LR = 1e-3                     # Same as Brown et. al.
   SGD_BATCH_SIZE = 20000            # Same as Brown et. al.
+  TRAIN_DATASET_SIZE = 1e6          # TODO(milo): Try something bigger?
 
   DEVICE = torch.device("cuda")
+  NUM_DATA_WORKERS = 0
+
+  MEMORY_FOLDER = os.path.join("./memory/", EXPERIMENT_NAME)
+  TRAIN_LOG_FOLDER = os.path.join("./training_logs/", EXPERIMENT_NAME)
+
+  ADVT_BUFFER_FMT = "advt_mem_{}"
+  STRAT_BUFFER_FMT = "strat_mem_{}"
 
 
-def run_deep_cfr(params):
-  advantage_mems = {
-    Constants.PLAYER1_UID: MemoryBuffer(Constants.INFO_SET_SIZE, Constants.NUM_ACTIONS, max_size=1e6, store_weights=True),
-    Constants.PLAYER2_UID: MemoryBuffer(Constants.INFO_SET_SIZE, Constants.NUM_ACTIONS, max_size=1e6, store_weights=True)
-  }
+class Trainer(object):
+  def __init__(self, params):
+    self.params = params
 
-  value_networks = {
-    Constants.PLAYER1_UID: NetworkWrapper(4, Constants.NUM_BETTING_ACTIONS, Constants.NUM_ACTIONS, params.EMBED_DIM),
-    Constants.PLAYER2_UID: NetworkWrapper(4, Constants.NUM_BETTING_ACTIONS, Constants.NUM_ACTIONS, params.EMBED_DIM)
-  }
+    p1_avt_mem_name = params.ADVT_BUFFER_FMT.format(Constants.PLAYER1_UID)
+    p2_avt_mem_name = params.ADVT_BUFFER_FMT.format(Constants.PLAYER2_UID)
 
-  strategy_mem = MemoryBuffer(Constants.INFO_SET_SIZE, Constants.NUM_ACTIONS, max_size=1e6, store_weights=True)
+    self.advantage_mems = {
+      Constants.PLAYER1_UID: MemoryBuffer(Constants.INFO_SET_SIZE, Constants.NUM_ACTIONS,
+      max_size=params.MEM_BUFFER_MAX_SIZE, autosave_params=(params.MEMORY_FOLDER, p1_avt_mem_name)),
+      Constants.PLAYER2_UID: MemoryBuffer(Constants.INFO_SET_SIZE, Constants.NUM_ACTIONS,
+      max_size=params.MEM_BUFFER_MAX_SIZE, autosave_params=(params.MEMORY_FOLDER, p2_avt_mem_name))
+    }
 
-  # Set up the game emulator.
-  emulator = Emulator()
-  emulator.set_game_rule(
-    player_num=1,
-    max_round=params.NUM_TRAVERSALS_PER_ITER,
-    small_blind_amount=Constants.SMALL_BLIND_AMOUNT,
-    ante_amount=0)
+    self.value_networks = {
+      Constants.PLAYER1_UID: NetworkWrapper(Constants.NUM_STREETS, Constants.NUM_BETTING_ACTIONS,
+                                            Constants.NUM_ACTIONS, params.EMBED_DIM),
+      Constants.PLAYER2_UID: NetworkWrapper(Constants.NUM_STREETS, Constants.NUM_BETTING_ACTIONS,
+                                            Constants.NUM_ACTIONS, params.EMBED_DIM)
+    }
 
-  for t in range(params.NUM_CFR_ITERS):
-    for traverse_player in [Constants.PLAYER1_UID, Constants.PLAYER2_UID]:
-      for k in range(params.NUM_TRAVERSALS_PER_ITER):
-        # Make sure each player has a full starting stack at the beginning of the round.
-        players_info = {}
-        players_info[Constants.PLAYER1_UID] = {"name": Constants.PLAYER1_UID, "stack": Constants.INITIAL_STACK}
-        players_info[Constants.PLAYER2_UID] = {"name": Constants.PLAYER2_UID, "stack": Constants.INITIAL_STACK}
-      
-        initial_state = emulator.generate_initial_game_state(players_info)
-        game_state, events = emulator.start_new_round(initial_state)
+    self.strategy_mem = MemoryBuffer(Constants.INFO_SET_SIZE, Constants.NUM_ACTIONS,
+                                     max_size=params.MEM_BUFFER_MAX_SIZE)
 
-        # Collect training samples by traversing the game tree with external sampling.
-        traverse(game_state, events, emulator, generate_actions, make_infoset,
-                 traverse_player, value_networks[Constants.PLAYER1_UID],
-                 value_networks[Constants.PLAYER2_UID], advantage_mems[traverse_player],
-                 strategy_mem, t)
-  
-    # Train the advantage network from scratch using samples from the traverse player's buffer.
-    model_wrap = value_networks[traverse_player]
+    # TODO(milo): Does this need to be different than the value networks?
+    self.strategy_network = NetworkWrapper(Constants.NUM_STREETS, Constants.NUM_BETTING_ACTIONS,
+                                           Constants.NUM_ACTIONS, params.EMBED_DIM)
+
+    self.writers = {}
+      for mode in ["train", "val"]:
+        self.writers[mode] = SummaryWriter(os.path.join(params.TRAIN_LOG_FOLDER, mode))
+
+  def main(self):
+    emulator = Emulator()
+
+    for t in range(self.params.NUM_CFR_ITERS):
+      for traverse_player in [Constants.PLAYER1_UID, Constants.PLAYER2_UID]:
+        for k in range(self.params.NUM_TRAVERSALS_PER_ITER):
+          emulator.set_game_rule(
+            player_num=(k % 2),
+            max_round=self.params.NUM_TRAVERSALS_PER_ITER,
+            small_blind_amount=Constants.SMALL_BLIND_AMOUNT,
+            ante_amount=0)
+
+          # Make sure each player has a full starting stack at the beginning of the round.
+          players_info = {}
+          players_info[Constants.PLAYER1_UID] = {"name": Constants.PLAYER1_UID, "stack": Constants.INITIAL_STACK}
+          players_info[Constants.PLAYER2_UID] = {"name": Constants.PLAYER2_UID, "stack": Constants.INITIAL_STACK}
+        
+          initial_state = emulator.generate_initial_game_state(players_info)
+          game_state, events = emulator.start_new_round(initial_state)
+
+          # Collect training samples by traversing the game tree with external sampling.
+          traverse(game_state, events, emulator, generate_actions, make_infoset,
+                  traverse_player, self.value_networks[Constants.PLAYER1_UID],
+                  self.value_networks[Constants.PLAYER2_UID], self.advantage_mems[traverse_player],
+                  self.strategy_mem, t)
+    
+    # Finally, train the strategy network.
+    # TODO(milo)
+
+  def train_value_network(self, traverse_player, t):
+    """
+    Train the advantage network from scratch using samples from the traverse player's buffer.
+    """
+    losses = {}
+
+    model_wrap = self.value_networks[traverse_player]
     model_wrap.reset_network()
 
-    net = model_wrap._network
+    net = model_wrap.network()
     net.train()
+    optimizer = torch.optim.Adam(net.parameters(), lr=self.params.SGD_LR)
 
-    optimizer = torch.optim.Adam(net.parameters(), lr=params.SGD_LR)
+    buffer_name = self.params.ADVT_BUFFER_FMT.format(traverse_player)
+    train_dataset = MemoryBufferDataset(self.params.MEMORY_FOLDER, buffer_name,
+                                        self.params.TRAIN_DATASET_SIZE)
+    train_loader = DataLoader(train_dataset, batch_size=self.params.SGD_BATCH_SIZE,
+                              num_workers=self.params.NUM_DATA_WORKERS)
 
-    for batch_idx, (inputs, regrets) in enumerate(train_loader):
-      inputs, regrets = inputs.to(params.DEVICE), regrets.to(params.DEVICE)
+    # Due to memory limitations, we can only store a subset of the dataset in memory at a time.
+    # Calculate the number of times we'll have to resample and iterate over the dataset.
+    num_resample_iters = (self.params.SGD_ITERS * self.params.SGD_BATCH_SIZE) / self.params.TRAIN_DATASET_SIZE
 
-      optimizer.zero_grad()
-      output = net(inputs)
+    for resample_iter in range(num_resample_iters):
+      print(">> Doing resample iteration {}/{}".format(resample_iter, num_resample_iters))
+      train_dataset.resample()
 
-      loss = torch.nn.functional.mse_loss(inputs, regrets)
-      loss.backward()
+      for batch_idx, (inputs, regrets) in enumerate(train_loader):
+        inputs, regrets = inputs.to(self.params.DEVICE), regrets.to(self.params.DEVICE)
 
-      optimizer.step()
+        optimizer.zero_grad()
+
+        # Get predicted advantage from network.
+        output = net(inputs)
+
+        # Minimize MSE between predicted advantage and instantaneous regret samples.
+        loss = torch.nn.functional.mse_loss(inputs, regrets)
+        loss.backward()
+        losses["mse_loss/{}/{}".format(t, traverse_player)] = loss
+
+        optimizer.step()
+
+        if batch_idx % 1000 == 0:
+          self.log("train", losses)
+          # self.val()
+
+  def save_models(self, t):
+    """
+    Save model weights to disk.
+    """
+    save_folder = os.path.join(self.params.TRAIN_LOG_FOLDER, "models", "weights_{}".format(t))
+    if not os.path.exists(save_folder):
+      os.makedirs(save_folder)
+
+    for player_name, wrap in self.value_networks.items():
+      save_path = os.path.join(save_folder, "value_network_{}.pth".format(player_name)))
+      to_save = wrap.network().state_dict()
+      torch.save(to_save, save_path)
+
+    # Save the strategy network also.
+    save_path = os.path.join(save_folder, "strategy_nentwork.pth")
+    to_save = self.strategy_network.network().state_dict()
+    torch.save(to_save, save_path)
+
+  def val(self):
+    raise NotImplementedError()
+
+  def log(self, mode, losses):
+    """
+    Write an event to the tensorboard events file.
+    """
+    writer = self.writers[mode]
+    for l, v in losses.items():
+      writer.add_scalar("{}".format(l), v, self.step)
 
 
 if __name__ == "__main__":

@@ -14,6 +14,9 @@ class NetworkWrapper(object):
     self._nactions = nactions
     self._embed_dim = embed_dim
 
+  def network(self):
+    return self._network
+
   def get_action_probabilities(self, infoset):
     """
     Takes an infoset, passes it into the network, and returns the action probabilities predicted
@@ -23,7 +26,8 @@ class NetworkWrapper(object):
     bets_input = infoset.get_bet_input_tensors()
 
     # NOTE(milo): Not using positional input yet...
-    normalized_adv = self._network(cards_input, bets_input[0].to(self._device))[0]
+    with torch.no_grad():
+      normalized_adv = self._network(cards_input, bets_input[0].to(self._device))[0]
 
     # Do regret matching on the predicted advantages.
     r_plus = torch.clamp(normalized_adv, min=0)

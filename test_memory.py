@@ -21,7 +21,7 @@ class MemoryBufferTest(unittest.TestCase):
     info_set_size = 1 + 2 + 5 + 24
     item_size = 64
     max_size = int(1e6)
-    mb = MemoryBuffer(info_set_size, item_size, max_size=max_size, store_weights=True)
+    mb = MemoryBuffer(info_set_size, item_size, max_size=max_size)
     print(mb._infosets.dtype)
     print(mb._items.dtype)
     print(mb._weights.dtype)
@@ -33,7 +33,7 @@ class MemoryBufferTest(unittest.TestCase):
     info_set_size = 1 + 2 + 5 + 24
     item_size = 64
     max_size = int(1e6)
-    mb = MemoryBuffer(info_set_size, item_size, max_size=max_size, store_weights=True)
+    mb = MemoryBuffer(info_set_size, item_size, max_size=max_size)
     mb.save("./memory/memory_buffer_test/", "test_buffer")
 
     self.assertTrue(os.path.exists("./memory/memory_buffer_test/manifest_test_buffer.csv"))
@@ -45,7 +45,7 @@ class MemoryBufferTest(unittest.TestCase):
 
 
 class MemoryBufferDatasetTest(unittest.TestCase):
-  def test_rebuild(self):
+  def test_resample(self):
     if os.path.exists("./memory/memory_buffer_test/"):
       shutil.rmtree("./memory/memory_buffer_test/")
 
@@ -53,7 +53,7 @@ class MemoryBufferDatasetTest(unittest.TestCase):
     info_set_size = 1 + 2 + 5 + 24
     item_size = 64
     max_size = int(1e4)
-    mb = MemoryBuffer(info_set_size, item_size, max_size=max_size, store_weights=True)
+    mb = MemoryBuffer(info_set_size, item_size, max_size=max_size)
 
     buf1_size = 100
     for i in range(buf1_size):
@@ -78,6 +78,10 @@ class MemoryBufferDatasetTest(unittest.TestCase):
       self.assertEqual(len(dataset._items), n)
       self.assertEqual(len(dataset._weights), n)
 
+    # Test iteration over the dataset.
+    for inputs in dataset:
+      print(inputs.keys())
+
 
 class InfoSetTest(unittest.TestCase):
   def test_info_set(self):
@@ -96,7 +100,7 @@ class InfoSetTest(unittest.TestCase):
 
     info_set_size = 1 + 2 + 5 + 24
     item_size = 64
-    mb = MemoryBuffer(info_set_size, item_size, max_size=int(10000), store_weights=True, device=torch.device("cpu"))
+    mb = MemoryBuffer(info_set_size, item_size, max_size=int(10000), device=torch.device("cpu"))
 
     t0 = time.time()
     for i in range(int(10000)):
@@ -114,7 +118,7 @@ class InfoSetTest(unittest.TestCase):
 
     info_set_size = 1 + 2 + 5 + 24
     item_size = 64
-    mb = MemoryBuffer(info_set_size, item_size, max_size=int(10000), store_weights=True, device=torch.device("cuda"))
+    mb = MemoryBuffer(info_set_size, item_size, max_size=int(10000), device=torch.device("cuda"))
 
     t0 = time.time()
     for i in range(int(1e6)):

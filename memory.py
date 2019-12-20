@@ -102,32 +102,45 @@ def get_manifest_entries(folder, buffer_name):
 
 
 class MemoryBuffer(object):
-  def __init__(self, info_set_size, item_size, max_size=80000, store_weights=True,
-               device=torch.device("cpu")):
+  def __init__(self, info_set_size, item_size, max_size=80000, device=torch.device("cpu"),
+               autosave_params=None):
     self._max_size = max_size
     self._info_set_size = info_set_size
     self._item_size = item_size
+    self._autosave_params = autosave_params
+    if self._autosave_params is not None:
+      print(">> NOTE: Autosaving is turned ON for buffer")
+      print("  >> folder={}".format(self._autosave_params[0]))
+      print("  >> name={}".format(self._autosave_params[1]))
+
     self._device = device
+
     self._infosets = torch.zeros((int(max_size), info_set_size), dtype=torch.float32).to(self._device)
     self._items = torch.zeros((int(max_size), item_size), dtype=torch.float32).to(self._device)
-    if store_weights:
-      self._has_weights = True
-      self._weights = torch.zeros(int(max_size), dtype=torch.float32).to(self._device)
-    else:
-      self._has_weights = False
+    self._weights = torch.zeros(int(max_size), dtype=torch.float32).to(self._device)
 
     self._next_index = 0
 
   def add(self, infoset, item):
+    """
+    Add an infoset and corresponding item to the buffer.
+
+    If the buffer is full, then it will either:
+      (1) Save its contents and then clear before adding the item (autosave=(folder, name)).
+      (2) Ignore the add and do nothing (autosave=None).
+    """
     if self.full():
-      return
+      if self._autosave_params is not None:
+        self.save(self._autosave_params[0], self._autosave_params[1])
+      else:
+        return
     self._infosets[self._next_index] = infoset.pack()
     self._items[self._next_index] = item
     self._next_index += 1
 
   def add_weighted(self, infoset, item, weight):
     if self.full():
-      return
+      if self._autosave
     self._weights[self._next_index] = weight
     self.add(infoset, item)
 
@@ -140,8 +153,7 @@ class MemoryBuffer(object):
   def size_mb(self):
     total = getsizeof(self._infosets.storage())
     total += getsizeof(self._items.storage())
-    if self._has_weights:
-      total += getsizeof(self._weights.storage())
+    total += getsizeof(self._weights.storage())
     return total / 1e6
 
   def clear(self):

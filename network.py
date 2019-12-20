@@ -102,6 +102,7 @@ class DeepCFRModel(nn.Module):
     z = F.relu(self.comb2(z) + z)
     z = F.relu(self.comb3(z) + z)
 
-    # z = self.normalize(z) # Normalized to have zero mean and stdev 1.
+    # Normalized to have zero mean and stdev 1.
     z = (z - z.mean()) / torch.std(z)
+
     return self.action_head(z)
