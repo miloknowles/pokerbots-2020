@@ -96,7 +96,7 @@ def get_manifest_entries(folder, buffer_name):
   """
   manifest_path = get_buffer_manifest_path(folder, buffer_name)
   if os.path.exists(manifest_path):
-    return pd.read_csv(manifest_path, header=0, sep=", ", index_col="index")
+    return pd.read_csv(manifest_path, header=0, sep=",", index_col="index")
   else:
     return None
 
@@ -104,6 +104,9 @@ def get_manifest_entries(folder, buffer_name):
 class MemoryBuffer(object):
   def __init__(self, info_set_size, item_size, max_size=80000, store_weights=True,
                device=torch.device("cpu")):
+    self._max_size = max_size
+    self._info_set_size = info_set_size
+    self._item_size = item_size
     self._device = device
     self._infosets = torch.zeros((int(max_size), info_set_size), dtype=torch.float32).to(self._device)
     self._items = torch.zeros((int(max_size), item_size), dtype=torch.float32).to(self._device)
@@ -141,6 +144,12 @@ class MemoryBuffer(object):
       total += getsizeof(self._weights.storage())
     return total / 1e6
 
+  def clear(self):
+    self._infosets = torch.zeros((int(self._max_size), self._info_set_size), dtype=torch.float32).to(self._device)
+    self._items = torch.zeros((int(self._max_size), self._item_size), dtype=torch.float32).to(self._device)
+    self._weights = torch.zeros(int(self._max_size), dtype=torch.float32).to(self._device)
+    self._next_index = 0
+
   def save(self, folder, buffer_name):
     """
     Save the current buffer to a .pth file. The file will contain a dictionary with:
@@ -161,7 +170,7 @@ class MemoryBuffer(object):
       os.makedirs(os.path.abspath(folder), exist_ok=True)
       print("Manifest does not exist at {}, creating...".format(manifest_file_path))
       with open(manifest_file_path, "w") as f:
-        f.write("index, filename, num_entries\n")
+        f.write("index,filename,num_entries\n")
       next_avail_idx = 0
     else:
       next_avail_idx = manifest_df.index[-1] + 1
@@ -181,21 +190,59 @@ class MemoryBuffer(object):
     print(">> Saved buffer to {}".format(buf_path))
 
     with open(manifest_file_path, "a") as f:
-      f.write("{}, {}, {}\n".format(next_avail_idx, buf_path, self.size()))
+      f.write("{},{},{}\n".format(next_avail_idx, buf_path, self.size()))
     print(">> Updated manifest file at {}".format(manifest_file_path))
 
 
 class MemoryBufferDataset(Dataset):
-  def __init__(self, folder, buffer_name):
+  def __init__(self, folder, buffer_name, n):
     """
-    A PyTorch dataset for loading infosets and targets from disk.
+    A PyTorch dataset for loading infosets and targets from disk. Because there are too many to fit
+    into memory at once, we resample a dataset of size n << N periodically by choosing n random
+    items from all N on disk.
     """
-    manifest_df = get_manifest_entries(folder, buffer_name)
+    self._folder = folder
+    self._buffer_name = buffer_name
+    self._n = int(n)
 
-    # if manifest_df is 
+    self._manifest_df = get_manifest_entries(self._folder, self._buffer_name)
+    self._N = int(self._manifest_df["num_entries"].sum())
+
+    self._infosets = None
+    self._weights = None
+    self._items = None
+    print(">> Made MemoryBufferDataset to store {}/{} items at a time".format(self._n, self._N))
+
+  def resample(self):
+    """
+    Resample the dataset by sampling n items from the N total items on disk.
+    """
+    self._infosets = None
+    self._weights = None
+    self._items = None
+
+    idx = torch.randint(0, self._N, (self._n,))
+    cumul_idx = 0
+    for i in self._manifest_df.index:
+      num_entries = self._manifest_df["num_entries"][i]
+      idx_this_file = idx[idx.ge(cumul_idx) * idx.le(cumul_idx + num_entries - 1)] - cumul_idx
+      d = torch.load(self._manifest_df["filename"][i])
+      if self._infosets is None:
+        self._infosets = d["infosets"][idx_this_file]
+      else:
+        self._infosets = torch.cat([self._infosets, d["infosets"][idx_this_file]], axis=0)
+      if self._weights is None:
+        self._weights = d["weights"][idx_this_file]
+      else:
+        self._weights = torch.cat([self._weights, d["weights"][idx_this_file]], axis=0)
+      if self._items is None:
+        self._items = d["items"][idx_this_file]
+      else:
+        self._items = torch.cat([self._items, d["items"][idx_this_file]], axis=0)
+      cumul_idx += num_entries
 
   def __len__(self):
-    return self._next_index
+    return self._n
 
   def __getitem__(self, idx):
     return {
