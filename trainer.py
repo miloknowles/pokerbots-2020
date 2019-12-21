@@ -1,4 +1,5 @@
 from copy import deepcopy
+import os
 
 import torch
 from torch.utils.data import DataLoader
@@ -123,13 +124,13 @@ class Trainer(object):
 
     p1_avt_mem_name = params.ADVT_BUFFER_FMT.format(Constants.PLAYER1_UID)
     p2_avt_mem_name = params.ADVT_BUFFER_FMT.format(Constants.PLAYER2_UID)
-
     self.advantage_mems = {
       Constants.PLAYER1_UID: MemoryBuffer(Constants.INFO_SET_SIZE, Constants.NUM_ACTIONS,
       max_size=params.MEM_BUFFER_MAX_SIZE, autosave_params=(params.MEMORY_FOLDER, p1_avt_mem_name)),
       Constants.PLAYER2_UID: MemoryBuffer(Constants.INFO_SET_SIZE, Constants.NUM_ACTIONS,
       max_size=params.MEM_BUFFER_MAX_SIZE, autosave_params=(params.MEMORY_FOLDER, p2_avt_mem_name))
     }
+    print("[DONE] Made ADVANTAGE memory")
 
     self.value_networks = {
       Constants.PLAYER1_UID: NetworkWrapper(Constants.NUM_STREETS, Constants.NUM_BETTING_ACTIONS,
@@ -137,46 +138,53 @@ class Trainer(object):
       Constants.PLAYER2_UID: NetworkWrapper(Constants.NUM_STREETS, Constants.NUM_BETTING_ACTIONS,
                                             Constants.NUM_ACTIONS, params.EMBED_DIM)
     }
+    print("[DONE] Made value networks")
 
     self.strategy_mem = MemoryBuffer(Constants.INFO_SET_SIZE, Constants.NUM_ACTIONS,
                                      max_size=params.MEM_BUFFER_MAX_SIZE)
+    print("[DONE] Made strategy memory")
 
     # TODO(milo): Does this need to be different than the value networks?
     self.strategy_network = NetworkWrapper(Constants.NUM_STREETS, Constants.NUM_BETTING_ACTIONS,
                                            Constants.NUM_ACTIONS, params.EMBED_DIM)
+    print("[DONE] Made strategy network")
 
     self.writers = {}
-      for mode in ["train", "val"]:
-        self.writers[mode] = SummaryWriter(os.path.join(params.TRAIN_LOG_FOLDER, mode))
+    for mode in ["train", "val"]:
+      self.writers[mode] = SummaryWriter(os.path.join(params.TRAIN_LOG_FOLDER, mode))
 
   def main(self):
-    emulator = Emulator()
-
     for t in range(self.params.NUM_CFR_ITERS):
       for traverse_player in [Constants.PLAYER1_UID, Constants.PLAYER2_UID]:
-        for k in range(self.params.NUM_TRAVERSALS_PER_ITER):
-          emulator.set_game_rule(
-            player_num=(k % 2),
-            max_round=self.params.NUM_TRAVERSALS_PER_ITER,
-            small_blind_amount=Constants.SMALL_BLIND_AMOUNT,
-            ante_amount=0)
-
-          # Make sure each player has a full starting stack at the beginning of the round.
-          players_info = {}
-          players_info[Constants.PLAYER1_UID] = {"name": Constants.PLAYER1_UID, "stack": Constants.INITIAL_STACK}
-          players_info[Constants.PLAYER2_UID] = {"name": Constants.PLAYER2_UID, "stack": Constants.INITIAL_STACK}
-        
-          initial_state = emulator.generate_initial_game_state(players_info)
-          game_state, events = emulator.start_new_round(initial_state)
-
-          # Collect training samples by traversing the game tree with external sampling.
-          traverse(game_state, events, emulator, generate_actions, make_infoset,
-                  traverse_player, self.value_networks[Constants.PLAYER1_UID],
-                  self.value_networks[Constants.PLAYER2_UID], self.advantage_mems[traverse_player],
-                  self.strategy_mem, t)
+        self.do_cfr_iteration_for_player(traverse_player, t)
+        self.train_value_network(traverse_player, t)
     
     # Finally, train the strategy network.
     # TODO(milo)
+  
+  def do_cfr_iteration_for_player(self, t):
+    emulator = Emulator()
+
+    for k in range(self.params.NUM_TRAVERSALS_PER_ITER):
+      emulator.set_game_rule(
+        player_num=(k % 2),
+        max_round=self.params.NUM_TRAVERSALS_PER_ITER,
+        small_blind_amount=Constants.SMALL_BLIND_AMOUNT,
+        ante_amount=0)
+
+      # Make sure each player has a full starting stack at the beginning of the round.
+      players_info = {}
+      players_info[Constants.PLAYER1_UID] = {"name": Constants.PLAYER1_UID, "stack": Constants.INITIAL_STACK}
+      players_info[Constants.PLAYER2_UID] = {"name": Constants.PLAYER2_UID, "stack": Constants.INITIAL_STACK}
+    
+      initial_state = emulator.generate_initial_game_state(players_info)
+      game_state, events = emulator.start_new_round(initial_state)
+
+      # Collect training samples by traversing the game tree with external sampling.
+      traverse(game_state, events, emulator, generate_actions, make_infoset,
+              traverse_player, self.value_networks[Constants.PLAYER1_UID],
+              self.value_networks[Constants.PLAYER2_UID], self.advantage_mems[traverse_player],
+              self.strategy_mem, t)
 
   def train_value_network(self, traverse_player, t):
     """
@@ -233,7 +241,7 @@ class Trainer(object):
       os.makedirs(save_folder)
 
     for player_name, wrap in self.value_networks.items():
-      save_path = os.path.join(save_folder, "value_network_{}.pth".format(player_name)))
+      save_path = os.path.join(save_folder, "value_network_{}.pth".format(player_name))
       to_save = wrap.network().state_dict()
       torch.save(to_save, save_path)
 
@@ -252,35 +260,3 @@ class Trainer(object):
     writer = self.writers[mode]
     for l, v in losses.items():
       writer.add_scalar("{}".format(l), v, self.step)
-
-
-if __name__ == "__main__":
-  emulator = Emulator()
-  emulator.set_game_rule(
-    player_num=1,
-    max_round=10,
-    small_blind_amount=Constants.SMALL_BLIND_AMOUNT,
-    ante_amount=0)
-
-  players_info = {}
-  players_info[Constants.PLAYER1_UID] = {"name": Constants.PLAYER1_UID, "stack": Constants.INITIAL_STACK}
-  players_info[Constants.PLAYER2_UID] = {"name": Constants.PLAYER2_UID, "stack": Constants.INITIAL_STACK}
-
-  initial_state = emulator.generate_initial_game_state(players_info)
-  game_state, events = emulator.start_new_round(initial_state)
-
-  p1_strategy = NetworkWrapper(4, Constants.NUM_BETTING_ACTIONS, Constants.NUM_ACTIONS, 128)
-  p2_strategy = NetworkWrapper(4, Constants.NUM_BETTING_ACTIONS, Constants.NUM_ACTIONS, 128)
-
-  advantage_mem = MemoryBuffer(Constants.INFO_SET_SIZE, Constants.NUM_ACTIONS, max_size=1e6, store_weights=True)
-  strategy_mem = MemoryBuffer(Constants.INFO_SET_SIZE, Constants.NUM_ACTIONS, max_size=1e6, store_weights=True)
-
-  evs = []
-  t = 0
-  for _ in range(100):
-    ev = traverse(game_state, events, emulator, generate_actions, make_infoset,
-                  Constants.PLAYER1_UID, p1_strategy, p2_strategy, advantage_mem, strategy_mem, t)
-    evs.append(ev)
-
-  avg_ev = np.array(evs).mean()
-  print("Average EV={}".format(avg_ev))

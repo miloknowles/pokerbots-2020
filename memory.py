@@ -121,7 +121,7 @@ class MemoryBuffer(object):
 
     self._next_index = 0
 
-  def add(self, infoset, item):
+  def add(self, infoset, item, weight):
     """
     Add an infoset and corresponding item to the buffer.
 
@@ -132,17 +132,13 @@ class MemoryBuffer(object):
     if self.full():
       if self._autosave_params is not None:
         self.save(self._autosave_params[0], self._autosave_params[1])
+        self.clear()
       else:
         return
     self._infosets[self._next_index] = infoset.pack()
     self._items[self._next_index] = item
-    self._next_index += 1
-
-  def add_weighted(self, infoset, item, weight):
-    if self.full():
-      if self._autosave
     self._weights[self._next_index] = weight
-    self.add(infoset, item)
+    self._next_index += 1
 
   def size(self):
     return self._next_index

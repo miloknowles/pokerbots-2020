@@ -29,7 +29,8 @@ class MemoryBufferTest(unittest.TestCase):
 
   def test_memory_buffer_save(self):
     # Make sure the folder doesn't exist so the manifest has to be created.
-    shutil.rmtree("./memory/memory_buffer_test/")
+    if os.path.exists("./memory/memory_buffer_test/"):
+      shutil.rmtree("./memory/memory_buffer_test/")
     info_set_size = 1 + 2 + 5 + 24
     item_size = 64
     max_size = int(1e6)
@@ -42,6 +43,26 @@ class MemoryBufferTest(unittest.TestCase):
     # Now save again.
     mb.save("./memory/memory_buffer_test/", "test_buffer")
     self.assertTrue(os.path.exists("./memory/memory_buffer_test/test_buffer_00001.pth"))
+
+  def test_memory_buffer_autosave(self):
+    print("\n ================= AUTOSAVE TEST ====================")
+    # Make sure the folder doesn't exist so the manifest has to be created.
+    if os.path.exists("./memory/memory_buffer_test/"):
+      shutil.rmtree("./memory/memory_buffer_test/")
+    info_set_size = 1 + 2 + 5 + 24
+    item_size = 64
+    max_size = int(1e3)
+
+    # Add autosave params.
+    mb = MemoryBuffer(info_set_size, item_size, max_size=max_size,
+                      autosave_params=("./memory/memory_buffer_test/", "test_buffer"))
+
+    for _ in range(max_size):
+      mb.add(make_dummy_infoset(), torch.zeros(item_size), 1234)
+    self.assertTrue(mb.full())
+
+    # This should trigger the save and reset.
+    mb.add(make_dummy_infoset(), torch.zeros(item_size), 1234)
 
 
 class MemoryBufferDatasetTest(unittest.TestCase):
@@ -57,13 +78,13 @@ class MemoryBufferDatasetTest(unittest.TestCase):
 
     buf1_size = 100
     for i in range(buf1_size):
-      mb.add(make_dummy_infoset(), torch.zeros(item_size))
+      mb.add(make_dummy_infoset(), torch.zeros(item_size), 1234)
     mb.save("./memory/memory_buffer_test/", "advt_buf_P1")
     mb.clear()
 
     buf2_size = 200
     for i in range(buf2_size):
-      mb.add(make_dummy_infoset(), torch.zeros(item_size))
+      mb.add(make_dummy_infoset(), torch.zeros(item_size), 1234)
     mb.save("./memory/memory_buffer_test/", "advt_buf_P1")
     mb.clear()
 
@@ -104,7 +125,7 @@ class InfoSetTest(unittest.TestCase):
 
     t0 = time.time()
     for i in range(int(10000)):
-      mb.add(infoset, torch.zeros(item_size))
+      mb.add(infoset, torch.zeros(item_size), 1234)
     elapsed = time.time() - t0
     print("Took {} sec".format(elapsed))
 
@@ -122,7 +143,7 @@ class InfoSetTest(unittest.TestCase):
 
     t0 = time.time()
     for i in range(int(1e6)):
-      mb.add(infoset, torch.zeros(item_size))
+      mb.add(infoset, torch.zeros(item_size), 1234)
     elapsed = time.time() - t0
     print("Took {} sec".format(elapsed))
 
