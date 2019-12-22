@@ -1,6 +1,9 @@
-from trainer import Trainer, DeepCFRParams
+import time
+
+from trainer import Trainer
+from options import Options
 
 
 if __name__ == "__main__":
-  params = DeepCFRParams()
-  trainer = Trainer(params)
+  opt = Options()
+  trainer = Trainer(opt)

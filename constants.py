@@ -12,10 +12,10 @@ class Constants(object):
   ALL_ACTIONS = [
     ["fold", 0],
     ["call", -1],
+    # ["raise", -1],
     ["raise", -1],
-    ["raise", -1],
-    ["raise", -1],
-    ["raise", -1],
+    # ["raise", -1],
+    # ["raise", -1],
     ["raise", -1]
   ]
 
@@ -23,10 +23,10 @@ class Constants(object):
 
   ACTION_FOLD = 0
   ACTION_CALL = 1
-  ACTION_MINRAISE = 2
-  ACTION_POTRAISE = 3
-  ACTION_TWOPOTRAISE = 4
-  ACTION_THREEPOTRAISE = 5
-  ACTION_MAXRAISE = 6
+  # ACTION_MINRAISE = 2
+  ACTION_POTRAISE = 2
+  # ACTION_TWOPOTRAISE = 4
+  # ACTION_THREEPOTRAISE = 5
+  ACTION_MAXRAISE = 3
 
   NUM_STREETS = 4

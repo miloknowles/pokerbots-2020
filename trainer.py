@@ -1,5 +1,5 @@
 from copy import deepcopy
-import os
+import os, time
 
 import torch
 from torch.utils.data import DataLoader
@@ -75,86 +75,63 @@ def generate_actions(valid_actions, pot_amount):
     elif item["action"] == "raise":
       min_raise, max_raise = item["amount"]["min"], item["amount"]["max"]
 
-      actions_mask[Constants.ACTION_MINRAISE] = 1
+      # actions_mask[Constants.ACTION_MINRAISE] = 1
       actions_mask[Constants.ACTION_MAXRAISE] = 1
-      actions_scaled[Constants.ACTION_MINRAISE][1] = min_raise
+      # actions_scaled[Constants.ACTION_MINRAISE][1] = min_raise
       actions_scaled[Constants.ACTION_MAXRAISE][1] = max_raise
 
       if pot_amount <= max_raise:
         actions_mask[Constants.ACTION_POTRAISE] = 1
         actions_scaled[Constants.ACTION_POTRAISE][1] = pot_amount
 
-      if 2 * pot_amount <= max_raise:
-        actions_mask[Constants.ACTION_TWOPOTRAISE] = 1
-        actions_scaled[Constants.ACTION_TWOPOTRAISE][1] = 2 * pot_amount
+      # if 2 * pot_amount <= max_raise:
+      #   actions_mask[Constants.ACTION_TWOPOTRAISE] = 1
+      #   actions_scaled[Constants.ACTION_TWOPOTRAISE][1] = 2 * pot_amount
       
-      if 3 * pot_amount <= max_raise:
-        actions_mask[Constants.ACTION_THREEPOTRAISE] = 1
-        actions_scaled[Constants.ACTION_THREEPOTRAISE][1] = 3 * pot_amount
+      # if 3 * pot_amount <= max_raise:
+      #   actions_mask[Constants.ACTION_THREEPOTRAISE] = 1
+      #   actions_scaled[Constants.ACTION_THREEPOTRAISE][1] = 3 * pot_amount
 
   return actions_scaled, actions_mask
 
 
-class DeepCFRParams(object):
-  EXPERIMENT_NAME = "deep_cfr_paper"
-
-  NUM_CFR_ITERS = 100               # Exploitability seems to converge around 100 iters.
-  NUM_TRAVERSALS_PER_ITER = 1e5     # 100k seems to be the best in Brown et. al.
-  MEM_BUFFER_MAX_SIZE = 1e6         # Brown. et. al. use 40 million for all 3 buffers.
-  EMBED_DIM = 128                   # Seems like this gave the best performance.
-
-  SGD_ITERS = 32000                 # Same as Brown et. al.
-  SGD_LR = 1e-3                     # Same as Brown et. al.
-  SGD_BATCH_SIZE = 20000            # Same as Brown et. al.
-  TRAIN_DATASET_SIZE = 1e6          # TODO(milo): Try something bigger?
-
-  DEVICE = torch.device("cuda")
-  NUM_DATA_WORKERS = 0
-
-  MEMORY_FOLDER = os.path.join("./memory/", EXPERIMENT_NAME)
-  TRAIN_LOG_FOLDER = os.path.join("./training_logs/", EXPERIMENT_NAME)
-
-  ADVT_BUFFER_FMT = "advt_mem_{}"
-  STRAT_BUFFER_FMT = "strat_mem_{}"
-
-
 class Trainer(object):
-  def __init__(self, params):
-    self.params = params
+  def __init__(self, opt):
+    self.opt = opt
 
-    p1_avt_mem_name = params.ADVT_BUFFER_FMT.format(Constants.PLAYER1_UID)
-    p2_avt_mem_name = params.ADVT_BUFFER_FMT.format(Constants.PLAYER2_UID)
+    p1_avt_mem_name = opt.ADVT_BUFFER_FMT.format(Constants.PLAYER1_UID)
+    p2_avt_mem_name = opt.ADVT_BUFFER_FMT.format(Constants.PLAYER2_UID)
     self.advantage_mems = {
       Constants.PLAYER1_UID: MemoryBuffer(Constants.INFO_SET_SIZE, Constants.NUM_ACTIONS,
-      max_size=params.MEM_BUFFER_MAX_SIZE, autosave_params=(params.MEMORY_FOLDER, p1_avt_mem_name)),
+      max_size=opt.MEM_BUFFER_MAX_SIZE, autosave_params=(opt.MEMORY_FOLDER, p1_avt_mem_name)),
       Constants.PLAYER2_UID: MemoryBuffer(Constants.INFO_SET_SIZE, Constants.NUM_ACTIONS,
-      max_size=params.MEM_BUFFER_MAX_SIZE, autosave_params=(params.MEMORY_FOLDER, p2_avt_mem_name))
+      max_size=opt.MEM_BUFFER_MAX_SIZE, autosave_params=(opt.MEMORY_FOLDER, p2_avt_mem_name))
     }
     print("[DONE] Made ADVANTAGE memory")
 
     self.value_networks = {
       Constants.PLAYER1_UID: NetworkWrapper(Constants.NUM_STREETS, Constants.NUM_BETTING_ACTIONS,
-                                            Constants.NUM_ACTIONS, params.EMBED_DIM),
+                                            Constants.NUM_ACTIONS, opt.EMBED_DIM),
       Constants.PLAYER2_UID: NetworkWrapper(Constants.NUM_STREETS, Constants.NUM_BETTING_ACTIONS,
-                                            Constants.NUM_ACTIONS, params.EMBED_DIM)
+                                            Constants.NUM_ACTIONS, opt.EMBED_DIM)
     }
     print("[DONE] Made value networks")
 
     self.strategy_mem = MemoryBuffer(Constants.INFO_SET_SIZE, Constants.NUM_ACTIONS,
-                                     max_size=params.MEM_BUFFER_MAX_SIZE)
+                                     max_size=opt.MEM_BUFFER_MAX_SIZE)
     print("[DONE] Made strategy memory")
 
     # TODO(milo): Does this need to be different than the value networks?
     self.strategy_network = NetworkWrapper(Constants.NUM_STREETS, Constants.NUM_BETTING_ACTIONS,
-                                           Constants.NUM_ACTIONS, params.EMBED_DIM)
+                                           Constants.NUM_ACTIONS, opt.EMBED_DIM)
     print("[DONE] Made strategy network")
 
     self.writers = {}
     for mode in ["train", "val"]:
-      self.writers[mode] = SummaryWriter(os.path.join(params.TRAIN_LOG_FOLDER, mode))
+      self.writers[mode] = SummaryWriter(os.path.join(opt.TRAIN_LOG_FOLDER, mode))
 
   def main(self):
-    for t in range(self.params.NUM_CFR_ITERS):
+    for t in range(self.opt.NUM_CFR_ITERS):
       for traverse_player in [Constants.PLAYER1_UID, Constants.PLAYER2_UID]:
         self.do_cfr_iteration_for_player(traverse_player, t)
         self.train_value_network(traverse_player, t)
@@ -162,13 +139,14 @@ class Trainer(object):
     # Finally, train the strategy network.
     # TODO(milo)
   
-  def do_cfr_iteration_for_player(self, t):
+  def do_cfr_iteration_for_player(self, traverse_player, t):
     emulator = Emulator()
 
-    for k in range(self.params.NUM_TRAVERSALS_PER_ITER):
+    for k in range(self.opt.NUM_TRAVERSALS_PER_ITER):
+      # t0 = time.time()
       emulator.set_game_rule(
         player_num=(k % 2),
-        max_round=self.params.NUM_TRAVERSALS_PER_ITER,
+        max_round=self.opt.NUM_TRAVERSALS_PER_ITER,
         small_blind_amount=Constants.SMALL_BLIND_AMOUNT,
         ante_amount=0)
 
@@ -179,6 +157,8 @@ class Trainer(object):
     
       initial_state = emulator.generate_initial_game_state(players_info)
       game_state, events = emulator.start_new_round(initial_state)
+      # elapsed = time.time() - t0
+      # print("Setup game time = {}".format(elapsed))
 
       # Collect training samples by traversing the game tree with external sampling.
       traverse(game_state, events, emulator, generate_actions, make_infoset,
@@ -197,24 +177,24 @@ class Trainer(object):
 
     net = model_wrap.network()
     net.train()
-    optimizer = torch.optim.Adam(net.parameters(), lr=self.params.SGD_LR)
+    optimizer = torch.optim.Adam(net.parameters(), lr=self.opt.SGD_LR)
 
-    buffer_name = self.params.ADVT_BUFFER_FMT.format(traverse_player)
-    train_dataset = MemoryBufferDataset(self.params.MEMORY_FOLDER, buffer_name,
-                                        self.params.TRAIN_DATASET_SIZE)
-    train_loader = DataLoader(train_dataset, batch_size=self.params.SGD_BATCH_SIZE,
-                              num_workers=self.params.NUM_DATA_WORKERS)
+    buffer_name = self.opt.ADVT_BUFFER_FMT.format(traverse_player)
+    train_dataset = MemoryBufferDataset(self.opt.MEMORY_FOLDER, buffer_name,
+                                        self.opt.TRAIN_DATASET_SIZE)
+    train_loader = DataLoader(train_dataset, batch_size=self.opt.SGD_BATCH_SIZE,
+                              num_workers=self.opt.NUM_DATA_WORKERS)
 
     # Due to memory limitations, we can only store a subset of the dataset in memory at a time.
     # Calculate the number of times we'll have to resample and iterate over the dataset.
-    num_resample_iters = (self.params.SGD_ITERS * self.params.SGD_BATCH_SIZE) / self.params.TRAIN_DATASET_SIZE
+    num_resample_iters = (self.opt.SGD_ITERS * self.opt.SGD_BATCH_SIZE) / self.opt.TRAIN_DATASET_SIZE
 
     for resample_iter in range(num_resample_iters):
       print(">> Doing resample iteration {}/{}".format(resample_iter, num_resample_iters))
       train_dataset.resample()
 
       for batch_idx, (inputs, regrets) in enumerate(train_loader):
-        inputs, regrets = inputs.to(self.params.DEVICE), regrets.to(self.params.DEVICE)
+        inputs, regrets = inputs.to(self.opt.DEVICE), regrets.to(self.opt.DEVICE)
 
         optimizer.zero_grad()
 
@@ -236,7 +216,7 @@ class Trainer(object):
     """
     Save model weights to disk.
     """
-    save_folder = os.path.join(self.params.TRAIN_LOG_FOLDER, "models", "weights_{}".format(t))
+    save_folder = os.path.join(self.opt.TRAIN_LOG_FOLDER, "models", "weights_{}".format(t))
     if not os.path.exists(save_folder):
       os.makedirs(save_folder)
 

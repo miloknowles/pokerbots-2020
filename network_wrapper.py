@@ -8,7 +8,6 @@ class NetworkWrapper(object):
   def __init__(self, ncardtypes, nbets, nactions, embed_dim, device=torch.device("cuda")):
     self._network = DeepCFRModel(ncardtypes, nbets, nactions, embed_dim).to(device)
     self._device = device
-
     self._ncardtypes = ncardtypes
     self._nbets = nbets
     self._nactions = nactions
@@ -22,6 +21,7 @@ class NetworkWrapper(object):
     Takes an infoset, passes it into the network, and returns the action probabilities predicted
     by the network.
     """
+    # return self.get_action_probabilities_uniform(infoset)
     cards_input = [ipt.to(self._device) for ipt in infoset.get_card_input_tensors()]
     bets_input = infoset.get_bet_input_tensors()
 
