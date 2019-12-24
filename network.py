@@ -69,6 +69,10 @@ class DeepCFRModel(nn.Module):
     self.normalize = nn.BatchNorm1d(embed_dim)
     self.action_head = nn.Linear(embed_dim, nactions)
 
+    # NOTE(milo): Initialize so that all actions have equal output.
+    torch.nn.init.zeros_(self.action_head.weight)
+    torch.nn.init.ones_(self.action_head.bias)
+
   def forward(self, cards, bets):
     """
     cards (tuple of torch.Tensor): Shape ((B x 2), (B x 3)[, (B x 1), (B x 1)]) # Hole, board [, turn, river]).

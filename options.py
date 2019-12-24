@@ -21,7 +21,7 @@ class Options(object):
   SGD_BATCH_SIZE = 20000            # Same as Brown et. al.
   TRAIN_DATASET_SIZE = 1e6          # TODO(milo): Try something bigger?
 
-  DEVICE = torch.device("cuda")
+  DEVICE = torch.device("cuda:0")
   NUM_DATA_WORKERS = 0
 
   MEMORY_FOLDER = os.path.join("./memory/", EXPERIMENT_NAME)

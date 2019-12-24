@@ -13,44 +13,40 @@ from network_wrapper import NetworkWrapper
 from trainer import generate_actions, make_infoset
 
 
-NUM_TRAVERSALS_TOTAL = 400
-NUM_PROCESSES = 2
+NUM_TRAVERSALS_TOTAL = 4000
+NUM_PROCESSES = 8
 NUM_TRAVERSALS_EACH = int(NUM_TRAVERSALS_TOTAL / NUM_PROCESSES)
+CHUNK_SIZE = 100
 
-def traverse_multiple(worker_id, game_state, events, emulator, action_generator, infoset_generator,
-                      traverse_player, strategies, advantage_mem, strategy_mem, t):
-  for _ in range(NUM_TRAVERSALS_EACH):
+def traverse_multiple(worker_id, traverse_player, strategies, advantage_mem, strategy_mem, t):
+  for k in range(NUM_TRAVERSALS_EACH):
     ctr = [0]
+
+    emulator = Emulator()
+    emulator.set_game_rule(
+      player_num=k % 2,
+      max_round=10,
+      small_blind_amount=Constants.SMALL_BLIND_AMOUNT,
+      ante_amount=0)
 
     players_info = {}
     players_info[Constants.PLAYER1_UID] = {"name": Constants.PLAYER1_UID, "stack": Constants.INITIAL_STACK}
     players_info[Constants.PLAYER2_UID] = {"name": Constants.PLAYER2_UID, "stack": Constants.INITIAL_STACK}
-    
+
     initial_state = emulator.generate_initial_game_state(players_info)
     game_state, events = emulator.start_new_round(initial_state)
 
-    traverse(game_state, [events[-1]], emulator, action_generator, infoset_generator, traverse_player,
-             strategies, advantage_mem, strategy_mem, t, ctr)
-    # print("Traversal used {} recursive calls (worker={})".format(ctr[0], worker_id))
+    traverse(game_state, [events[-1]], emulator, generate_actions, make_infoset, traverse_player,
+             strategies, advantage_mem, strategy_mem, t, recursion_ctr=ctr)
+
+    if (k % 100) == 0:
+      print("Finished {}/{} traversals".format(k, NUM_TRAVERSALS_EACH))
+      print("Traversal used {} recursive calls (worker={})".format(ctr[0], worker_id))
 
 
 if __name__ == '__main__':
-  emulator = Emulator()
-  emulator.set_game_rule(
-    player_num=1,
-    max_round=1000,
-    small_blind_amount=Constants.SMALL_BLIND_AMOUNT,
-    ante_amount=0)
-
-  players_info = {}
-  players_info[Constants.PLAYER1_UID] = {"name": Constants.PLAYER1_UID, "stack": Constants.INITIAL_STACK}
-  players_info[Constants.PLAYER2_UID] = {"name": Constants.PLAYER2_UID, "stack": Constants.INITIAL_STACK}
-
-  initial_state = emulator.generate_initial_game_state(players_info)
-  game_state, events = emulator.start_new_round(initial_state)
-
-  p1_strategy = NetworkWrapper(4, Constants.NUM_BETTING_ACTIONS, Constants.NUM_ACTIONS, 128)
-  p2_strategy = NetworkWrapper(4, Constants.NUM_BETTING_ACTIONS, Constants.NUM_ACTIONS, 128)
+  p1_strategy = NetworkWrapper(4, Constants.NUM_BETTING_ACTIONS, Constants.NUM_ACTIONS, 128, torch.device("cuda:0"))
+  p2_strategy = NetworkWrapper(4, Constants.NUM_BETTING_ACTIONS, Constants.NUM_ACTIONS, 128, torch.device("cuda:1"))
   p1_strategy._network.share_memory()
   p2_strategy._network.share_memory()
 
@@ -65,12 +61,23 @@ if __name__ == '__main__':
   strategy_mem = None
 
   t0 = time.time()
+  # mp.set_start_method("spawn", force=True)
 
+  # traverse_multiple(0, Constants.PLAYER1_UID, strategies, advantage_mem, strategy_mem, 0)
+
+  # for chunk in range(NUM_TRAVERSALS_EACH // CHUNK_SIZE):
   mp.spawn(
     traverse_multiple,
-    args=(game_state, events, emulator, generate_actions, make_infoset, Constants.PLAYER1_UID,
-    strategies, advantage_mem, strategy_mem, 0),
+    args=(Constants.PLAYER1_UID, strategies, advantage_mem, strategy_mem, 0),
     nprocs=NUM_PROCESSES, join=True, daemon=False) #, start_method='spawn')
+  # processes = []
+  # for i in range(NUM_PROCESSES):
+  #   p = mp.Process(target=traverse_multiple, args=(i, Constants.PLAYER1_UID, strategies, advantage_mem, strategy_mem, 0))
+  #   p.start()
+  #   processes.append(p)
+
+  # for p in processes:
+  #   p.join()
 
   elapsed = time.time() - t0
   print("Time for {} traversals across {} threads: {} sec".format(NUM_TRAVERSALS_TOTAL, NUM_PROCESSES, elapsed))
