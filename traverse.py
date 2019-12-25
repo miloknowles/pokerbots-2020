@@ -7,6 +7,7 @@ import time
 
 from utils import *
 from constants import Constants
+from utils import sample_uniform_action
 
 
 def check_terminal_node(events):
@@ -31,6 +32,29 @@ def check_turn_node(events):
   if e["type"] == "event_ask_player" and e["round_state"]["street"] == "turn":
     return True, e["uuid"], e
   return False, None, None
+
+
+def traverse_until_turn(game_state, events, emulator, action_generator, traverse_player, recursion_ctr=[0]):
+  with torch.no_grad():
+    recursion_ctr[0] += 1
+    other_player = {Constants.PLAYER1_UID: Constants.PLAYER2_UID,
+                    Constants.PLAYER2_UID: Constants.PLAYER1_UID}[traverse_player]
+
+    # Base case: first action of the turn, return the state and event.
+    is_turn_node, uuid, evt = check_turn_node(events)
+    if is_turn_node:
+      return (game_state, evt)
+
+    is_player_node, uuid, evt = check_player_node(events)
+
+    if is_player_node:
+      action, amount = sample_uniform_action(evt["valid_actions"])
+      updated_state, new_events = emulator.apply_action(game_state, action, amount)
+
+      return traverse_until_turn(updated_state, new_events, emulator, action_generator,
+                      traverse_player, recursion_ctr=recursion_ctr)
+    else:
+      return None
 
 
 def traverse(game_state, events, emulator, action_generator, infoset_generator, traverse_player,
@@ -90,8 +114,8 @@ def traverse(game_state, events, emulator, action_generator, infoset_generator, 
 
       # Add the instantaneous regrets to advantage memory for the traversing player.
       if advantage_mem is not None:
-        advantage_mem.put((infoset, instant_regrets, t), True, 1.0)
-        # advantage_mem.add(infoset, instant_regrets, t)
+        # advantage_mem.put((infoset, instant_regrets, t), True, 1.0)
+        advantage_mem.add(infoset, instant_regrets, t)
 
       return strategy_ev
 
@@ -114,8 +138,8 @@ def traverse(game_state, events, emulator, action_generator, infoset_generator, 
 
       # Add the action probabilities to the strategy buffer.
       if strategy_mem is not None:
-        strategy_mem.put((infoset, action_probs, t), True, 1.0)
-        # strategy_mem.add(infoset, action_probs, t)
+        # strategy_mem.put((infoset, action_probs, t), True, 1.0)
+        strategy_mem.add(infoset, action_probs, t)
 
       # Using external sampling, choose only ONE action for the non-traversal player.
       if external_sampling:

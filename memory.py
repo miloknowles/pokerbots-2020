@@ -103,7 +103,7 @@ def get_manifest_entries(folder, buffer_name):
 
 class MemoryBuffer(object):
   def __init__(self, info_set_size, item_size, max_size=80000, device=torch.device("cpu"),
-               autosave_params=None):
+               autosave_params=None, save_lock=None):
     self._max_size = max_size
     self._info_set_size = info_set_size
     self._item_size = item_size
@@ -120,6 +120,8 @@ class MemoryBuffer(object):
     self._weights = torch.zeros(int(max_size), dtype=torch.float32).to(self._device)
 
     self._next_index = 0
+
+    self._save_lock = save_lock
 
   def add(self, infoset, item, weight):
     """
@@ -170,6 +172,8 @@ class MemoryBuffer(object):
     This function will automatically figure out the next .pth file to save in, and add an entry
     to the manifest file in folder.
     """
+    if self._save_lock is not None: self._save_lock.acquire()
+
     manifest_df = get_manifest_entries(folder, buffer_name)
     manifest_file_path = get_buffer_manifest_path(folder, buffer_name)
 
@@ -185,6 +189,12 @@ class MemoryBuffer(object):
 
     buf_path = get_buffer_path(folder, buffer_name, next_avail_idx)
 
+    with open(manifest_file_path, "a") as f:
+      f.write("{},{},{}\n".format(next_avail_idx, buf_path, self.size()))
+    print(">> Updated manifest file at {}".format(manifest_file_path))
+
+    if self._save_lock is not None: self._save_lock.release()
+
     # Resize to minimum size.
     self._infosets = self._infosets[:self.size(),:].clone()
     self._items = self._items[:self.size(),:].clone()
@@ -196,10 +206,6 @@ class MemoryBuffer(object):
       "weights": self._weights
     }, buf_path)
     print(">> Saved buffer to {}".format(buf_path))
-
-    with open(manifest_file_path, "a") as f:
-      f.write("{},{},{}\n".format(next_avail_idx, buf_path, self.size()))
-    print(">> Updated manifest file at {}".format(manifest_file_path))
 
 
 class MemoryBufferDataset(Dataset):

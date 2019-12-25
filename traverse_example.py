@@ -16,12 +16,22 @@ from network_wrapper import NetworkWrapper
 from trainer import generate_actions, make_infoset
 
 
-NUM_TRAVERSALS_TOTAL = 4000
-NUM_PROCESSES = 2
+NUM_TRAVERSALS_TOTAL = 10000
+NUM_PROCESSES = 8
 NUM_TRAVERSALS_EACH = int(NUM_TRAVERSALS_TOTAL / NUM_PROCESSES)
 
 
-def traverse_multiple(worker_id, traverse_player, strategies, advantage_mem_queue, strategy_mem_queue, t):
+def traverse_multiple(worker_id, traverse_player, strategies, t, save_lock):
+  advt_mem = MemoryBuffer(Constants.INFO_SET_SIZE, Constants.NUM_ACTIONS,
+                          max_size=1e4,
+                          autosave_params=("./memory/traverse_example/", "p1_advt_mem"),
+                          save_lock=save_lock)
+  
+  strt_mem = MemoryBuffer(Constants.INFO_SET_SIZE, Constants.NUM_ACTIONS,
+                          max_size=1e4,
+                          autosave_params=("./memory/traverse_example/", "strategy_mem"),
+                          save_lock=save_lock)
+
   for k in range(NUM_TRAVERSALS_EACH):
     ctr = [0]
 
@@ -40,7 +50,7 @@ def traverse_multiple(worker_id, traverse_player, strategies, advantage_mem_queu
     game_state, events = emulator.start_new_round(initial_state)
 
     traverse(game_state, [events[-1]], emulator, generate_actions, make_infoset, traverse_player,
-             strategies, advantage_mem_queue, strategy_mem_queue, t, recursion_ctr=ctr)
+             strategies, advt_mem, strt_mem, t, recursion_ctr=ctr)
 
     if (k % 100) == 0:
       print("Finished {}/{} traversals".format(k, NUM_TRAVERSALS_EACH))
@@ -53,11 +63,12 @@ def memory_manager(mem, in_queue):
     ctr = 0
     while True:
       if not in_queue.empty():
-        tup = in_queue.get_nowait()
+        tup = in_queue.get(True, 0.01)
         mem.add(tup[0], tup[1], tup[2])
         ctr += 1
-        if (ctr % 1000) == 0:
+        if (ctr % 100) == 0:
           print("Managed memory size = {}".format(mem.size()))
+          print("Queue size:", in_queue.qsize())
           ctr = 0
   except KeyboardInterrupt:
     exit()
@@ -70,6 +81,7 @@ if __name__ == '__main__':
                                 torch.device("cuda:0" if torch.cuda.device_count() >= 2 else "cuda"))
   p2_strategy = NetworkWrapper(4, Constants.NUM_BETTING_ACTIONS, Constants.NUM_ACTIONS, opt.EMBED_DIM,
                                 torch.device("cuda:1" if torch.cuda.device_count() >= 2 else "cuda"))
+
   p1_strategy._network.share_memory()
   p2_strategy._network.share_memory()
 
@@ -82,32 +94,44 @@ if __name__ == '__main__':
   advantage_mem_queue = manager.Queue()
   strategy_mem_queue = manager.Queue()
 
-  advantage_mem = MemoryBuffer(Constants.INFO_SET_SIZE, Constants.NUM_ACTIONS,
-                               max_size=opt.MEM_BUFFER_MAX_SIZE,
-                               autosave_params=("./memory/traverse_example/", "p1_advt_mem"))
-  strategy_mem = MemoryBuffer(Constants.INFO_SET_SIZE, Constants.NUM_ACTIONS,
-                              max_size=opt.MEM_BUFFER_MAX_SIZE,
-                              autosave_params=("./memory/traverse_example/", "strategy_mem"))
-  # advantage_mem = None
-  # strategy_mem = None
+  save_lock = manager.Lock()
+
+  # advantage_mem = MemoryBuffer(Constants.INFO_SET_SIZE, Constants.NUM_ACTIONS,
+  #                              max_size=opt.MEM_BUFFER_MAX_SIZE,
+  #                              autosave_params=("./memory/traverse_example/", "p1_advt_mem"),
+  #                              save_lock=save_lock)
+  # strategy_mem1 = MemoryBuffer(Constants.INFO_SET_SIZE, Constants.NUM_ACTIONS,
+  #                             max_size=opt.MEM_BUFFER_MAX_SIZE,
+  #                             autosave_params=("./memory/traverse_example/", "strategy_mem"),
+  #                             save_lock=save_lock)
+  
+  # strategy_mem2 = MemoryBuffer(Constants.INFO_SET_SIZE, Constants.NUM_ACTIONS,
+  #                             max_size=opt.MEM_BUFFER_MAX_SIZE,
+  #                             autosave_params=("./memory/traverse_example/", "strategy_mem"),
+  #                             save_lock=save_lock)
 
   t0 = time.time()
 
-  p1 = mp.Process(target=memory_manager, args=(advantage_mem, advantage_mem_queue))
-  p1.start()
+  # advt_mem_worker1 = mp.Process(target=memory_manager, args=(advantage_mem, advantage_mem_queue))
+  # advt_mem_worker1.start()
 
-  p2 = mp.Process(target=memory_manager, args=(strategy_mem, strategy_mem_queue))
-  p2.start()
+  # strat_mem_worker1 = mp.Process(target=memory_manager, args=(strategy_mem1, strategy_mem_queue))
+  # strat_mem_worker1.start()
 
-  # traverse_multiple(1234, Constants.PLAYER1_UID, strategies, advantage_mem, strategy_mem, 0)
+  # strat_mem_worker2 = mp.Process(target=memory_manager, args=(strategy_mem2, strategy_mem_queue))
+  # strat_mem_worker2.start()
 
+  # traverse_multiple(1234, Constants.PLAYER1_UID, strategies, advantage_mem_queue, strategy_mem_queue, 0)
+    # with multiprocessing.Pool(nprocess) as pool:
+        # pool.map(cycle, offsets)
   mp.spawn(
     traverse_multiple,
-    args=(Constants.PLAYER1_UID, strategies, advantage_mem_queue, strategy_mem_queue, 0),
+    args=(Constants.PLAYER1_UID, strategies, 0, save_lock),
     nprocs=NUM_PROCESSES, join=True, daemon=False)
 
-  p1.terminate()
-  p2.terminate()
+  # advt_mem_worker1.terminate()
+  # strat_mem_worker1.terminate()
+  # strat_mem_worker2.terminate()
 
   elapsed = time.time() - t0
   print("Time for {} traversals across {} threads: {} sec".format(NUM_TRAVERSALS_TOTAL, NUM_PROCESSES, elapsed))
