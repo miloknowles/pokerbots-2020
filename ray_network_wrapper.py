@@ -1,13 +1,13 @@
+import ray
 import torch
-# import ray
 
-from constants import Constants
 from network import DeepCFRModel
 
 
-class NetworkWrapper(object):
+@ray.remote(num_gpus=1)
+class RayNetworkWrapper(object):
   def __init__(self, ncardtypes, nbets, nactions, embed_dim, device=torch.device("cpu")):
-    print("Network wrapper init")
+    print("Initialized RayNetworkWrapper")
     self._network = DeepCFRModel(ncardtypes, nbets, nactions, embed_dim).to(device)
     self._network.eval()
     self._device = device
@@ -51,3 +51,4 @@ class NetworkWrapper(object):
     Reset the network so that it outputs all zeros.
     """
     self._network = DeepCFRModel(self._ncardtypes, self._nbets, self._nactions, self._embed_dim)
+

@@ -16,7 +16,7 @@ from trainer import generate_actions, make_infoset
 NUM_TRAVERSALS_TOTAL = 4000
 NUM_PROCESSES = 8
 NUM_TRAVERSALS_EACH = int(NUM_TRAVERSALS_TOTAL / NUM_PROCESSES)
-CHUNK_SIZE = 100
+
 
 def traverse_multiple(worker_id, traverse_player, strategies, advantage_mem, strategy_mem, t):
   for k in range(NUM_TRAVERSALS_EACH):
@@ -45,8 +45,10 @@ def traverse_multiple(worker_id, traverse_player, strategies, advantage_mem, str
 
 
 if __name__ == '__main__':
-  p1_strategy = NetworkWrapper(4, Constants.NUM_BETTING_ACTIONS, Constants.NUM_ACTIONS, 128, torch.device("cuda:0"))
-  p2_strategy = NetworkWrapper(4, Constants.NUM_BETTING_ACTIONS, Constants.NUM_ACTIONS, 128, torch.device("cuda:1"))
+  p1_strategy = NetworkWrapper(4, Constants.NUM_BETTING_ACTIONS, Constants.NUM_ACTIONS, 128,
+                                torch.device("cuda:0" if torch.cuda.device_count() >= 2 else "cuda"))
+  p2_strategy = NetworkWrapper(4, Constants.NUM_BETTING_ACTIONS, Constants.NUM_ACTIONS, 128,
+                                torch.device("cuda:1" if torch.cuda.device_count() >= 2 else "cuda"))
   p1_strategy._network.share_memory()
   p2_strategy._network.share_memory()
 
@@ -61,23 +63,11 @@ if __name__ == '__main__':
   strategy_mem = None
 
   t0 = time.time()
-  # mp.set_start_method("spawn", force=True)
 
-  # traverse_multiple(0, Constants.PLAYER1_UID, strategies, advantage_mem, strategy_mem, 0)
-
-  # for chunk in range(NUM_TRAVERSALS_EACH // CHUNK_SIZE):
   mp.spawn(
     traverse_multiple,
     args=(Constants.PLAYER1_UID, strategies, advantage_mem, strategy_mem, 0),
     nprocs=NUM_PROCESSES, join=True, daemon=False) #, start_method='spawn')
-  # processes = []
-  # for i in range(NUM_PROCESSES):
-  #   p = mp.Process(target=traverse_multiple, args=(i, Constants.PLAYER1_UID, strategies, advantage_mem, strategy_mem, 0))
-  #   p.start()
-  #   processes.append(p)
-
-  # for p in processes:
-  #   p.join()
 
   elapsed = time.time() - t0
   print("Time for {} traversals across {} threads: {} sec".format(NUM_TRAVERSALS_TOTAL, NUM_PROCESSES, elapsed))
