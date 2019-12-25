@@ -1,5 +1,4 @@
 import torch
-# import ray
 
 from constants import Constants
 from network import DeepCFRModel
@@ -7,7 +6,6 @@ from network import DeepCFRModel
 
 class NetworkWrapper(object):
   def __init__(self, ncardtypes, nbets, nactions, embed_dim, device=torch.device("cpu")):
-    print("Network wrapper init")
     self._network = DeepCFRModel(ncardtypes, nbets, nactions, embed_dim).to(device)
     self._network.eval()
     self._device = device
@@ -15,6 +13,7 @@ class NetworkWrapper(object):
     self._nbets = nbets
     self._nactions = nactions
     self._embed_dim = embed_dim
+    print("Initialized NetworkWrapper")
 
   def network(self):
     return self._network

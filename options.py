@@ -14,7 +14,7 @@ class Options(object):
   NUM_CFR_ITERS = 100               # Exploitability seems to converge around 100 iters.
   NUM_TRAVERSALS_PER_ITER = 1e5     # 100k seems to be the best in Brown et. al.
   MEM_BUFFER_MAX_SIZE = 1e6         # Brown. et. al. use 40 million for all 3 buffers.
-  EMBED_DIM = 128                   # Seems like this gave the best performance.
+  EMBED_DIM = 128                   # Seems like 128 gave the best performance.
 
   SGD_ITERS = 32000                 # Same as Brown et. al.
   SGD_LR = 1e-3                     # Same as Brown et. al.

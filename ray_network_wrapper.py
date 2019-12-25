@@ -4,7 +4,7 @@ import torch
 from network import DeepCFRModel
 
 
-@ray.remote(num_gpus=1)
+@ray.remote(num_gpus=0.5)
 class RayNetworkWrapper(object):
   def __init__(self, ncardtypes, nbets, nactions, embed_dim, device=torch.device("cpu")):
     print("Initialized RayNetworkWrapper")

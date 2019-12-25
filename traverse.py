@@ -1,5 +1,5 @@
+import ray
 import torch
-# import ray
 
 import numpy as np
 from copy import deepcopy
@@ -66,7 +66,10 @@ def traverse(game_state, events, emulator, action_generator, infoset_generator, 
       del evt, pot_size
 
       # Do regret matching to get action probabilities.
-      action_probs = strategies[traverse_player].get_action_probabilities(infoset)
+      if remote:
+        action_probs = ray.get(strategies[traverse_player].get_action_probabilities.remote(infoset))
+      else:
+        action_probs = strategies[traverse_player].get_action_probabilities(infoset)
 
       action_probs = apply_mask_and_normalize(action_probs, mask)
       assert torch.allclose(action_probs.sum(), torch.ones(1))
@@ -100,7 +103,11 @@ def traverse(game_state, events, emulator, action_generator, infoset_generator, 
       actions, mask = action_generator(evt["valid_actions"], pot_size)
       del evt, pot_size
 
-      action_probs = strategies[other_player].get_action_probabilities(infoset)
+      if remote:
+        action_probs = ray.get(strategies[traverse_player].get_action_probabilities.remote(infoset))
+      else:
+        action_probs = strategies[traverse_player].get_action_probabilities(infoset)
+
       action_probs = apply_mask_and_normalize(action_probs, mask)
       assert torch.allclose(action_probs.sum(), torch.ones(1))
 
