@@ -181,7 +181,7 @@ class MemoryBuffer(object):
         f.write("index,filename,num_entries\n")
       next_avail_idx = 0
     else:
-      next_avail_idx = manifest_df.index[-1] + 1
+      next_avail_idx = 0 if len(manifest_df.index) == 0 else (manifest_df.index[-1] + 1)
 
     buf_path = get_buffer_path(folder, buffer_name, next_avail_idx)
 

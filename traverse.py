@@ -90,7 +90,8 @@ def traverse(game_state, events, emulator, action_generator, infoset_generator, 
 
       # Add the instantaneous regrets to advantage memory for the traversing player.
       if advantage_mem is not None:
-        advantage_mem.add(infoset, instant_regrets, t)
+        advantage_mem.put((infoset, instant_regrets, t), True, 1.0)
+        # advantage_mem.add(infoset, instant_regrets, t)
 
       return strategy_ev
 
@@ -113,7 +114,8 @@ def traverse(game_state, events, emulator, action_generator, infoset_generator, 
 
       # Add the action probabilities to the strategy buffer.
       if strategy_mem is not None:
-        strategy_mem.add(infoset, action_probs, t)
+        strategy_mem.put((infoset, action_probs, t), True, 1.0)
+        # strategy_mem.add(infoset, action_probs, t)
 
       # Using external sampling, choose only ONE action for the non-traversal player.
       if external_sampling:
