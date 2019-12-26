@@ -160,6 +160,14 @@ class MemoryBuffer(object):
     self._weights = torch.zeros(int(self._max_size), dtype=torch.float32).to(self._device)
     self._next_index = 0
 
+  def autosave(self):
+    if self._autosave_params is not None:
+      self.save(self._autosave_params[0], self._autosave_params[1])
+      self.clear()
+      return True
+    else:
+      return False
+
   def save(self, folder, buffer_name):
     """
     Save the current buffer to a .pth file. The file will contain a dictionary with:

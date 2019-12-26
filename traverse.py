@@ -10,6 +10,12 @@ from constants import Constants
 from utils import sample_uniform_action
 
 
+class TraverseMode(object):
+  TRAVERSE_PRE_TURN = 0
+  TRAVERSE_POST_TURN = 1
+  TRAVERSE_FULL = 2
+
+
 def check_terminal_node(events):
   for e in events:
     if e["type"] == "event_round_finish":
@@ -34,7 +40,12 @@ def check_turn_node(events):
   return False, None, None
 
 
-def traverse_until_turn(game_state, events, emulator, action_generator, traverse_player, recursion_ctr=[0]):
+def traverse_until_turn(game_state, events, emulator, action_generator, traverse_player,
+                        recursion_ctr=[0]):
+  """
+  Randomly sample actions to traverse until a turn action node is reached. Returns the game_state
+  and new_events at the first turn node that is reached.
+  """
   with torch.no_grad():
     recursion_ctr[0] += 1
     other_player = {Constants.PLAYER1_UID: Constants.PLAYER2_UID,
@@ -57,9 +68,9 @@ def traverse_until_turn(game_state, events, emulator, action_generator, traverse
       return None
 
 
-def traverse(game_state, events, emulator, action_generator, infoset_generator, traverse_player,
-             strategies, advantage_mem, strategy_mem, t, recursion_ctr=[0], remote=False,
-             external_sampling=True):
+def traverse(game_state, events, emulator, action_generator, infoset_generator,
+             traverse_player, strategies, advt_mem, strt_mem, t, recursion_ctr=[0],
+             do_external_sampling=True):
   """
   Recursively traverse the game tree with external sampling.
   """
@@ -74,13 +85,7 @@ def traverse(game_state, events, emulator, action_generator, infoset_generator, 
       payoff = (winning_stack - Constants.INITIAL_STACK)
       return payoff if traverse_player == winning_player else (-1 * payoff)
 
-    # TODO(milo): Remove this!
-    is_turn_node, uuid, evt = check_turn_node(events)
-    if is_turn_node:
-      return 0
-    del is_turn_node, uuid, evt
-
-    # CASE 2: Traversal player action node.
+    # CASE 1: Traversal player action node.
     is_player_node, uuid, evt = check_player_node(events)
 
     if is_player_node and uuid == traverse_player:
@@ -90,10 +95,7 @@ def traverse(game_state, events, emulator, action_generator, infoset_generator, 
       del evt, pot_size
 
       # Do regret matching to get action probabilities.
-      if remote:
-        action_probs = ray.get(strategies[traverse_player].get_action_probabilities.remote(infoset))
-      else:
-        action_probs = strategies[traverse_player].get_action_probabilities(infoset)
+      action_probs = strategies[traverse_player].get_action_probabilities(infoset)
 
       action_probs = apply_mask_and_normalize(action_probs, mask)
       assert torch.allclose(action_probs.sum(), torch.ones(1))
@@ -106,20 +108,19 @@ def traverse(game_state, events, emulator, action_generator, infoset_generator, 
           continue
         updated_state, new_events = emulator.apply_action(game_state, a[0], a[1]) 
         values[i] = traverse(updated_state, new_events, emulator, action_generator, infoset_generator,
-                            traverse_player, strategies, advantage_mem, strategy_mem, t,
-                            recursion_ctr=recursion_ctr, remote=remote, external_sampling=external_sampling)
+                            traverse_player, strategies, advt_mem, strt_mem, t,
+                            recursion_ctr=recursion_ctr, do_external_sampling=do_external_sampling)
       
       strategy_ev = (action_probs * values).sum().item()
       instant_regrets = (values - strategy_ev * mask)
 
       # Add the instantaneous regrets to advantage memory for the traversing player.
-      if advantage_mem is not None:
-        # advantage_mem.put((infoset, instant_regrets, t), True, 1.0)
-        advantage_mem.add(infoset, instant_regrets, t)
+      if advt_mem is not None:
+        advt_mem.add(infoset, instant_regrets, t)
 
       return strategy_ev
 
-    # CASE 3: Other player action node.
+    # CASE 2: Other player action node.
     elif is_player_node and uuid != traverse_player:
       infoset = infoset_generator(game_state, evt)
 
@@ -128,30 +129,25 @@ def traverse(game_state, events, emulator, action_generator, infoset_generator, 
       actions, mask = action_generator(evt["valid_actions"], pot_size)
       del evt, pot_size
 
-      if remote:
-        action_probs = ray.get(strategies[traverse_player].get_action_probabilities.remote(infoset))
-      else:
-        action_probs = strategies[traverse_player].get_action_probabilities(infoset)
-
+      action_probs = strategies[traverse_player].get_action_probabilities(infoset)
       action_probs = apply_mask_and_normalize(action_probs, mask)
       assert torch.allclose(action_probs.sum(), torch.ones(1))
 
       # Add the action probabilities to the strategy buffer.
-      if strategy_mem is not None:
-        # strategy_mem.put((infoset, action_probs, t), True, 1.0)
-        strategy_mem.add(infoset, action_probs, t)
+      if strt_mem is not None:
+        strt_mem.add(infoset, action_probs, t)
 
-      # Using external sampling, choose only ONE action for the non-traversal player.
-      if external_sampling:
+      # EXTERNAL SAMPLING: choose only ONE action for the non-traversal player.
+      if do_external_sampling:
         action, amount = actions[torch.multinomial(action_probs, 1).item()]
         updated_state, new_events = emulator.apply_action(game_state, action, amount)
 
         # NOTE(milo): Delete all events except the last one to save memory usage.
         return traverse(updated_state, new_events, emulator, action_generator, infoset_generator, traverse_player,
-                        strategies, advantage_mem, strategy_mem, t, recursion_ctr=recursion_ctr, remote=remote,
-                        external_sampling=external_sampling)
+                        strategies, advt_mem, strt_mem, t, recursion_ctr=recursion_ctr,
+                        do_external_sampling=do_external_sampling)
         
-      # Otherwise recurse on ALL non-traversal player actions.
+      # NO SAMPLING: Otherwise recurse on ALL non-traversal player actions.
       else:
         values = torch.zeros(len(actions))
         for i, a in enumerate(actions):
@@ -159,8 +155,8 @@ def traverse(game_state, events, emulator, action_generator, infoset_generator, 
             continue 
           updated_state, new_events = emulator.apply_action(game_state, a[0], a[1])
           values[i] = traverse(updated_state, new_events, emulator, action_generator, infoset_generator,
-                              traverse_player, strategies, advantage_mem, strategy_mem, t,
-                              recursion_ctr=recursion_ctr, remote=remote, external_sampling=external_sampling)
+                              traverse_player, strategies, advt_mem, strt_mem, t,
+                              recursion_ctr=recursion_ctr, do_external_sampling=do_external_sampling)
         strategy_ev = (action_probs * values).sum().item()
         return strategy_ev
 

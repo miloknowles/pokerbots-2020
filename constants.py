@@ -3,6 +3,7 @@ class Constants(object):
   PLAYER2_UID = "P2"
   INITIAL_STACK = 100
   SMALL_BLIND_AMOUNT = 1
+  ANTE_AMOUNT = 0
 
   STREET_OFFSET = 6
   NUM_BETTING_ACTIONS = 24 # 4 streets, 6 betting actions per street.

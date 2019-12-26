@@ -2,6 +2,7 @@ from copy import deepcopy
 import os, time
 
 import torch
+import torch.multiprocessing as mp
 from torch.utils.data import DataLoader
 from tensorboardX import SummaryWriter
 
@@ -95,19 +96,55 @@ def generate_actions(valid_actions, pot_amount):
   return actions_scaled, actions_mask
 
 
+def traverse_worker(worker_id, traverse_player, strategies, save_lock, opt, t):
+  """
+  A worker that traverses the game tree K times, saving things to memory buffers. Each worker
+  maintains its own memory buffers and saves them after finishing.
+  """
+  advt_mem = MemoryBuffer(Constants.INFO_SET_SIZE, Constants.NUM_ACTIONS,
+                          max_size=opt.SINGLE_PROC_MEM_BUFFER_MAX_SIZE,
+                          autosave_params=(opt.MEMORY_FOLDER, opt.ADVT_BUFFER_FMT.format(traverse_player)),
+                          save_lock=save_lock)
+  
+  strt_mem = MemoryBuffer(Constants.INFO_SET_SIZE, Constants.NUM_ACTIONS,
+                          max_size=opt.SINGLE_PROC_MEM_BUFFER_MAX_SIZE,
+                          autosave_params=(opt.MEMORY_FOLDER, opt.STRT_BUFFER_FMT),
+                          save_lock=save_lock)
+
+  num_traversals_per_worker = int(opt.NUM_TRAVERSALS_PER_ITER / opt.NUM_TRAVERSE_WORKERS)
+  for k in range(num_traversals_per_worker):
+    ctr = [0]
+
+    # Generate a random initialization, alternating the SB player each time.
+    emulator = Emulator()
+    emulator.set_game_rule(
+      player_num=k % 2,
+      max_round=5,
+      small_blind_amount=Constants.SMALL_BLIND_AMOUNT,
+      ante_amount=Constants.ANTE_AMOUNT)
+
+    players_info = {}
+    players_info[Constants.PLAYER1_UID] = {"name": Constants.PLAYER1_UID, "stack": Constants.INITIAL_STACK}
+    players_info[Constants.PLAYER2_UID] = {"name": Constants.PLAYER2_UID, "stack": Constants.INITIAL_STACK}
+
+    initial_state = emulator.generate_initial_game_state(players_info)
+    game_state, events = emulator.start_new_round(initial_state)
+
+    traverse(game_state, [events[-1]], emulator, generate_actions, make_infoset, traverse_player,
+             strategies, advt_mem, strt_mem, t, recursion_ctr=ctr, do_external_sampling=True)
+
+    if (k % opt.TRAVERSE_DEBUG_PRINT_HZ) == 0:
+      print("[WORKER{}] done with {}/{} traversals | recursion depth={} | advt={} strt={}".format(
+            k, num_traversals, ctr[0], advt_mem.size(), strt_mem.size()))
+
+  # Save all the buffers one last time.
+  advt_mem.autosave()
+  strt_mem.autosave()
+
+
 class Trainer(object):
   def __init__(self, opt):
     self.opt = opt
-
-    p1_avt_mem_name = opt.ADVT_BUFFER_FMT.format(Constants.PLAYER1_UID)
-    p2_avt_mem_name = opt.ADVT_BUFFER_FMT.format(Constants.PLAYER2_UID)
-    self.advantage_mems = {
-      Constants.PLAYER1_UID: MemoryBuffer(Constants.INFO_SET_SIZE, Constants.NUM_ACTIONS,
-      max_size=opt.MEM_BUFFER_MAX_SIZE, autosave_params=(opt.MEMORY_FOLDER, p1_avt_mem_name)),
-      Constants.PLAYER2_UID: MemoryBuffer(Constants.INFO_SET_SIZE, Constants.NUM_ACTIONS,
-      max_size=opt.MEM_BUFFER_MAX_SIZE, autosave_params=(opt.MEMORY_FOLDER, p2_avt_mem_name))
-    }
-    print("[DONE] Made ADVANTAGE memory")
 
     self.value_networks = {
       Constants.PLAYER1_UID: NetworkWrapper(Constants.NUM_STREETS, Constants.NUM_BETTING_ACTIONS,
@@ -115,11 +152,9 @@ class Trainer(object):
       Constants.PLAYER2_UID: NetworkWrapper(Constants.NUM_STREETS, Constants.NUM_BETTING_ACTIONS,
                                             Constants.NUM_ACTIONS, opt.EMBED_DIM)
     }
+    self.value_networks[Constants.PLAYER1_UID]._network.share_memory()
+    self.value_networks[Constants.PLAYER2_UID]._network.share_memory()
     print("[DONE] Made value networks")
-
-    self.strategy_mem = MemoryBuffer(Constants.INFO_SET_SIZE, Constants.NUM_ACTIONS,
-                                     max_size=opt.MEM_BUFFER_MAX_SIZE)
-    print("[DONE] Made strategy memory")
 
     # TODO(milo): Does this need to be different than the value networks?
     self.strategy_network = NetworkWrapper(Constants.NUM_STREETS, Constants.NUM_BETTING_ACTIONS,
@@ -133,38 +168,23 @@ class Trainer(object):
   def main(self):
     for t in range(self.opt.NUM_CFR_ITERS):
       for traverse_player in [Constants.PLAYER1_UID, Constants.PLAYER2_UID]:
-        self.do_cfr_iteration_for_player(traverse_player, t)
+        self.do_cfr_iter_for_player(traverse_player, t)
         self.train_value_network(traverse_player, t)
-    
-    # Finally, train the strategy network.
-    # TODO(milo)
+    # TODO(milo): Train strategy network.
   
-  def do_cfr_iteration_for_player(self, traverse_player, t):
-    emulator = Emulator()
+  def do_cfr_iter_for_player(self, traverse_player, t):
+    manager = mp.Manager()
+    save_lock = manager.Lock()
 
-    for k in range(self.opt.NUM_TRAVERSALS_PER_ITER):
-      # t0 = time.time()
-      emulator.set_game_rule(
-        player_num=(k % 2),
-        max_round=self.opt.NUM_TRAVERSALS_PER_ITER,
-        small_blind_amount=Constants.SMALL_BLIND_AMOUNT,
-        ante_amount=0)
+    t0 = time.time()
 
-      # Make sure each player has a full starting stack at the beginning of the round.
-      players_info = {}
-      players_info[Constants.PLAYER1_UID] = {"name": Constants.PLAYER1_UID, "stack": Constants.INITIAL_STACK}
-      players_info[Constants.PLAYER2_UID] = {"name": Constants.PLAYER2_UID, "stack": Constants.INITIAL_STACK}
-    
-      initial_state = emulator.generate_initial_game_state(players_info)
-      game_state, events = emulator.start_new_round(initial_state)
-      # elapsed = time.time() - t0
-      # print("Setup game time = {}".format(elapsed))
+    mp.spawn(
+      traverse_worker,
+      args=(traverse_player, self.value_networks, save_lock, self.opt, t),
+      nprocs=opt.NUM_TRAVERSE_WORKERS, join=True, daemon=False)
 
-      # Collect training samples by traversing the game tree with external sampling.
-      traverse(game_state, events, emulator, generate_actions, make_infoset,
-              traverse_player, self.value_networks[Constants.PLAYER1_UID],
-              self.value_networks[Constants.PLAYER2_UID], self.advantage_mems[traverse_player],
-              self.strategy_mem, t)
+    elapsed = time.time() - t0
+    print("Time for {} traversals across {} threads: {} sec".format(NUM_TRAVERSALS_TOTAL, NUM_PROCESSES, elapsed))
 
   def train_value_network(self, traverse_player, t):
     """

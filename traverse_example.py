@@ -17,18 +17,18 @@ from trainer import generate_actions, make_infoset
 
 
 NUM_TRAVERSALS_TOTAL = 10000
-NUM_PROCESSES = 8
+NUM_PROCESSES = 2
 NUM_TRAVERSALS_EACH = int(NUM_TRAVERSALS_TOTAL / NUM_PROCESSES)
 
 
 def traverse_multiple(worker_id, traverse_player, strategies, t, save_lock):
   advt_mem = MemoryBuffer(Constants.INFO_SET_SIZE, Constants.NUM_ACTIONS,
-                          max_size=1e4,
+                          max_size=1e5,
                           autosave_params=("./memory/traverse_example/", "p1_advt_mem"),
                           save_lock=save_lock)
   
   strt_mem = MemoryBuffer(Constants.INFO_SET_SIZE, Constants.NUM_ACTIONS,
-                          max_size=1e4,
+                          max_size=1e5,
                           autosave_params=("./memory/traverse_example/", "strategy_mem"),
                           save_lock=save_lock)
 
@@ -58,24 +58,8 @@ def traverse_multiple(worker_id, traverse_player, strategies, t, save_lock):
       print("Memory sizes: value={} strategy={}".format(advt_mem.size(), strt_mem.size()))
 
 
-def memory_manager(mem, in_queue):
-  try:
-    ctr = 0
-    while True:
-      if not in_queue.empty():
-        tup = in_queue.get(True, 0.01)
-        mem.add(tup[0], tup[1], tup[2])
-        ctr += 1
-        if (ctr % 100) == 0:
-          print("Managed memory size = {}".format(mem.size()))
-          print("Queue size:", in_queue.qsize())
-          ctr = 0
-  except KeyboardInterrupt:
-    exit()
-
-
 if __name__ == '__main__':
-  opt = Options()
+  opt = Options().parse_default()
 
   p1_strategy = NetworkWrapper(4, Constants.NUM_BETTING_ACTIONS, Constants.NUM_ACTIONS, opt.EMBED_DIM,
                                 torch.device("cuda:0" if torch.cuda.device_count() >= 2 else "cuda"))
@@ -91,47 +75,14 @@ if __name__ == '__main__':
   }
 
   manager = mp.Manager()
-  advantage_mem_queue = manager.Queue()
-  strategy_mem_queue = manager.Queue()
-
   save_lock = manager.Lock()
-
-  # advantage_mem = MemoryBuffer(Constants.INFO_SET_SIZE, Constants.NUM_ACTIONS,
-  #                              max_size=opt.MEM_BUFFER_MAX_SIZE,
-  #                              autosave_params=("./memory/traverse_example/", "p1_advt_mem"),
-  #                              save_lock=save_lock)
-  # strategy_mem1 = MemoryBuffer(Constants.INFO_SET_SIZE, Constants.NUM_ACTIONS,
-  #                             max_size=opt.MEM_BUFFER_MAX_SIZE,
-  #                             autosave_params=("./memory/traverse_example/", "strategy_mem"),
-  #                             save_lock=save_lock)
-  
-  # strategy_mem2 = MemoryBuffer(Constants.INFO_SET_SIZE, Constants.NUM_ACTIONS,
-  #                             max_size=opt.MEM_BUFFER_MAX_SIZE,
-  #                             autosave_params=("./memory/traverse_example/", "strategy_mem"),
-  #                             save_lock=save_lock)
 
   t0 = time.time()
 
-  # advt_mem_worker1 = mp.Process(target=memory_manager, args=(advantage_mem, advantage_mem_queue))
-  # advt_mem_worker1.start()
-
-  # strat_mem_worker1 = mp.Process(target=memory_manager, args=(strategy_mem1, strategy_mem_queue))
-  # strat_mem_worker1.start()
-
-  # strat_mem_worker2 = mp.Process(target=memory_manager, args=(strategy_mem2, strategy_mem_queue))
-  # strat_mem_worker2.start()
-
-  # traverse_multiple(1234, Constants.PLAYER1_UID, strategies, advantage_mem_queue, strategy_mem_queue, 0)
-    # with multiprocessing.Pool(nprocess) as pool:
-        # pool.map(cycle, offsets)
   mp.spawn(
     traverse_multiple,
     args=(Constants.PLAYER1_UID, strategies, 0, save_lock),
     nprocs=NUM_PROCESSES, join=True, daemon=False)
-
-  # advt_mem_worker1.terminate()
-  # strat_mem_worker1.terminate()
-  # strat_mem_worker2.terminate()
 
   elapsed = time.time() - t0
   print("Time for {} traversals across {} threads: {} sec".format(NUM_TRAVERSALS_TOTAL, NUM_PROCESSES, elapsed))
