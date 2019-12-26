@@ -52,10 +52,10 @@ def traverse_multiple(worker_id, traverse_player, strategies, t, save_lock):
     traverse(game_state, [events[-1]], emulator, generate_actions, make_infoset, traverse_player,
              strategies, advt_mem, strt_mem, t, recursion_ctr=ctr)
 
-    if (k % 100) == 0:
+    if (k % 300) == 0:
       print("Finished {}/{} traversals".format(k, NUM_TRAVERSALS_EACH))
       print("Traversal used {} recursive calls (worker={})".format(ctr[0], worker_id))
-      # print("Memory sizes: value={} strategy={}".format(advantage_mem.size(), strategy_mem.size()))
+      print("Memory sizes: value={} strategy={}".format(advt_mem.size(), strt_mem.size()))
 
 
 def memory_manager(mem, in_queue):

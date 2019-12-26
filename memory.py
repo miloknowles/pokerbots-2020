@@ -235,11 +235,11 @@ class MemoryBufferDataset(Dataset):
     self._weights = None
     self._items = None
 
-    idx = torch.randint(0, self._N, (self._n,))
+    idx = torch.randint(0, self._N, (self._n,)).long()
     cumul_idx = 0
     for i in self._manifest_df.index:
       num_entries = self._manifest_df["num_entries"][i]
-      idx_this_file = idx[idx.ge(cumul_idx) * idx.le(cumul_idx + num_entries - 1)] - cumul_idx
+      idx_this_file = (idx[idx.ge(cumul_idx) * idx.le(cumul_idx + num_entries - 1)] - cumul_idx).long()
       d = torch.load(self._manifest_df["filename"][i])
       if self._infosets is None:
         self._infosets = d["infosets"][idx_this_file]
