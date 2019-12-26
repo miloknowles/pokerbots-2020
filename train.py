@@ -6,4 +6,5 @@ from options import Options
 
 if __name__ == "__main__":
   opt = Options()
-  trainer = Trainer(opt)
+  trainer = Trainer(opt.parse())
+  trainer.main()

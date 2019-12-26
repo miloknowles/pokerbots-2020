@@ -134,10 +134,11 @@ def traverse_worker(worker_id, traverse_player, strategies, save_lock, opt, t):
              strategies, advt_mem, strt_mem, t, recursion_ctr=ctr, do_external_sampling=True)
 
     if (k % opt.TRAVERSE_DEBUG_PRINT_HZ) == 0:
-      print("[WORKER{}] done with {}/{} traversals | recursion depth={} | advt={} strt={}".format(
-            k, num_traversals, ctr[0], advt_mem.size(), strt_mem.size()))
+      print("[WORKER #{}] done with {}/{} traversals | recursion depth={} | advt={} strt={}".format(
+            worker_id, k, num_traversals_per_worker, ctr[0], advt_mem.size(), strt_mem.size()))
 
   # Save all the buffers one last time.
+  print("[WORKER #{}] Final autosave ...".format(worker_id))
   advt_mem.autosave()
   strt_mem.autosave()
 
@@ -169,7 +170,7 @@ class Trainer(object):
     for t in range(self.opt.NUM_CFR_ITERS):
       for traverse_player in [Constants.PLAYER1_UID, Constants.PLAYER2_UID]:
         self.do_cfr_iter_for_player(traverse_player, t)
-        self.train_value_network(traverse_player, t)
+        # self.train_value_network(traverse_player, t)
     # TODO(milo): Train strategy network.
   
   def do_cfr_iter_for_player(self, traverse_player, t):
@@ -181,10 +182,11 @@ class Trainer(object):
     mp.spawn(
       traverse_worker,
       args=(traverse_player, self.value_networks, save_lock, self.opt, t),
-      nprocs=opt.NUM_TRAVERSE_WORKERS, join=True, daemon=False)
+      nprocs=self.opt.NUM_TRAVERSE_WORKERS, join=True, daemon=False)
 
     elapsed = time.time() - t0
-    print("Time for {} traversals across {} threads: {} sec".format(NUM_TRAVERSALS_TOTAL, NUM_PROCESSES, elapsed))
+    print("Time for {} traversals across {} workers: {} sec".format(
+      self.opt.NUM_TRAVERSALS_PER_ITER, self.opt.NUM_TRAVERSE_WORKERS, elapsed))
 
   def train_value_network(self, traverse_player, t):
     """

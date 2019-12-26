@@ -70,7 +70,7 @@ class Options(object):
   # NUM_TRAVERSE_WORKERS = 8
   # TRAVERSE_DEBUG_PRINT_HZ = 500
 
-  # #=========================== NETWORK PARAMS ===============================
+  # #=========================== NETWORK PARAMS =====.parse()==========================
   # DEVICE = torch.device("cuda:0")
   # EMBED_DIM = 64                   # Seems like 128 gave the best performance.
   # SGD_ITERS = 32000                 # Same as Brown et. al.
@@ -80,12 +80,12 @@ class Options(object):
   # NUM_DATA_WORKERS = 0
 
   def setup_after_parse(self, options):
-    options.MEMORY_FOLDER = os.path.join("./memory/", options.EXPERIMENT_NAME)
-    options.TRAIN_LOG_FOLDER = os.path.join("./training_logs/", options.EXPERIMENT_NAME)
+    options.MEMORY_FOLDER = os.path.join("/home/milo/pokerbots-2020/memory/", options.EXPERIMENT_NAME)
+    options.TRAIN_LOG_FOLDER = os.path.join("/home/milo/pokerbots-2020/training_logs/", options.EXPERIMENT_NAME)
 
     # Call THIS_FMT.format(PLAYER_UID) to get the right name.
     options.ADVT_BUFFER_FMT = "advt_mem_{}"
-    options.STRAT_BUFFER_FMT = "strt_mem"  
+    options.STRT_BUFFER_FMT = "strt_mem"  
 
   def parse(self):
     """
