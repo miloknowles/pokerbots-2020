@@ -11,7 +11,8 @@ from pypokerengine.api.emulator import Emulator
 from constants import Constants
 from utils import *
 from traverse import traverse
-from memory import InfoSet, MemoryBuffer, MemoryBufferDataset
+from memory import InfoSet, MemoryBuffer
+from memory_buffer_dataset import MemoryBufferDataset
 from network_wrapper import NetworkWrapper
 
 
@@ -199,29 +200,38 @@ class Trainer(object):
 
     net = model_wrap.network()
     net.train()
+
     optimizer = torch.optim.Adam(net.parameters(), lr=self.opt.SGD_LR)
 
     buffer_name = self.opt.ADVT_BUFFER_FMT.format(traverse_player)
     train_dataset = MemoryBufferDataset(self.opt.MEMORY_FOLDER, buffer_name,
                                         self.opt.TRAIN_DATASET_SIZE)
-    train_loader = DataLoader(train_dataset, batch_size=self.opt.SGD_BATCH_SIZE,
+    train_loader = DataLoader(train_dataset,
+                              batch_size=self.opt.SGD_BATCH_SIZE,
                               num_workers=self.opt.NUM_DATA_WORKERS)
 
     # Due to memory limitations, we can only store a subset of the dataset in memory at a time.
     # Calculate the number of times we'll have to resample and iterate over the dataset.
-    num_resample_iters = (self.opt.SGD_ITERS * self.opt.SGD_BATCH_SIZE) / self.opt.TRAIN_DATASET_SIZE
+    num_resample_iters = int((self.opt.SGD_ITERS * self.opt.SGD_BATCH_SIZE) / self.opt.TRAIN_DATASET_SIZE)
 
     for resample_iter in range(num_resample_iters):
-      print(">> Doing resample iteration {}/{}".format(resample_iter, num_resample_iters))
+      print(">> Doing resample iteration {}/{} ...".format(resample_iter, num_resample_iters))
       train_dataset.resample()
+      print(">> Done")
 
-      for batch_idx, (inputs, regrets) in enumerate(train_loader):
-        inputs, regrets = inputs.to(self.opt.DEVICE), regrets.to(self.opt.DEVICE)
+      for batch_idx, input_dict in enumerate(train_loader):
+        bets_input = input_dict["bets_input"].to(self.opt.DEVICE)
+        advt_target = input_dict["target"].to(self.opt.DEVICE)
+
+        print(bets_input.shape)
+        print(advt_target.shape)
+
+        cards_input = input_dict["cards_input"].to(self.opt.DEVICE)
 
         optimizer.zero_grad()
 
         # Get predicted advantage from network.
-        output = net(inputs)
+        output = net(cards_input, bets_input)
 
         # Minimize MSE between predicted advantage and instantaneous regret samples.
         loss = torch.nn.functional.mse_loss(inputs, regrets)
@@ -231,7 +241,7 @@ class Trainer(object):
         optimizer.step()
 
         if batch_idx % 1000 == 0:
-          self.log("train", losses)
+          self.log("train", traverse_player, t, losses, batch_idx)
           # self.val()
 
   def save_models(self, t):
@@ -255,10 +265,13 @@ class Trainer(object):
   def val(self):
     raise NotImplementedError()
 
-  def log(self, mode, losses):
+  def log(self, mode, traverse_player, t, losses, steps):
     """
     Write an event to the tensorboard events file.
     """
+    loss = "mse_loss/{}/{}".format(t, traverse_player)
+    print("TRAINING | steps={} | loss={} | cfr_iter={}".format(steps, loss, t))
+
     writer = self.writers[mode]
     for l, v in losses.items():
       writer.add_scalar("{}".format(l), v, self.step)

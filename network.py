@@ -13,7 +13,7 @@ class CardEmbedding(nn.Module):
     self.suit = nn.Embedding(4, embed_dim)
     self.card = nn.Embedding(52, embed_dim)
   
-  def forward(self, input):
+  def forward(self, x):
     """
     Returns the sum of embeddings for cards in input.
 
@@ -22,8 +22,7 @@ class CardEmbedding(nn.Module):
     Returns:
       (torch.Tensor) : Shape (batch_size, embed_dim).
     """
-    B, num_cards = input.shape
-    x = input.view(-1)
+    B, num_cards = x.shape
 
     valid = x.ge(0).float() # -1 means "no card".
     x = x.clamp(min=0)
@@ -33,7 +32,7 @@ class CardEmbedding(nn.Module):
     # This means that the rank increases every 4 indices, and the suit is given
     # by the index mod 4.
     embs = self.card(x) + self.rank(x // 4) + self.suit(x % 4)
-    embs = embs * valid.unsqueeze(1) # Mask out the "no card" embeddings.
+    embs = embs * valid.unsqueeze(-1) # Mask out the "no card" embeddings.
 
     # Sum across the cards in the hole/board set input.
     return embs.view(B, num_cards, -1).sum(1)
@@ -73,18 +72,29 @@ class DeepCFRModel(nn.Module):
     torch.nn.init.zeros_(self.action_head.weight)
     torch.nn.init.ones_(self.action_head.bias)
 
-  def forward(self, cards, bets):
+  # def forward(self, cards, bets):
+  def forward(self, hole_cards, board_cards, bets):
     """
-    cards (tuple of torch.Tensor): Shape ((B x 2), (B x 3)[, (B x 1), (B x 1)]) # Hole, board [, turn, river]).
+    hole_cards (torch.Tensor) : Shape (B x 2)
+    board_cards (torch.Tensor) : Shape (B x 5) where NA cards have value -1.
     bets (torch.Tensor) : Shape (batch_size, nbets).
 
     Returns:
       (torch.Tensor) : Shape (batch_size, nactions).
     """
     # STEP 1: Embed the hole, flop, and optionally turn and river cards.
-    card_embs = []
-    for embedding, card_group in zip(self.card_embeddings, cards):
-      card_embs.append(embedding(card_group))
+    card_embs = [self.card_embeddings[0](hole_cards)]
+
+    flop = board_cards[:, :3]
+    turn = board_cards[:, 3].unsqueeze(-1).contiguous()
+    river = board_cards[:, 4].unsqueeze(-1).contiguous()
+
+    card_embs.append(self.card_embeddings[1](flop))
+    card_embs.append(self.card_embeddings[2](turn))
+    card_embs.append(self.card_embeddings[3](river))
+  
+    # for embedding, card_group in zip(self.card_embeddings[1:], board_cards):
+    #   card_embs.append(embedding(card_group))
 
     card_embs = torch.cat(card_embs, dim=1)
 

@@ -24,10 +24,13 @@ class NetworkWrapper(object):
     by the network.
     """
     with torch.no_grad():
-      cards_input = [ipt.to(self._device) for ipt in infoset.get_card_input_tensors()]
+      hole_cards, board_cards = infoset.get_card_input_tensors()
+      hole_cards = hole_cards.to(self._device)
+      board_cards = board_cards.to(self._device)
+
       bets_input = infoset.get_bet_input_tensors()[0].to(self._device)
 
-      normalized_adv = self._network(cards_input, bets_input)[0]
+      normalized_adv = self._network(hole_cards, board_cards, bets_input)[0]
 
       # Do regret matching on the predicted advantages.
       r_plus = torch.clamp(normalized_adv, min=0)

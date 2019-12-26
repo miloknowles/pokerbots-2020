@@ -2,11 +2,16 @@ from sys import getsizeof
 import os
 
 import torch
-from torch.utils.data import Dataset
-
 import pandas as pd
 
+from constants import Constants
+
+
 class InvalidBoardSizeException(Exception):
+  pass
+
+
+class IncompatibleInfosetException(Exception):
   pass
 
 
@@ -14,12 +19,15 @@ class InfoSet(object):
   def __init__(self, hole_cards, board_cards, bet_history_vec, player_position):
     """
     hole_cards (torch.Tensor): The 0-51 encoding of each  of (2) hole cards.
-    board_cards (torch.Tensor) : The 0-51 encoding of each of (3-5) board cards.
+    board_cards (torch.Tensor) : The 0-51 encoding of each of (0, 3, or 5) board cards.
     bet_history_vec (torch.Tensor) : Betting actions, represented as a fraction of the pot size.
     player_position (int) : 0 if the acting player is the SB and 1 if they are BB.
 
     The bet history has size (num_streets * num_actions_per_street) = 6 * 4 = 24.
     """
+    if len(board_cards) not in [0, 3, 4, 5]:
+      raise InvalidBoardSizeException()
+
     self.hole_cards = hole_cards
     self.board_cards = board_cards
     self.bet_history_vec = bet_history_vec
@@ -27,23 +35,16 @@ class InfoSet(object):
 
   def get_card_input_tensors(self):
     """
-    The network expects (tuple of torch.Tensor):
-    Shape ((B x 2), (B x 3)[, (B x 1), (B x 1)]) # Hole, board [, turn, river]).
+    Returns hole cards (1 x 2) and board cards (1 x 5).
     """
-    if len(self.board_cards) == 0:
-      return [self.hole_cards.unsqueeze(0).long(), -1*torch.ones(1, 3).long(),
-              -1*torch.ones(1, 1).long(), -1*torch.ones(1, 1).long()]
-    elif len(self.board_cards) == 3:
-      return [self.hole_cards.unsqueeze(0).long(), self.board_cards.unsqueeze(0).long(),
-             -1*torch.ones(1, 1).long(), -1*torch.ones(1, 1).long()]
-    elif len(self.board_cards) == 4:
-      return [self.hole_cards.unsqueeze(0).long(), self.board_cards[:3].unsqueeze(0).long(),
-              self.board_cards[3].view(1, 1).long(), -1*torch.ones(1, 1).long()]
-    elif len(self.board_cards) == 5:
-      return [self.hole_cards.unsqueeze(0).long(), self.board_cards[:3].unsqueeze(0).long(),
-              self.board_cards[3].view(1, 1).long(), self.board_cards[4].view(1, 1).long()]
-    else:
+    if len(self.board_cards) not in [0, 3, 4, 5]:
       raise InvalidBoardSizeException()
+
+    hole_cards = self.hole_cards.unsqueeze(0).long()
+    board_cards = -1 * torch.ones(1, 5).long()
+    board_cards[:,:len(self.board_cards)] = self.board_cards.unsqueeze(0).long()
+
+    return hole_cards, board_cards
 
   def get_bet_input_tensors(self):
     """
@@ -60,14 +61,30 @@ class InfoSet(object):
     Packs the infoset into a compact torch.Tensor of size:
       (1 player position, 2 hole cards, 5 board cards, num_betting_actions)
     """
-    board_cards_fixed_size = torch.zeros(5)
+    board_cards_fixed_size = -1 * torch.ones(5)
     board_cards_fixed_size[:len(self.board_cards)] = self.board_cards
     return torch.cat([
       torch.Tensor([self.player_position]),
       self.hole_cards,
       board_cards_fixed_size,
       self.bet_history_vec])
-    
+
+
+def unpack_infoset(tensor):
+  """
+  Unpack a compactified infoset tensor into an Infoset object.
+  """
+  player_position = tensor[0]
+  hole_cards = tensor[1:3]
+  num_board_cards = torch.sum(tensor[3:8] >= 0) # Cards with -1 indicate NA.
+  board_cards = tensor[3:3+num_board_cards]
+  bet_history_vec = tensor[1+2+5:]
+
+  if len(bet_history_vec) != Constants.NUM_BETTING_ACTIONS:
+    raise IncompatibleInfosetException()
+
+  return InfoSet(hole_cards, board_cards, bet_history_vec, player_position)
+
 
 def get_buffer_manifest_path(folder, buffer_name):
   """
@@ -214,61 +231,3 @@ class MemoryBuffer(object):
       "weights": self._weights
     }, buf_path)
     print(">> Saved buffer to {}".format(buf_path))
-
-
-class MemoryBufferDataset(Dataset):
-  def __init__(self, folder, buffer_name, n):
-    """
-    A PyTorch dataset for loading infosets and targets from disk. Because there are too many to fit
-    into memory at once, we resample a dataset of size n << N periodically by choosing n random
-    items from all N on disk.
-    """
-    self._folder = folder
-    self._buffer_name = buffer_name
-    self._n = int(n)
-
-    self._manifest_df = get_manifest_entries(self._folder, self._buffer_name)
-    self._N = int(self._manifest_df["num_entries"].sum())
-
-    self._infosets = None
-    self._weights = None
-    self._items = None
-    print(">> Made MemoryBufferDataset to store {}/{} items at a time".format(self._n, self._N))
-
-  def resample(self):
-    """
-    Resample the dataset by sampling n items from the N total items on disk.
-    """
-    self._infosets = None
-    self._weights = None
-    self._items = None
-
-    idx = torch.randint(0, self._N, (self._n,)).long()
-    cumul_idx = 0
-    for i in self._manifest_df.index:
-      num_entries = self._manifest_df["num_entries"][i]
-      idx_this_file = (idx[idx.ge(cumul_idx) * idx.le(cumul_idx + num_entries - 1)] - cumul_idx).long()
-      d = torch.load(self._manifest_df["filename"][i])
-      if self._infosets is None:
-        self._infosets = d["infosets"][idx_this_file]
-      else:
-        self._infosets = torch.cat([self._infosets, d["infosets"][idx_this_file]], axis=0)
-      if self._weights is None:
-        self._weights = d["weights"][idx_this_file]
-      else:
-        self._weights = torch.cat([self._weights, d["weights"][idx_this_file]], axis=0)
-      if self._items is None:
-        self._items = d["items"][idx_this_file]
-      else:
-        self._items = torch.cat([self._items, d["items"][idx_this_file]], axis=0)
-      cumul_idx += num_entries
-
-  def __len__(self):
-    return self._n
-
-  def __getitem__(self, idx):
-    return {
-      "infoset": self._infosets[idx],
-      "weight": self._weights[idx],
-      "target": self._items[idx]
-    }
