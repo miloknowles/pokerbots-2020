@@ -150,9 +150,9 @@ class Trainer(object):
 
     self.value_networks = {
       Constants.PLAYER1_UID: NetworkWrapper(Constants.NUM_STREETS, Constants.NUM_BETTING_ACTIONS,
-                                            Constants.NUM_ACTIONS, opt.EMBED_DIM),
+                                            Constants.NUM_ACTIONS, opt.EMBED_DIM, device=opt.DEVICE),
       Constants.PLAYER2_UID: NetworkWrapper(Constants.NUM_STREETS, Constants.NUM_BETTING_ACTIONS,
-                                            Constants.NUM_ACTIONS, opt.EMBED_DIM)
+                                            Constants.NUM_ACTIONS, opt.EMBED_DIM, device=opt.DEVICE)
     }
     self.value_networks[Constants.PLAYER1_UID]._network.share_memory()
     self.value_networks[Constants.PLAYER2_UID]._network.share_memory()
@@ -170,8 +170,8 @@ class Trainer(object):
   def main(self):
     for t in range(self.opt.NUM_CFR_ITERS):
       for traverse_player in [Constants.PLAYER1_UID, Constants.PLAYER2_UID]:
-        self.do_cfr_iter_for_player(traverse_player, t)
-        # self.train_value_network(traverse_player, t)
+        # self.do_cfr_iter_for_player(traverse_player, t)
+        self.train_value_network(traverse_player, t)
     # TODO(milo): Train strategy network.
   
   def do_cfr_iter_for_player(self, traverse_player, t):
@@ -196,7 +196,8 @@ class Trainer(object):
     losses = {}
 
     model_wrap = self.value_networks[traverse_player]
-    model_wrap.reset_network()
+    model_wrap = NetworkWrapper(Constants.NUM_STREETS, Constants.NUM_BETTING_ACTIONS,
+                                Constants.NUM_ACTIONS, self.opt.EMBED_DIM, device=self.opt.DEVICE)
 
     net = model_wrap.network()
     net.train()
@@ -220,21 +221,19 @@ class Trainer(object):
       print(">> Done")
 
       for batch_idx, input_dict in enumerate(train_loader):
+        hole_cards_input = input_dict["hole_cards"].to(self.opt.DEVICE)
+        board_cards_input = input_dict["board_cards"].to(self.opt.DEVICE)
+
         bets_input = input_dict["bets_input"].to(self.opt.DEVICE)
         advt_target = input_dict["target"].to(self.opt.DEVICE)
-
-        print(bets_input.shape)
-        print(advt_target.shape)
-
-        cards_input = input_dict["cards_input"].to(self.opt.DEVICE)
 
         optimizer.zero_grad()
 
         # Get predicted advantage from network.
-        output = net(cards_input, bets_input)
+        output = net(hole_cards_input, board_cards_input, bets_input)
 
         # Minimize MSE between predicted advantage and instantaneous regret samples.
-        loss = torch.nn.functional.mse_loss(inputs, regrets)
+        loss = torch.nn.functional.mse_loss(output, advt_target)
         loss.backward()
         losses["mse_loss/{}/{}".format(t, traverse_player)] = loss
 
@@ -269,9 +268,9 @@ class Trainer(object):
     """
     Write an event to the tensorboard events file.
     """
-    loss = "mse_loss/{}/{}".format(t, traverse_player)
+    loss = losses["mse_loss/{}/{}".format(t, traverse_player)]
     print("TRAINING | steps={} | loss={} | cfr_iter={}".format(steps, loss, t))
 
     writer = self.writers[mode]
     for l, v in losses.items():
-      writer.add_scalar("{}".format(l), v, self.step)
+      writer.add_scalar("{}".format(l), v, steps)

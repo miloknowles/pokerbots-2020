@@ -48,8 +48,8 @@ class NetworkWrapper(object):
   def get_action_probabilities_uniform(self, infoset):
     return torch.ones(Constants.NUM_ACTIONS) / Constants.NUM_ACTIONS
 
-  def reset_network(self):
-    """
-    Reset the network so that it outputs all zeros.
-    """
-    self._network = DeepCFRModel(self._ncardtypes, self._nbets, self._nactions, self._embed_dim)
+  # def reset_network(self):
+  #   """
+  #   Reset the network so that it outputs all zeros.
+  #   """
+  #   self._network = DeepCFRModel(self._ncardtypes, self._nbets, self._nactions, self._embed_dim)

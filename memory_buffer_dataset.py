@@ -56,18 +56,16 @@ class MemoryBufferDataset(Dataset):
 
   def __getitem__(self, idx):
     infoset = unpack_infoset(self._infosets[idx])
-    cards_input = infoset.get_card_input_tensors()
+
+    hole_cards, board_cards = infoset.get_card_input_tensors()
 
     # NOTE(milo): This function unsqueezes the first dim for traversal, but the DataLoader will
     # add another batch dimension anyways.
     bets_input, position_mask = infoset.get_bet_input_tensors()
 
-    # print(self._weights[idx].unsqueeze(0).shape)
-    # print(self._items[idx].shape)
-    # print(bets_input.shape)
-
     return {
-      "cards_input": cards_input,
+      "hole_cards": hole_cards.squeeze(0),
+      "board_cards": board_cards.squeeze(0),
       "bets_input": bets_input.squeeze(0),
       "weight": self._weights[idx].unsqueeze(0),
       "target": self._items[idx]
