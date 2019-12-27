@@ -116,7 +116,10 @@ def traverse(game_state, events, emulator, action_generator, infoset_generator,
       del evt, pot_size
 
       # Do regret matching to get action probabilities.
-      action_probs = strategies[traverse_player].get_action_probabilities(infoset)
+      if t == 0:
+        action_probs = strategies[traverse_player].get_action_probabilities_uniform(infoset)
+      else:
+        action_probs = strategies[traverse_player].get_action_probabilities(infoset)
       action_probs = apply_mask_and_normalize(action_probs, mask)
       assert torch.allclose(action_probs.sum(), torch.ones(1))
 
@@ -172,7 +175,10 @@ def traverse(game_state, events, emulator, action_generator, infoset_generator,
       actions, mask = action_generator(evt["valid_actions"], pot_size)
       del evt, pot_size
 
-      action_probs = strategies[traverse_player].get_action_probabilities(infoset)
+      if t == 0:
+        action_probs = strategies[other_player].get_action_probabilities_uniform(infoset)
+      else:
+        action_probs = strategies[other_player].get_action_probabilities(infoset)
       action_probs = apply_mask_and_normalize(action_probs, mask)
       assert torch.allclose(action_probs.sum(), torch.ones(1))
 

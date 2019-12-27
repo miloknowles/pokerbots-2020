@@ -69,10 +69,11 @@ class DeepCFRModel(nn.Module):
     self.action_head = nn.Linear(embed_dim, nactions)
 
     # NOTE(milo): Initialize so that all actions have equal output.
-    torch.nn.init.zeros_(self.action_head.weight)
-    torch.nn.init.ones_(self.action_head.bias)
+    # NOTE(milo): I think this could be problematic for training, so leaving it out. Better to just
+    # sample actions uniformly on the first training iteration.
+    # torch.nn.init.zeros_(self.action_head.weight)
+    # torch.nn.init.ones_(self.action_head.bias)
 
-  # def forward(self, cards, bets):
   def forward(self, hole_cards, board_cards, bets):
     """
     hole_cards (torch.Tensor) : Shape (B x 2)
@@ -92,9 +93,6 @@ class DeepCFRModel(nn.Module):
     card_embs.append(self.card_embeddings[1](flop))
     card_embs.append(self.card_embeddings[2](turn))
     card_embs.append(self.card_embeddings[3](river))
-  
-    # for embedding, card_group in zip(self.card_embeddings[1:], board_cards):
-    #   card_embs.append(embedding(card_group))
 
     card_embs = torch.cat(card_embs, dim=1)
 
