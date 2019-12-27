@@ -68,13 +68,31 @@ def traverse_until_turn(game_state, events, emulator, action_generator, traverse
       return None
 
 
+class TreeNodeInfo(object):
+  @staticmethod
+  def uuid_to_index(uuid):
+    return 0 if uuid == Constants.PLAYER1_UID else 1
+
+  def __init__(self):
+    self.strategy_ev = torch.zeros(2)
+    self.best_response_ev = torch.zeros(2)
+    self.exploitability = torch.zeros(2)
+
+
 def traverse(game_state, events, emulator, action_generator, infoset_generator,
              traverse_player, strategies, advt_mem, strt_mem, t, recursion_ctr=[0],
              do_external_sampling=True):
   """
   Recursively traverse the game tree with external sampling.
+
+  Returns:
+    payoff for traversing player (float)
+
   """
   with torch.no_grad():
+    node_info = TreeNodeInfo()
+    tp_index = TreeNodeInfo.uuid_to_index(traverse_player)
+
     recursion_ctr[0] += 1
     other_player = {Constants.PLAYER1_UID: Constants.PLAYER2_UID,
                     Constants.PLAYER2_UID: Constants.PLAYER1_UID}[traverse_player]
@@ -83,7 +101,10 @@ def traverse(game_state, events, emulator, action_generator, infoset_generator,
     is_terminal_node, winning_player, winning_stack = check_terminal_node(events)
     if is_terminal_node:
       payoff = (winning_stack - Constants.INITIAL_STACK)
-      return payoff if traverse_player == winning_player else (-1 * payoff)
+      node_info.strategy_ev[0] = payoff if winning_player == Constants.PLAYER1_UID else -1 * payoff
+      node_info.strategy_ev[1] = -1 * node_info.strategy_ev[0]
+      node_info.best_response_ev = node_info.strategy_ev
+      return node_info
 
     # CASE 1: Traversal player action node.
     is_player_node, uuid, evt = check_player_node(events)
@@ -96,29 +117,51 @@ def traverse(game_state, events, emulator, action_generator, infoset_generator,
 
       # Do regret matching to get action probabilities.
       action_probs = strategies[traverse_player].get_action_probabilities(infoset)
-
       action_probs = apply_mask_and_normalize(action_probs, mask)
       assert torch.allclose(action_probs.sum(), torch.ones(1))
 
-      values = torch.zeros(len(actions))
+      action_values = torch.zeros(2, len(actions))
+      br_values = torch.zeros(2, len(actions))
       instant_regrets = torch.zeros(len(actions))
+
+      plyr_idx = TreeNodeInfo.uuid_to_index(uuid)
+      opp_idx = (1 - plyr_idx)
 
       for i, a in enumerate(actions):
         if mask[i] == 0:
           continue
         updated_state, new_events = emulator.apply_action(game_state, a[0], a[1]) 
-        values[i] = traverse(updated_state, new_events, emulator, action_generator, infoset_generator,
+        child_node_info = traverse(updated_state, new_events, emulator, action_generator, infoset_generator,
                             traverse_player, strategies, advt_mem, strt_mem, t,
                             recursion_ctr=recursion_ctr, do_external_sampling=do_external_sampling)
+        
+        # Expected value of the acting player taking this action (for P1 and P2).
+        action_values[:,i] = child_node_info.strategy_ev
+
+        # Expected value for each player if the acting player takes this action and then they both
+        # follow a best-response strategy.
+        br_values[:,i] = child_node_info.best_response_ev
       
-      strategy_ev = (action_probs * values).sum().item()
-      instant_regrets = (values - strategy_ev * mask)
+      # Sum along every action multiplied by its probability of occurring.
+      node_info.strategy_ev = (action_values * action_probs).sum(axis=1)
+
+      # Compute the instantaneous regrets for the traversing player.
+      instant_regrets_tp = (action_values[tp_index] - (node_info.strategy_ev[tp_index] * mask))
+
+      # The acting player chooses the BEST action with probability 1, while the opponent best
+      # response EV depends on the reach probability of their next acting situation.
+      node_info.best_response_ev[plyr_idx] = torch.max(br_values[plyr_idx,:])
+      node_info.best_response_ev[opp_idx] = torch.sum(action_probs * br_values[opp_idx,:])
+
+      # Exploitability is the difference in payoff between a local best response strategy and the
+      # full mixed strategy.
+      node_info.exploitability = node_info.best_response_ev - node_info.strategy_ev
 
       # Add the instantaneous regrets to advantage memory for the traversing player.
       if advt_mem is not None:
-        advt_mem.add(infoset, instant_regrets, t)
+        advt_mem.add(infoset, instant_regrets_tp, t)
 
-      return strategy_ev
+      return node_info
 
     # CASE 2: Other player action node.
     elif is_player_node and uuid != traverse_player:
@@ -149,16 +192,43 @@ def traverse(game_state, events, emulator, action_generator, infoset_generator,
         
       # NO SAMPLING: Otherwise recurse on ALL non-traversal player actions.
       else:
-        values = torch.zeros(len(actions))
+        action_values = torch.zeros(2, len(actions))
+        br_values = torch.zeros(2, len(actions))
+        instant_regrets = torch.zeros(len(actions))
+
+        plyr_idx = TreeNodeInfo.uuid_to_index(uuid)
+        opp_idx = (1 - plyr_idx)
+
         for i, a in enumerate(actions):
           if mask[i] == 0:
             continue 
           updated_state, new_events = emulator.apply_action(game_state, a[0], a[1])
-          values[i] = traverse(updated_state, new_events, emulator, action_generator, infoset_generator,
+          child_node_info = traverse(updated_state, new_events, emulator, action_generator, infoset_generator,
                               traverse_player, strategies, advt_mem, strt_mem, t,
                               recursion_ctr=recursion_ctr, do_external_sampling=do_external_sampling)
-        strategy_ev = (action_probs * values).sum().item()
-        return strategy_ev
+          # Expected value of the acting player taking this action (for P1 and P2).
+          action_values[:,i] = child_node_info.strategy_ev
 
+          # Expected value for each player if the acting player takes this action and then they both
+          # follow a best-response strategy.
+          br_values[:,i] = child_node_info.best_response_ev
+        
+        # Sum along every action multiplied by its probability of occurring.
+        node_info.strategy_ev = (action_values * action_probs).sum(axis=1)
+
+        # Compute the instantaneous regrets for the traversing player.
+        instant_regrets_tp = (action_values[tp_index] - (node_info.strategy_ev[tp_index] * mask))
+
+        # The acting player chooses the BEST action with probability 1, while the opponent best
+        # response EV depends on the reach probability of their next acting situation.
+        node_info.best_response_ev[plyr_idx] = torch.max(br_values[plyr_idx,:])
+        node_info.best_response_ev[opp_idx] = torch.sum(action_probs * br_values[opp_idx,:])
+
+        # Exploitability is the difference in payoff between a local best response strategy and the
+        # full mixed strategy.
+        node_info.exploitability = node_info.best_response_ev - node_info.strategy_ev
+        
+        return node_info
+    
     else:
       raise NotImplementedError()

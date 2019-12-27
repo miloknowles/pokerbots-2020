@@ -11,13 +11,13 @@ from constants import Constants
 from options import Options
 from utils import *
 from traverse import traverse
-from memory import InfoSet, MemoryBuffer, MemoryBufferDataset
+from memory import InfoSet, MemoryBuffer
 from network_wrapper import NetworkWrapper
 from trainer import generate_actions, make_infoset
 
 
 NUM_TRAVERSALS_TOTAL = 10000
-NUM_PROCESSES = 2
+NUM_PROCESSES = 1
 NUM_TRAVERSALS_EACH = int(NUM_TRAVERSALS_TOTAL / NUM_PROCESSES)
 
 
@@ -49,8 +49,10 @@ def traverse_multiple(worker_id, traverse_player, strategies, t, save_lock):
     initial_state = emulator.generate_initial_game_state(players_info)
     game_state, events = emulator.start_new_round(initial_state)
 
-    traverse(game_state, [events[-1]], emulator, generate_actions, make_infoset, traverse_player,
-             strategies, advt_mem, strt_mem, t, recursion_ctr=ctr)
+    node_info = traverse(game_state, [events[-1]], emulator, generate_actions, make_infoset, traverse_player,
+             strategies, advt_mem, strt_mem, t, recursion_ctr=ctr, do_external_sampling=False)
+
+    print("Node info:", node_info.exploitability)
 
     if (k % 300) == 0:
       print("Finished {}/{} traversals".format(k, NUM_TRAVERSALS_EACH))

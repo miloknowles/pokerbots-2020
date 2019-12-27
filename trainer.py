@@ -191,10 +191,11 @@ class Trainer(object):
 
   def train_value_network(self, traverse_player, t):
     """
-    Train the advantage network from scratch using samples from the traverse player's buffer.
+    Train a value network from scratch using samples from the traverse player's buffer.
     """
     losses = {}
 
+    # This causes the network to be reset.
     model_wrap = self.value_networks[traverse_player]
     model_wrap = NetworkWrapper(Constants.NUM_STREETS, Constants.NUM_BETTING_ACTIONS,
                                 Constants.NUM_ACTIONS, self.opt.EMBED_DIM, device=self.opt.DEVICE)
@@ -239,7 +240,6 @@ class Trainer(object):
 
         if (batch_idx % self.opt.TRAINING_LOG_HZ) == 0:
           self.log("train", traverse_player, t, losses, batch_idx)
-          # self.val()
 
         # Only need to save the value network for the traversing player.
         if (batch_idx % self.opt.TRAINING_VALUE_NET_SAVE_HZ) == 0:
@@ -252,6 +252,7 @@ class Trainer(object):
     """
     Save model weights to disk.
 
+    t (int) : The CFR iteration that these models are being trained on.
     save_value_networks (list of str) : Zero or more of [PLAYER1_UID, PLAYER2_UID].
     save_strategy_network (bool) : Whether or not to save the current strategy network.
     """
