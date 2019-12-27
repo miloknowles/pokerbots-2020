@@ -73,6 +73,10 @@ class Options(object):
                 type=int,
                 help="Save the value network after this many minibatches",
                 default=8000)
+    self.parser.add_argument("--NUM_TRAVERSALS_EVAL",
+                type=int,
+                help="Number of traversals for evaluating exploitability",
+                default=10)
 
   #=========================== TRAVERSAL PARAMS ==============================
   # NUM_CFR_ITERS = 100               # Exploitability seems to converge around 100 iters.

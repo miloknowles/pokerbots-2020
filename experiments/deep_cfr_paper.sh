@@ -3,3 +3,4 @@ python ../train.py --EXPERIMENT_NAME deep_cfr_paper \
   --NUM_TRAVERSALS_PER_ITER 1000 \
   --TRAINING_VALUE_NET_SAVE_HZ 10 \
   --SGD_BATCH_SIZE 100 \
+  --NUM_TRAVERSALS_EVAL 2 \

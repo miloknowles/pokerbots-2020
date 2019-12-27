@@ -97,22 +97,28 @@ def generate_actions(valid_actions, pot_amount):
   return actions_scaled, actions_mask
 
 
-def traverse_worker(worker_id, traverse_player, strategies, save_lock, opt, t):
+def traverse_worker(worker_id, traverse_player, strategies, save_lock, opt, t, eval_mode=False, info_queue=None):
   """
   A worker that traverses the game tree K times, saving things to memory buffers. Each worker
   maintains its own memory buffers and saves them after finishing.
+
+  If eval_mode is set to True, no memory buffers are created.
   """
   advt_mem = MemoryBuffer(Constants.INFO_SET_SIZE, Constants.NUM_ACTIONS,
                           max_size=opt.SINGLE_PROC_MEM_BUFFER_MAX_SIZE,
                           autosave_params=(opt.MEMORY_FOLDER, opt.ADVT_BUFFER_FMT.format(traverse_player)),
-                          save_lock=save_lock)
+                          save_lock=save_lock) if eval_mode == False else None
   
   strt_mem = MemoryBuffer(Constants.INFO_SET_SIZE, Constants.NUM_ACTIONS,
                           max_size=opt.SINGLE_PROC_MEM_BUFFER_MAX_SIZE,
                           autosave_params=(opt.MEMORY_FOLDER, opt.STRT_BUFFER_FMT),
-                          save_lock=save_lock)
+                          save_lock=save_lock) if eval_mode == False else None
 
-  num_traversals_per_worker = int(opt.NUM_TRAVERSALS_PER_ITER / opt.NUM_TRAVERSE_WORKERS)
+  if eval_mode:
+    num_traversals_per_worker = int(opt.NUM_TRAVERSALS_EVAL / opt.NUM_TRAVERSE_WORKERS)
+  else:
+    num_traversals_per_worker = int(opt.NUM_TRAVERSALS_PER_ITER / opt.NUM_TRAVERSE_WORKERS)
+  
   for k in range(num_traversals_per_worker):
     ctr = [0]
 
@@ -131,17 +137,20 @@ def traverse_worker(worker_id, traverse_player, strategies, save_lock, opt, t):
     initial_state = emulator.generate_initial_game_state(players_info)
     game_state, events = emulator.start_new_round(initial_state)
 
-    traverse(game_state, [events[-1]], emulator, generate_actions, make_infoset, traverse_player,
-             strategies, advt_mem, strt_mem, t, recursion_ctr=ctr, do_external_sampling=True)
+    info = traverse(game_state, [events[-1]], emulator, generate_actions, make_infoset, traverse_player,
+             strategies, advt_mem, strt_mem, t, recursion_ctr=ctr, do_external_sampling=not eval_mode)
 
-    if (k % opt.TRAVERSE_DEBUG_PRINT_HZ) == 0:
+    if info_queue is not None:
+      info_queue.put(info, True, 0.1)
+
+    if (k % opt.TRAVERSE_DEBUG_PRINT_HZ) == 0 and eval_mode == False:
       print("[WORKER #{}] done with {}/{} traversals | recursion depth={} | advt={} strt={}".format(
             worker_id, k, num_traversals_per_worker, ctr[0], advt_mem.size(), strt_mem.size()))
 
   # Save all the buffers one last time.
   print("[WORKER #{}] Final autosave ...".format(worker_id))
-  advt_mem.autosave()
-  strt_mem.autosave()
+  if advt_mem is not None: advt_mem.autosave()
+  if strt_mem is not None: strt_mem.autosave()
 
 
 class Trainer(object):
@@ -164,14 +173,15 @@ class Trainer(object):
     print("[DONE] Made strategy network")
 
     self.writers = {}
-    for mode in ["train", "val"]:
+    for mode in ["train", "eval"]:
       self.writers[mode] = SummaryWriter(os.path.join(opt.TRAIN_LOG_FOLDER, mode))
 
   def main(self):
     for t in range(self.opt.NUM_CFR_ITERS):
       for traverse_player in [Constants.PLAYER1_UID, Constants.PLAYER2_UID]:
         # self.do_cfr_iter_for_player(traverse_player, t)
-        self.train_value_network(traverse_player, t)
+        # self.train_value_network(traverse_player, t)
+        self.eval_value_network("eval", t, None)
     # TODO(milo): Train strategy network.
   
   def do_cfr_iter_for_player(self, traverse_player, t):
@@ -182,7 +192,7 @@ class Trainer(object):
 
     mp.spawn(
       traverse_worker,
-      args=(traverse_player, self.value_networks, save_lock, self.opt, t),
+      args=(traverse_player, self.value_networks, save_lock, self.opt, t, False, None),
       nprocs=self.opt.NUM_TRAVERSE_WORKERS, join=True, daemon=False)
 
     elapsed = time.time() - t0
@@ -245,8 +255,8 @@ class Trainer(object):
         if (batch_idx % self.opt.TRAINING_VALUE_NET_SAVE_HZ) == 0:
           self.save_models(t, save_value_networks=[traverse_player], save_strategy_network=False)
 
-        # if (batch_idx % self.opt.TRAINING_VALUE_NET_EVAL_HZ) == 0:
-          # self.eval_value_network()
+        if (batch_idx % self.opt.TRAINING_VALUE_NET_EVAL_HZ) == 0:
+          self.eval_value_network("train", t, batch_idx)
 
   def save_models(self, t, save_value_networks=[], save_strategy_network=False):
     """
@@ -274,8 +284,41 @@ class Trainer(object):
     
     print("Saved models to {}".format(save_folder))
 
-  def eval_value_network(self):
-    raise NotImplementedError()
+  def eval_value_network(self, mode, t, steps):
+    """
+    Evaluate the (total) exploitability of the value networks, as in Brown et. al.
+    """
+    manager = mp.Manager()
+    save_lock = manager.Lock()
+    info_queue = manager.Queue()
+
+    t0 = time.time()
+
+    # Use worker with eval_mode = True.
+    mp.spawn(
+      traverse_worker,
+      args=(Constants.PLAYER1_UID, self.value_networks, save_lock, self.opt, t, True, info_queue),
+      nprocs=self.opt.NUM_TRAVERSE_WORKERS, join=True, daemon=False)
+
+    elapsed = time.time() - t0
+    print("Time for {} traversals across {} workers: {} sec".format(
+      self.opt.NUM_TRAVERSALS_EVAL, self.opt.NUM_TRAVERSE_WORKERS, elapsed))
+
+    total_exploits = []
+
+    while not info_queue.empty():
+      info = info_queue.get_nowait()
+      total_exploits.append(info.exploitability.sum())
+
+    avg_total_exploit = torch.mean(torch.Tensor(total_exploits))
+    writer = self.writers[mode]
+
+    if mode == "train":
+      writer.add_scalar("avg_total_exploit/{}".format(t), avg_total_exploit, steps)
+    else:
+      writer.add_scalar("avg_total_exploit", avg_total_exploit, t)
+
+    print("========> [EVAL] Avg Total Exploitability={} (cfr_iter={})".format(avg_total_exploit, t))
 
   def log(self, mode, traverse_player, t, losses, steps):
     """
