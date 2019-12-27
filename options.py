@@ -61,6 +61,18 @@ class Options(object):
                 type=int,
                 help="Number of dataset batch fetching workers",
                 default=4)
+    self.parser.add_argument("--TRAINING_LOG_HZ",
+                type=int,
+                help="Log info after this many minibatches",
+                default=10)
+    self.parser.add_argument("--TRAINING_VALUE_NET_SAVE_HZ",
+                type=int,
+                help="Save the value network after this many minibatches",
+                default=8000)
+    self.parser.add_argument("--TRAINING_VALUE_NET_EVAL_HZ",
+                type=int,
+                help="Save the value network after this many minibatches",
+                default=8000)
 
   #=========================== TRAVERSAL PARAMS ==============================
   # NUM_CFR_ITERS = 100               # Exploitability seems to converge around 100 iters.

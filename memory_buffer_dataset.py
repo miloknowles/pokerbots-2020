@@ -10,6 +10,10 @@ class MemoryBufferDataset(Dataset):
     A PyTorch dataset for loading infosets and targets from disk. Because there are too many to fit
     into memory at once, we resample a dataset of size n << N periodically by choosing n random
     items from all N on disk.
+    
+    folder (str) : The folder where a manifest .csv is for the memory buffer.
+    buffer_name (str) : The name of this buffer (used a prefix in files).
+    n (int) : The container size of this dataset (n << N).
     """
     self._folder = folder
     self._buffer_name = buffer_name
@@ -21,7 +25,8 @@ class MemoryBufferDataset(Dataset):
     self._infosets = None
     self._weights = None
     self._items = None
-    print(">> Made MemoryBufferDataset to store {}/{} items at a time".format(self._n, self._N))
+    print(">> MemoryBufferDataset | folder={} | name={} | size(n)={} | total(N)={}".format(
+      self._folder, self._buffer_name, self._n, self._N))
 
   def resample(self):
     """
@@ -52,7 +57,7 @@ class MemoryBufferDataset(Dataset):
       cumul_idx += num_entries
 
   def __len__(self):
-    return self._n
+    return self._N
 
   def __getitem__(self, idx):
     infoset = unpack_infoset(self._infosets[idx])

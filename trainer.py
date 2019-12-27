@@ -218,7 +218,7 @@ class Trainer(object):
     for resample_iter in range(num_resample_iters):
       print(">> Doing resample iteration {}/{} ...".format(resample_iter, num_resample_iters))
       train_dataset.resample()
-      print(">> Done")
+      print(">> Done. DataLoader has {} batches of size {}.".format(len(train_loader), self.opt.SGD_BATCH_SIZE))
 
       for batch_idx, input_dict in enumerate(train_loader):
         hole_cards_input = input_dict["hole_cards"].to(self.opt.DEVICE)
@@ -229,39 +229,51 @@ class Trainer(object):
 
         optimizer.zero_grad()
 
-        # Get predicted advantage from network.
-        output = net(hole_cards_input, board_cards_input, bets_input)
-
         # Minimize MSE between predicted advantage and instantaneous regret samples.
+        output = net(hole_cards_input, board_cards_input, bets_input)
         loss = torch.nn.functional.mse_loss(output, advt_target)
         loss.backward()
         losses["mse_loss/{}/{}".format(t, traverse_player)] = loss
 
         optimizer.step()
 
-        if batch_idx % 1000 == 0:
+        if (batch_idx % self.opt.TRAINING_LOG_HZ) == 0:
           self.log("train", traverse_player, t, losses, batch_idx)
           # self.val()
 
-  def save_models(self, t):
+        # Only need to save the value network for the traversing player.
+        if (batch_idx % self.opt.TRAINING_VALUE_NET_SAVE_HZ) == 0:
+          self.save_models(t, save_value_networks=[traverse_player], save_strategy_network=False)
+
+        # if (batch_idx % self.opt.TRAINING_VALUE_NET_EVAL_HZ) == 0:
+          # self.eval_value_network()
+
+  def save_models(self, t, save_value_networks=[], save_strategy_network=False):
     """
     Save model weights to disk.
+
+    save_value_networks (list of str) : Zero or more of [PLAYER1_UID, PLAYER2_UID].
+    save_strategy_network (bool) : Whether or not to save the current strategy network.
     """
     save_folder = os.path.join(self.opt.TRAIN_LOG_FOLDER, "models", "weights_{}".format(t))
     if not os.path.exists(save_folder):
-      os.makedirs(save_folder)
+      os.makedirs(save_folder, exist_ok=True)
 
-    for player_name, wrap in self.value_networks.items():
+    # Optionally save the value networks.
+    for player_name in save_value_networks:
       save_path = os.path.join(save_folder, "value_network_{}.pth".format(player_name))
-      to_save = wrap.network().state_dict()
+      to_save = self.value_networks[player_name].network().state_dict()
       torch.save(to_save, save_path)
 
     # Save the strategy network also.
-    save_path = os.path.join(save_folder, "strategy_nentwork.pth")
-    to_save = self.strategy_network.network().state_dict()
-    torch.save(to_save, save_path)
+    if save_strategy_network:
+      save_path = os.path.join(save_folder, "strategy_network_{}.pth".format(t))
+      to_save = self.strategy_network.network().state_dict()
+      torch.save(to_save, save_path)
+    
+    print("Saved models to {}".format(save_folder))
 
-  def val(self):
+  def eval_value_network(self):
     raise NotImplementedError()
 
   def log(self, mode, traverse_player, t, losses, steps):
