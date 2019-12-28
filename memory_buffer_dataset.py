@@ -57,7 +57,11 @@ class MemoryBufferDataset(Dataset):
       cumul_idx += num_entries
 
   def __len__(self):
-    return self._N
+    """
+    This dataset will hold at most "n" things, but maybe have fewer than that if the number of items
+    on disk ("N") is less than the max size.
+    """
+    return min(self._n, self._N)
 
   def __getitem__(self, idx):
     infoset = unpack_infoset(self._infosets[idx])

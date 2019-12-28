@@ -244,7 +244,7 @@ class Trainer(object):
 
     # Due to memory limitations, we can only store a subset of the dataset in memory at a time.
     # Calculate the number of times we'll have to resample and iterate over the dataset.
-    num_resample_iters = int((self.opt.SGD_ITERS * self.opt.SGD_BATCH_SIZE) / self.opt.TRAIN_DATASET_SIZE)
+    num_resample_iters = int((self.opt.SGD_ITERS * self.opt.SGD_BATCH_SIZE) / train_dataset.size())
 
     step = 0
     for resample_iter in range(num_resample_iters):
