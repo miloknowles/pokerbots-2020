@@ -1,3 +1,4 @@
+import ray
 from copy import deepcopy
 import os, time
 
@@ -182,8 +183,8 @@ class Trainer(object):
   def main(self):
     for t in range(self.opt.NUM_CFR_ITERS):
       for traverse_player in [Constants.PLAYER1_UID, Constants.PLAYER2_UID]:
-        # self.do_cfr_iter_for_player(traverse_player, t)
-        # self.train_value_network(traverse_player, t)
+        self.do_cfr_iter_for_player(traverse_player, t)
+        self.train_value_network(traverse_player, t)
         self.eval_value_network("cfr", t, None)
     # TODO(milo): Train strategy network.
   

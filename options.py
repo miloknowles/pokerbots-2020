@@ -56,11 +56,11 @@ class Options(object):
     self.parser.add_argument("--TRAIN_DATASET_SIZE",
                 type=int,
                 help="The number of training examples to hold in memory at a time",
-                default=1e6)
+                default=1e7)
     self.parser.add_argument("--NUM_DATA_WORKERS",
                 type=int,
                 help="Number of dataset batch fetching workers",
-                default=4)
+                default=6)
     self.parser.add_argument("--TRAINING_LOG_HZ",
                 type=int,
                 help="Log info after this many minibatches",
@@ -72,7 +72,7 @@ class Options(object):
     self.parser.add_argument("--TRAINING_VALUE_NET_EVAL_HZ",
                 type=int,
                 help="Save the value network after this many minibatches",
-                default=8000)
+                default=4000)
     self.parser.add_argument("--NUM_TRAVERSALS_EVAL",
                 type=int,
                 help="Number of traversals for evaluating exploitability",
