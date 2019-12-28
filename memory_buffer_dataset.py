@@ -67,11 +67,12 @@ class MemoryBufferDataset(Dataset):
     # NOTE(milo): This function unsqueezes the first dim for traversal, but the DataLoader will
     # add another batch dimension anyways.
     bets_input, position_mask = infoset.get_bet_input_tensors()
+    bets_input = bets_input * position_mask
 
     return {
       "hole_cards": hole_cards.squeeze(0),
       "board_cards": board_cards.squeeze(0),
       "bets_input": bets_input.squeeze(0),
-      "weight": self._weights[idx].unsqueeze(0),
+      "weights": self._weights[idx].unsqueeze(0),
       "target": self._items[idx]
     }

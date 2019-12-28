@@ -77,6 +77,9 @@ class Options(object):
                 type=int,
                 help="Number of traversals for evaluating exploitability",
                 default=10)
+    self.parser.add_argument("--LINEAR_CFR_LOSS",
+                default=True,
+                action="store_true")
 
   #=========================== TRAVERSAL PARAMS ==============================
   # NUM_CFR_ITERS = 100               # Exploitability seems to converge around 100 iters.

@@ -29,7 +29,8 @@ class NetworkWrapper(object):
       hole_cards = hole_cards.to(self._device)
       board_cards = board_cards.to(self._device)
 
-      bets_input = infoset.get_bet_input_tensors()[0].to(self._device)
+      bets_input, position_mask = infoset.get_bet_input_tensors()
+      bets_input = (bets_input * position_mask).to(self._device)
 
       normalized_adv = self._network(hole_cards, board_cards, bets_input)[0]
 

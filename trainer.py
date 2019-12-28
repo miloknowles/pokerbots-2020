@@ -97,7 +97,8 @@ def generate_actions(valid_actions, pot_amount):
   return actions_scaled, actions_mask
 
 
-def traverse_worker(worker_id, traverse_player, strategies, save_lock, opt, t, eval_mode=False, info_queue=None):
+def traverse_worker(worker_id, traverse_player, strategies, save_lock, opt, t, eval_mode,
+                    info_queue):
   """
   A worker that traverses the game tree K times, saving things to memory buffers. Each worker
   maintains its own memory buffers and saves them after finishing.
@@ -119,6 +120,7 @@ def traverse_worker(worker_id, traverse_player, strategies, save_lock, opt, t, e
   else:
     num_traversals_per_worker = int(opt.NUM_TRAVERSALS_PER_ITER / opt.NUM_TRAVERSE_WORKERS)
   
+  t0 = time.time()
   for k in range(num_traversals_per_worker):
     ctr = [0]
 
@@ -144,8 +146,9 @@ def traverse_worker(worker_id, traverse_player, strategies, save_lock, opt, t, e
       info_queue.put(info, True, 0.1)
 
     if (k % opt.TRAVERSE_DEBUG_PRINT_HZ) == 0 and eval_mode == False:
-      print("[WORKER #{}] done with {}/{} traversals | recursion depth={} | advt={} strt={}".format(
-            worker_id, k, num_traversals_per_worker, ctr[0], advt_mem.size(), strt_mem.size()))
+      elapsed = time.time() - t0
+      print("[WORKER #{}] done with {}/{} traversals | recursion depth={} | advt={} strt={} | elapsed={} sec".format(
+            worker_id, k, num_traversals_per_worker, ctr[0], advt_mem.size(), strt_mem.size(), elapsed))
 
   # Save all the buffers one last time.
   print("[WORKER #{}] Final autosave ...".format(worker_id))
@@ -173,7 +176,7 @@ class Trainer(object):
     print("[DONE] Made strategy network")
 
     self.writers = {}
-    for mode in ["train", "eval"]:
+    for mode in ["train", "cfr"]:
       self.writers[mode] = SummaryWriter(os.path.join(opt.TRAIN_LOG_FOLDER, mode))
 
   def main(self):
@@ -181,12 +184,13 @@ class Trainer(object):
       for traverse_player in [Constants.PLAYER1_UID, Constants.PLAYER2_UID]:
         # self.do_cfr_iter_for_player(traverse_player, t)
         # self.train_value_network(traverse_player, t)
-        self.eval_value_network("eval", t, None)
+        self.eval_value_network("cfr", t, None)
     # TODO(milo): Train strategy network.
   
   def do_cfr_iter_for_player(self, traverse_player, t):
     manager = mp.Manager()
     save_lock = manager.Lock()
+    progress_queue = manager.Queue()
 
     t0 = time.time()
 
@@ -198,6 +202,21 @@ class Trainer(object):
     elapsed = time.time() - t0
     print("Time for {} traversals across {} workers: {} sec".format(
       self.opt.NUM_TRAVERSALS_PER_ITER, self.opt.NUM_TRAVERSE_WORKERS, elapsed))
+
+  def linear_cfr_loss(self, output, target, weights, T):
+    """
+    Mean-squared error loss, where each example is weighted by its CFR iteration t. We divide the
+    loss by the mean weight so that the batch has an average weight of 1.
+
+    output (torch.Tensor) : Shape (batch_size, num_actions).
+    target (torch.Tensor) : Shape (batch_size, num_actions).
+    weights (torch.Tensor) : Shape (batch_size).
+    T (int) : The current CFR iteration that we're training for (used in normalization).
+    """
+    # NOTE(milo): Need to add 1 to the weights to deal with zeroth CFR iteration.
+    weights_safe = (weights + 1.0)
+    weighted_se = weights_safe * (target - output).pow(2) / weights_safe.mean()
+    return weighted_se.mean()
 
   def train_value_network(self, traverse_player, t):
     """
@@ -226,6 +245,7 @@ class Trainer(object):
     # Calculate the number of times we'll have to resample and iterate over the dataset.
     num_resample_iters = int((self.opt.SGD_ITERS * self.opt.SGD_BATCH_SIZE) / self.opt.TRAIN_DATASET_SIZE)
 
+    step = 0
     for resample_iter in range(num_resample_iters):
       print(">> Doing resample iteration {}/{} ...".format(resample_iter, num_resample_iters))
       train_dataset.resample()
@@ -238,25 +258,30 @@ class Trainer(object):
         bets_input = input_dict["bets_input"].to(self.opt.DEVICE)
         advt_target = input_dict["target"].to(self.opt.DEVICE)
 
+        weights = input_dict["weights"].to(self.opt.DEVICE)
+
         optimizer.zero_grad()
 
         # Minimize MSE between predicted advantage and instantaneous regret samples.
         output = net(hole_cards_input, board_cards_input, bets_input)
-        loss = torch.nn.functional.mse_loss(output, advt_target)
+        loss = self.linear_cfr_loss(output, advt_target, weights, t)
+        # loss = torch.nn.functional.mse_loss(output, advt_target)
         loss.backward()
-        losses["mse_loss/{}/{}".format(t, traverse_player)] = loss
+        losses["mse_loss/{}/{}".format(t, traverse_player)] = loss.cpu().item()
 
         optimizer.step()
 
         if (batch_idx % self.opt.TRAINING_LOG_HZ) == 0:
-          self.log("train", traverse_player, t, losses, batch_idx)
+          self.log("train", traverse_player, t, losses, step)
 
         # Only need to save the value network for the traversing player.
         if (batch_idx % self.opt.TRAINING_VALUE_NET_SAVE_HZ) == 0:
           self.save_models(t, save_value_networks=[traverse_player], save_strategy_network=False)
 
-        if (batch_idx % self.opt.TRAINING_VALUE_NET_EVAL_HZ) == 0:
-          self.eval_value_network("train", t, batch_idx)
+        if (batch_idx % self.opt.TRAINING_VALUE_NET_EVAL_HZ) == 0 and batch_idx > 0:
+          self.eval_value_network("train", t, step)
+        
+        step += 1
 
   def save_models(self, t, save_value_networks=[], save_strategy_network=False):
     """
@@ -311,22 +336,31 @@ class Trainer(object):
       total_exploits.append(info.exploitability.sum())
 
     avg_total_exploit = torch.mean(torch.Tensor(total_exploits))
+    mbb_per_game = 1e3 * avg_total_exploit / (2 * Constants.SMALL_BLIND_AMOUNT)
+
     writer = self.writers[mode]
 
     if mode == "train":
-      writer.add_scalar("avg_total_exploit/{}".format(t), avg_total_exploit, steps)
+      writer.add_scalar("training_exploit_mbbg/{}".format(t), mbb_per_game, steps)
+    
+    # In eval mode, we log the mbb/g exploitability after each CFR iteration.
     else:
-      writer.add_scalar("avg_total_exploit", avg_total_exploit, t)
-
-    print("========> [EVAL] Avg Total Exploitability={} (cfr_iter={})".format(avg_total_exploit, t))
+      writer.add_scalar("cfr_exploit_mbbg", mbb_per_game, t)
+    
+    writer.close()
+    print("===> [EVAL] Avg total exploitability={} mbb/g (cfr_iter={})".format(mbb_per_game, t))
 
   def log(self, mode, traverse_player, t, losses, steps):
     """
     Write an event to the tensorboard events file.
     """
     loss = losses["mse_loss/{}/{}".format(t, traverse_player)]
-    print("TRAINING | steps={} | loss={} | cfr_iter={}".format(steps, loss, t))
+    print("==> TRAINING | steps={} | loss={} | cfr_iter={}".format(steps, loss, t))
 
     writer = self.writers[mode]
     for l, v in losses.items():
+      print("logging", l, v, steps)
       writer.add_scalar("{}".format(l), v, steps)
+
+    # For some reason need this for logging to work.
+    writer.close()
