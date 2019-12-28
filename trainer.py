@@ -181,11 +181,13 @@ class Trainer(object):
       self.writers[mode] = SummaryWriter(os.path.join(opt.TRAIN_LOG_FOLDER, mode))
 
   def main(self):
+    eval_t = 0
     for t in range(self.opt.NUM_CFR_ITERS):
       for traverse_player in [Constants.PLAYER1_UID, Constants.PLAYER2_UID]:
         self.do_cfr_iter_for_player(traverse_player, t)
         self.train_value_network(traverse_player, t)
-        self.eval_value_network("cfr", t, None)
+        self.eval_value_network("cfr", eval_t, None)
+        eval_t += 1
     # TODO(milo): Train strategy network.
   
   def do_cfr_iter_for_player(self, traverse_player, t):
@@ -244,7 +246,7 @@ class Trainer(object):
 
     # Due to memory limitations, we can only store a subset of the dataset in memory at a time.
     # Calculate the number of times we'll have to resample and iterate over the dataset.
-    num_resample_iters = int((self.opt.SGD_ITERS * self.opt.SGD_BATCH_SIZE) / train_dataset.size())
+    num_resample_iters = int((self.opt.SGD_ITERS * self.opt.SGD_BATCH_SIZE) / len(train_dataset))
 
     step = 0
     for resample_iter in range(num_resample_iters):
@@ -336,20 +338,24 @@ class Trainer(object):
       info = info_queue.get_nowait()
       total_exploits.append(info.exploitability.sum())
 
-    avg_total_exploit = torch.mean(torch.Tensor(total_exploits))
-    mbb_per_game = 1e3 * avg_total_exploit / (2 * Constants.SMALL_BLIND_AMOUNT)
+    mbb_per_game = 1e3 * torch.Tensor(total_exploits) / (2.0 * Constants.SMALL_BLIND_AMOUNT)
+    mean_mbb_per_game = mbb_per_game.mean()
+    stdev_mbb_per_game = mbb_per_game.std()
 
     writer = self.writers[mode]
 
     if mode == "train":
-      writer.add_scalar("training_exploit_mbbg/{}".format(t), mbb_per_game, steps)
+      writer.add_scalar("train_exploit_mbbg_mean/{}".format(t), mean_mbb_per_game, steps)
+      writer.add_scalar("train_exploit_mbbg_stdev/{}".format(t), stdev_mbb_per_game, steps)
     
     # In eval mode, we log the mbb/g exploitability after each CFR iteration.
     else:
-      writer.add_scalar("cfr_exploit_mbbg", mbb_per_game, t)
+      writer.add_scalar("cfr_exploit_mbbg_mean", mean_mbb_per_game, t)
+      writer.add_scalar("cfr_exploit_mbbg_stdev", stdev_mbb_per_game, t)
     
     writer.close()
-    print("===> [EVAL] Avg total exploitability={} mbb/g (cfr_iter={})".format(mbb_per_game, t))
+    print("===> [EVAL] Exploitability | mean={} mbb/g | stdev={} | (cfr_iter={})".format(
+        mean_mbb_per_game, stdev_mbb_per_game, t))
 
   def log(self, mode, traverse_player, t, losses, steps):
     """
@@ -360,7 +366,6 @@ class Trainer(object):
 
     writer = self.writers[mode]
     for l, v in losses.items():
-      print("logging", l, v, steps)
       writer.add_scalar("{}".format(l), v, steps)
 
     # For some reason need this for logging to work.
