@@ -370,3 +370,21 @@ class Trainer(object):
 
     # For some reason need this for logging to work.
     writer.close()
+
+  def load_networks(self, t):
+    save_folder = os.path.join(self.opt.TRAIN_LOG_FOLDER, "models", "weights_{}".format(t))
+    if not os.path.exists(save_folder):
+      os.makedirs(save_folder, exist_ok=True)
+
+    for player_name in [Constants.PLAYER1_UID, Constants.PLAYER2_UID]:
+      save_path = os.path.join(save_folder, "value_network_{}.pth".format(player_name))
+      if os.path.exists(save_path):
+        model_dict = self.value_networks[player_name].network().state_dict()
+        model_dict.update(torch.load(save_path))
+        print("==> Loaded value network weights for {} from {}".format(player_name, save_path))
+
+    strt_load_path = os.path.join(save_folder, "strategy_network_{}.pth".format(t))
+    if os.path.exists(strt_load_path):
+      model_dict = self.strategy_network.network().state_dict()
+      model_dict.update(torch.load(strt_load_path))
+      print("==> Loaded strategy network weights from", strt_load_path)
