@@ -80,6 +80,9 @@ class Options(object):
     self.parser.add_argument("--LINEAR_CFR_LOSS",
                 default=True,
                 action="store_true")
+    self.parser.add_argument("--LOAD_WEIGHTS_PATH",
+                type=str,
+                help="Path to a folder with model.pth files inside of it")
 
   #=========================== TRAVERSAL PARAMS ==============================
   # NUM_CFR_ITERS = 100               # Exploitability seems to converge around 100 iters.
