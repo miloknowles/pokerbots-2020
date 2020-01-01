@@ -17,27 +17,22 @@ from memory_buffer_dataset import MemoryBufferDataset
 from network_wrapper import NetworkWrapper
 
 
-def make_infoset(game_state, evt):
+def make_infoset_helper(hole_suit_rank, round_state):
   """
   Make an infoset representation for the player about to act.
   """
   # NOTE(milo): Acting position is 0 if this player is the SB (first to act) and 1 if BB.
-  small_blind_player_idx = (evt["round_state"]["big_blind_pos"] + 1) % 2
-  acting_player_idx = int(evt["round_state"]["next_player"])
+  small_blind_player_idx = (round_state["big_blind_pos"] + 1) % 2
+  acting_player_idx = int(round_state["next_player"])
 
   # This is 0 if the current acting player is the SB and 1 if BB.
   acting_player_blind = 0 if small_blind_player_idx == acting_player_idx else 1
 
   # NOTE(milo): PyPokerEngine encodes cards with rank-suit i.e CJ.
-  board_suit_rank = evt["round_state"]["community_card"]
-
-  players = game_state["table"].seats.players
-  hole_suit_rank = [
-    str(players[acting_player_idx].hole_card[0]),
-    str(players[acting_player_idx].hole_card[1])]
+  board_suit_rank = round_state["community_card"]
 
   bet_history_vec = torch.zeros(Constants.NUM_BETTING_ACTIONS)
-  h = evt["round_state"]["action_histories"]
+  h = round_state["action_histories"]
   
   # Always start out with SB + BB in the pot.
   pot_total = (3 * Constants.SMALL_BLIND_AMOUNT)
@@ -58,6 +53,16 @@ def make_infoset(game_state, evt):
     acting_player_idx)
 
   return infoset
+
+
+def make_infoset(game_state, evt):
+  acting_player_idx = int(evt["round_state"]["next_player"])
+  players = game_state["table"].seats.players
+  hole_suit_rank = [
+    str(players[acting_player_idx].hole_card[0]),
+    str(players[acting_player_idx].hole_card[1])]
+
+  return make_infoset_helper(hole_suit_rank, evt["round_state"])
 
 
 def generate_actions(valid_actions, pot_amount):
@@ -191,6 +196,9 @@ class Trainer(object):
     # TODO(milo): Train strategy network.
   
   def do_cfr_iter_for_player(self, traverse_player, t):
+    self.value_networks[Constants.PLAYER1_UID]._network.share_memory()
+    self.value_networks[Constants.PLAYER2_UID]._network.share_memory()
+
     manager = mp.Manager()
     save_lock = manager.Lock()
     progress_queue = manager.Queue()

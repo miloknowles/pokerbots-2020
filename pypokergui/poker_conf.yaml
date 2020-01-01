@@ -1,0 +1,15 @@
+{
+  "max_round_count"    : 10,
+  "small_blind_amount" : 1,
+  "initial_stack"      : 100,
+  "players_info" : [
+    {
+      "name" : "P1",
+      "algorithm_path": "/Users/kota/development/PyPokerEngine/pypokerengine/players/sample/fold_man.py"
+    },
+    {
+      "name" : "P2",
+      "algorithm_path": "/Users/kota/development/PyPokerEngine/pypokerengine/players/sample/fold_man.py"
+    }
+  ]
+}

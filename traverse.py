@@ -74,8 +74,13 @@ class TreeNodeInfo(object):
     return 0 if uuid == Constants.PLAYER1_UID else 1
 
   def __init__(self):
+    # Expected value for each player at this node if they play according to their current strategy.
     self.strategy_ev = torch.zeros(2)
+
+    # Expected value for each player if they choose a best-response strategy given the other.
     self.best_response_ev = torch.zeros(2)
+
+    # The difference in EV between the best response strategy and the current strategy.
     self.exploitability = torch.zeros(2)
 
 
@@ -86,8 +91,7 @@ def traverse(game_state, events, emulator, action_generator, infoset_generator,
   Recursively traverse the game tree with external sampling.
 
   Returns:
-    payoff for traversing player (float)
-
+    (TreeNodeInfo)
   """
   with torch.no_grad():
     node_info = TreeNodeInfo()
@@ -102,7 +106,7 @@ def traverse(game_state, events, emulator, action_generator, infoset_generator,
     if is_terminal_node:
       payoff = (winning_stack - Constants.INITIAL_STACK)
       node_info.strategy_ev[0] = payoff if winning_player == Constants.PLAYER1_UID else -1 * payoff
-      node_info.strategy_ev[1] = -1 * node_info.strategy_ev[0]
+      node_info.strategy_ev[1] = -1 * node_info.strategy_ev[0] # Zero sum.
       node_info.best_response_ev = node_info.strategy_ev
       return node_info
 
@@ -134,11 +138,12 @@ def traverse(game_state, events, emulator, action_generator, infoset_generator,
         if mask[i] == 0:
           continue
         updated_state, new_events = emulator.apply_action(game_state, a[0], a[1]) 
-        child_node_info = traverse(updated_state, new_events, emulator, action_generator, infoset_generator,
-                            traverse_player, strategies, advt_mem, strt_mem, t,
-                            recursion_ctr=recursion_ctr, do_external_sampling=do_external_sampling)
+        child_node_info = traverse(
+            updated_state, new_events, emulator, action_generator, infoset_generator,
+            traverse_player, strategies, advt_mem, strt_mem, t,
+            recursion_ctr=recursion_ctr, do_external_sampling=do_external_sampling)
         
-        # Expected value of the acting player taking this action (for P1 and P2).
+        # Expected value of the acting player taking this action and then continuing according to their strategy.
         action_values[:,i] = child_node_info.strategy_ev
 
         # Expected value for each player if the acting player takes this action and then they both

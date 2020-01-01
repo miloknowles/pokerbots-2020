@@ -76,7 +76,7 @@ class Options(object):
     self.parser.add_argument("--NUM_TRAVERSALS_EVAL",
                 type=int,
                 help="Number of traversals for evaluating exploitability",
-                default=10)
+                default=200)
     self.parser.add_argument("--LINEAR_CFR_LOSS",
                 default=True,
                 action="store_true")
