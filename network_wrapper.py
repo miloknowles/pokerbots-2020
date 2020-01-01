@@ -19,7 +19,7 @@ class NetworkWrapper(object):
   def network(self):
     return self._network
 
-  def get_action_probabilities(self, infoset):
+  def get_action_probabilities(self, infoset, valid_mask):
     """
     Takes an infoset, passes it into the network, and returns the action probabilities predicted
     by the network.
@@ -32,16 +32,18 @@ class NetworkWrapper(object):
       bets_input, position_mask = infoset.get_bet_input_tensors()
       bets_input = (bets_input * position_mask).to(self._device)
 
-      normalized_adv = self._network(hole_cards, board_cards, bets_input)[0]
+      pred_regret = self._network(hole_cards, board_cards, bets_input)[0]
 
       # Do regret matching on the predicted advantages.
-      r_plus = torch.clamp(normalized_adv, min=0)
+      r_plus = torch.clamp(pred_regret, min=0)
 
       # As advocated by Brown et. al., choose the action with highest advantage when all of them are
       # negative.
       if r_plus.sum() < 1e-5:
+        pred_regret -= pred_regret.min()
+        pred_regret *= valid_mask
         r = torch.zeros_like(r_plus)
-        r[torch.argmax(normalized_adv)] = 1.0
+        r[torch.argmax(pred_regret)] = 1.0
       else:
         r = r_plus / r_plus.sum()
 

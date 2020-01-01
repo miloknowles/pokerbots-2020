@@ -11,7 +11,7 @@ if __name__ == "__main__":
   P1 = DeepCFRPlayer("/home/milo/pokerbots-2020/training_logs/analysis/weights_6/value_network_P1.pth")
   P2 = DeepCFRPlayer("/home/milo/pokerbots-2020/training_logs/analysis/weights_0/value_network_P1.pth")
 
-  num_trials = 10
+  num_trials = 40
 
   total_winnings = torch.zeros(num_trials, 2)
 

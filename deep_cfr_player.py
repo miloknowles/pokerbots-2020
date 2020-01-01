@@ -23,11 +23,11 @@ class DeepCFRPlayer(BasePokerPlayer):
     hole_card (list of str) : i.e ['H2', 'C8']
     round_state (dict) : i.e {'action_histories': {'preflop': [{'add_amount': 1, 'action': 'SMALLBLIND', 'amount': 1, 'uuid': 'lgwgyegccmfobokqugvwud'}, {'add_amount': 1, 'action': 'BIGBLIND', 'amount': 2, 'uuid': 'jkuneswljvhvmhmcopbpmj'}]}, 'community_card': [], 'round_count': 1, 'big_blind_pos': 0, 'seats': [{'name': 'P1', 'stack': 98, 'uuid': 'jkuneswljvhvmhmcopbpmj', 'state': 'participating'}, {'name': 'P2', 'stack': 99, 'uuid': 'lgwgyegccmfobokqugvwud', 'state': 'participating'}], 'street': 'preflop', 'pot': {'main': {'amount': 3}, 'side': []}, 'next_player': 1, 'small_blind_pos': 1, 'dealer_btn': 0, 'small_blind_amount': 1}
     """
-    infoset = make_infoset_helper(hole_card, round_state)
-    action_probs = self.wrap.get_action_probabilities(infoset)
-
     pot_size = round_state["pot"]["main"]["amount"]
     actions, mask = generate_actions(valid_actions, pot_size)
+
+    infoset = make_infoset_helper(hole_card, round_state)
+    action_probs = self.wrap.get_action_probabilities(infoset, mask)
 
     # If no predicted actions are valid, choose one of the valid actions at random.
     action_probs *= mask
