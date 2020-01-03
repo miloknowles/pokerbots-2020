@@ -3,7 +3,7 @@ import torch
 
 from network import DeepCFRModel
 from network_wrapper import NetworkWrapper
-from memory import InfoSet
+from infoset import InfoSet
 from utils import *
 
 
@@ -41,7 +41,8 @@ class NetworkWrapperTest(unittest.TestCase):
     wrap = NetworkWrapper(4, 24, 4, 64, torch.device("cuda:0"))
 
     infoset = make_dummy_infoset()
-    p = wrap.get_action_probabilities(infoset)
+    valid_mask = torch.ones(4).to(torch.device("cuda:0"))
+    p = wrap.get_action_probabilities(infoset, valid_mask)
     self.assertEqual(p.shape, (4,))
 
 

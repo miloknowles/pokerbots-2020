@@ -1,7 +1,8 @@
 import torch
 from torch.utils.data import Dataset
 
-from memory import *
+from memory_buffer import *
+from infoset import unpack_infoset
 
 
 class MemoryBufferDataset(Dataset):

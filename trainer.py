@@ -12,7 +12,8 @@ from pypokerengine.api.emulator import Emulator
 from constants import Constants
 from utils import *
 from traverse import traverse
-from memory import InfoSet, MemoryBuffer
+from memory_buffer import MemoryBuffer
+from infoset import InfoSet
 from memory_buffer_dataset import MemoryBufferDataset
 from network_wrapper import NetworkWrapper
 

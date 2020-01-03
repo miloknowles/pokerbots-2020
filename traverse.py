@@ -121,7 +121,7 @@ def traverse(game_state, events, emulator, action_generator, infoset_generator,
 
       # Do regret matching to get action probabilities.
       if t == 0:
-        action_probs = strategies[traverse_player].get_action_probabilities_uniform(infoset)
+        action_probs = strategies[traverse_player].get_action_probabilities_uniform()
       else:
         action_probs = strategies[traverse_player].get_action_probabilities(infoset, mask)
       action_probs = apply_mask_and_normalize(action_probs, mask)
@@ -181,7 +181,7 @@ def traverse(game_state, events, emulator, action_generator, infoset_generator,
       del evt, pot_size
 
       if t == 0:
-        action_probs = strategies[other_player].get_action_probabilities_uniform(infoset)
+        action_probs = strategies[other_player].get_action_probabilities_uniform()
       else:
         action_probs = strategies[other_player].get_action_probabilities(infoset, mask)
       action_probs = apply_mask_and_normalize(action_probs, mask)

@@ -11,7 +11,8 @@ from constants import Constants
 from options import Options
 from utils import *
 from traverse import traverse
-from memory import InfoSet, MemoryBuffer
+from memory_buffer import MemoryBuffer
+from infoset import InfoSet
 from network_wrapper import NetworkWrapper
 from trainer import generate_actions, make_infoset
 

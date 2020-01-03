@@ -49,5 +49,5 @@ class NetworkWrapper(object):
 
       return r.cpu()
 
-  def get_action_probabilities_uniform(self, infoset):
+  def get_action_probabilities_uniform(self):
     return torch.ones(Constants.NUM_ACTIONS) / Constants.NUM_ACTIONS
