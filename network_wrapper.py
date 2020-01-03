@@ -41,7 +41,7 @@ class NetworkWrapper(object):
       # negative.
       if r_plus.sum() < 1e-5:
         pred_regret -= pred_regret.min()
-        pred_regret *= valid_mask
+        pred_regret *= valid_mask.to(self._device)
         r = torch.zeros_like(r_plus)
         r[torch.argmax(pred_regret)] = 1.0
       else:
