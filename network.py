@@ -102,7 +102,9 @@ class DeepCFRModel(nn.Module):
 
     # STEP 2: Process betting history.
     bet_size = bets.clamp(0, 1e6)
-    bet_occurred = bets.ge(0)
+
+    # NOTE(milo): Changed this to a not-equal, since we encode opponent bets with negative numbers.
+    bet_occurred = bets.ne(0)
     bet_feats = torch.cat([bet_size, bet_occurred.float()], dim=1)
 
     y = F.relu(self.bet1(bet_feats))
