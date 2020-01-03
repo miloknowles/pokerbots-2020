@@ -101,7 +101,7 @@ class DeepCFRModel(nn.Module):
     x = F.relu(self.card3(x))
 
     # STEP 2: Process betting history.
-    bet_size = bets.clamp(0, 1e6)
+    bet_size = bets.clamp(-1e6, 1e6)
 
     # NOTE(milo): Changed this to a not-equal, since we encode opponent bets with negative numbers.
     bet_occurred = bets.ne(0)

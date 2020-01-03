@@ -48,8 +48,8 @@ class InfoSet(object):
     """
     nbets = self.bet_history_vec.shape[0]
     position_mask = torch.zeros(nbets)
-    position_mask[torch.arange(self.player_position, nbets, 2)] = 1
-    position_mask[torch.arange((self.player_position + 1) % 2, nbets, 2)] = -1
+    position_mask[torch.arange(self.player_position, nbets, 2).long()] = 1
+    position_mask[torch.arange((self.player_position + 1) % 2, nbets, 2).long()] = -1
     return self.bet_history_vec.unsqueeze(0), position_mask
   
   def pack(self):

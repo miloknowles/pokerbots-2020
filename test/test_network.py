@@ -5,14 +5,7 @@ from network import DeepCFRModel
 from network_wrapper import NetworkWrapper
 from infoset import InfoSet
 from utils import *
-
-
-def make_dummy_infoset():
-  hole_cards = encode_cards_rank_suit(["Ac", "4s"])
-  board_cards = encode_cards_rank_suit(["Js", "Jc", "3h"])
-  bet_history_vec = torch.ones(24)
-  infoset = InfoSet(hole_cards, board_cards, bet_history_vec, 1)
-  return infoset
+from test_utils import make_dummy_infoset
 
 
 class NetworkTest(unittest.TestCase):
