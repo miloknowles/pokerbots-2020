@@ -24,6 +24,15 @@ class PermutationFilterTest(unittest.TestCase):
     r = ShowdownResult(["Ac", "3d"], ["2d", "2s"], ["Js", "Qs", "Ks"])
     print(r)
 
+  def test_prior(self):
+    t0 = time.time()
+    pf = PermutationFilter(1000)
+
+    for _ in range(10):
+      perm = pf.sample_no_constraints()
+      prior = pf.compute_prior(perm)
+      print(perm)
+      print("Prior={}".format(prior))
 
 if __name__ == "__main__":
   unittest.main()

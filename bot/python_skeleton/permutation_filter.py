@@ -48,7 +48,7 @@ def rank_and_suit_to_str(rank, suit):
 
 
 class Permutation(object):
-  def __init__(self, true_to_perm):
+  def __init__(self, perm_to_true):
     """
     Defines a two-way mapping between true values and permutation values (0-13). The zeroth index
     represents a 2, and the 13th index represents an A.
@@ -56,14 +56,14 @@ class Permutation(object):
     2 3 4 5 6 7 8 9 T J Q  K  A
     0 1 2 3 4 5 6 7 8 9 10 11 12
 
-    true_to_perm (list of int) : Should have length 13.
+    perm_to_true (list of int) : Should have length 13. perm_to_true[i] = j means that the ith value
+                                 that we see corresponds to a true value of j.
     """
-    self.true_to_perm = np.array(true_to_perm)
-    self.perm_to_true = np.zeros(13)
+    self.perm_to_true = np.array(perm_to_true)
+    self.true_to_perm = np.zeros(13)
 
-    # Build the reverse mapping (from permutation value to true value).
-    for i, mapped_val in enumerate(self.true_to_perm):
-      self.perm_to_true[mapped_val] = i
+    for perm_val, true_val in enumerate(self.perm_to_true):
+      self.true_to_perm[true_val] = perm_val
 
   def map_str(self, cards_str):
     out = []
@@ -125,7 +125,6 @@ class PermutationFilter(object):
     self._particles = [self.sample_no_constraints() for _ in range(self._num_particles)]
     self._weights = np.ones(self._num_particles) / self._num_particles
 
-    # self._constraints = []
     self._results = []
 
   def update(self, result):
@@ -176,7 +175,7 @@ class PermutationFilter(object):
 
   def sample_no_constraints(self):
     """
-    Generate a permutation that maps true values (indices) to their new value.
+    Generate a permutation of the true card values.
     """
     # Reversed list from 12 to 0.
     orig_perm = list(range(13))[::-1]
@@ -192,15 +191,26 @@ class PermutationFilter(object):
 
     return Permutation(prop_perm)
 
-  def sample_with_constraints(self):
-    # Reversed list from 12 to 0.
-    # orig_perm = list(range(13))[::-1]
-    # prop_perm = []
+  def compute_prior(self, perm):
+    """
+    Computes the prior probability of a permutation by reverse engineering the indices that must
+    have been sampled from a geometric distribution.
+    """
+    p = 1.0
 
-    # # Random offsets to pop from.
-    # seed = np.random.geometric(p=0.25, size=13) - 1
-    # for s in seed:
-    #   pop_i = len(orig_perm) - 1 - (s % len(orig_perm))
-    #   prop_perm.append(orig_perm.pop(pop_i))
-    # return prop_perm
-    raise NotImplementedError()
+    # These are the remaining "true" values to be chosen by each permuted value.
+    remaining = list(range(13))[::-1]
+
+    for perm_val, true_val in enumerate(perm.perm_to_true):
+      pop_i = remaining.index(true_val)
+      s = -1 * (pop_i - len(remaining) + 1)
+      remaining.pop(pop_i)
+
+      # Since indices wrap around, there are many possible ways we could've popped the value that we
+      # did. Approximate the probability by assuming that we don't wrap around more than 3 times.
+      p1 = 0.25 * (0.75 ** s)
+      p2 = 0.25 * (0.75 ** (s + len(remaining)))
+      p3 = 0.25 * (0.75 ** (s + 2*len(remaining)))
+      p *= (p1 + p2 + p3)
+
+    return p
