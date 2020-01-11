@@ -1,6 +1,7 @@
 import numpy as np
 import eval7
 from collections import OrderedDict
+import random
 
 
 RANK_STR_TO_VAL = OrderedDict({
@@ -59,13 +60,16 @@ class Permutation(object):
     perm_to_true (list of int) : Should have length 13. perm_to_true[i] = j means that the ith value
                                  that we see corresponds to a true value of j.
     """
-    self.perm_to_true = np.array(perm_to_true)
-    self.true_to_perm = np.zeros(13)
+    self.perm_to_true = np.array(perm_to_true).astype(int)
+    self.true_to_perm = np.zeros(13).astype(int)
 
     for perm_val, true_val in enumerate(self.perm_to_true):
       self.true_to_perm[true_val] = perm_val
 
   def map_str(self, cards_str):
+    """
+    Maps permuted card values to their true values.
+    """
     out = []
     for c in cards_str:
       rank, suit = str_to_rank_and_suit(c)
@@ -122,16 +126,16 @@ class PermutationFilter(object):
   def __init__(self, num_particles):
     self._num_particles = num_particles
 
-    self._particles = [self.sample_no_constraints() for _ in range(self._num_particles)]
+    self._particles = [self.sample_uniform() for _ in range(self._num_particles)]
     self._weights = np.ones(self._num_particles) / self._num_particles
 
     self._results = []
 
   def update(self, result):
     for i, p in enumerate(self._particles):
-      if not self.is_consistent_with_result(p, result):
-        self._weights[i] = 0
-
+      if self._weights[i] > 0:
+        if not self.is_consistent_with_result(p, result):
+          self._weights[i] = 0
     self._results.append(result)
 
   def is_consistent_with_result(self, p, result):
@@ -148,24 +152,37 @@ class PermutationFilter(object):
     else:
       return True
 
-  def resample(self):
-    """
-    This takes about 30 sec for 1000 resamples w/ 1000 particles right now.
-    """
-    self._particles = []
-    self._weights = np.zeros(self._num_particles)
+  def resample(self, nparticles):
+    # If we have no valid particles right now, need to do some expensive work to get a valid one.
+    if self.nonzero() == 0:
+      did_get_valid_particle = False
+      while not did_get_valid_particle:
+        p = self.sample_uniform()
+        is_valid = True
+        for r in self._results:
+          if not self.is_consistent_with_result(p, r):
+            is_valid = False
+            break
+        if is_valid:
+          self._particles[0] = p
+          self._weights[0] = 1
+          did_get_valid_particle = True
+    
+    # If we do have some valid particles, randomly choose one and use for MCMC.
+    valid_particles = []
+    for i in self._weights.nonzero()[0][:nparticles]:
+      valid_particles.append(self._particles[i])
+    self._particles = valid_particles
+
+    # NOTE(milo): Number of particles is updated here! We may want to resample fewer than the
+    # original number.
+    self._num_particles = nparticles
 
     while len(self._particles) < self._num_particles:
-      p = self.sample_no_constraints()
-
-      is_valid = True
-      for r in self._results:
-        if not self.is_consistent_with_result(p, r):
-          is_valid = False
-          break
-      
-      if is_valid:
-        self._particles.append(p)
+      original_perm = self._particles[np.random.choice(len(self._particles))]
+      p = self.sample_mcmc(original_perm)
+      self._particles.append(p)
+    self._weights = np.ones(self._num_particles) / self._num_particles
 
   def nonzero(self):
     """
@@ -173,7 +190,14 @@ class PermutationFilter(object):
     """
     return np.sum(self._weights > 0)
 
-  def sample_no_constraints(self):
+  def unique(self):
+    unique_set = set()
+    for p in self._particles:
+      s = "".join([str(c) for c in p.true_to_perm])
+      unique_set.add(s)
+    return len(unique_set)
+
+  def sample_uniform(self):
     """
     Generate a permutation of the true card values.
     """
@@ -214,3 +238,37 @@ class PermutationFilter(object):
       p *= (p1 + p2 + p3)
 
     return p
+
+  def sample_mcmc(self, original_perm):
+    """
+    Samples a new permutation from the posterior distribution given by observed results so far.
+    """
+    ij = np.random.choice(13, size=2, replace=False)
+    i, j = ij[0], ij[1]
+
+    # Swap the values at i and j to make a candidate.
+    oi = original_perm.perm_to_true[i]
+    oj = original_perm.perm_to_true[j]
+
+    proposal_perm_to_true = original_perm.perm_to_true.copy()
+    proposal_perm_to_true[i] = oj
+    proposal_perm_to_true[j] = oi
+    proposal_perm = Permutation(proposal_perm_to_true)
+
+    # Check if the proposal satisfies all of the constraints from events seen so far.
+    is_valid = True
+    for r in self._results:
+      if not self.is_consistent_with_result(proposal_perm, r):
+        is_valid = False
+        break
+
+    if is_valid:
+      prior_proposal = self.compute_prior(proposal_perm)
+      prior_original= self.compute_prior(original_perm)
+
+      # Accept according to Metropolis-Hastings.
+      A_ij = min(1, prior_proposal / prior_original)
+      if random.random() < A_ij:
+        return proposal_perm
+
+    return original_perm

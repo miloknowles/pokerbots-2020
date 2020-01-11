@@ -23,7 +23,8 @@ class Player(Bot):
         Returns:
         Nothing.
         '''
-        self._pf = PermutationFilter(1000)
+        self._pf = PermutationFilter(100000)
+        self._next_resample_nparticles = 1000
 
     def handle_new_round(self, game_state, round_state, active):
         '''
@@ -89,16 +90,23 @@ class Player(Bot):
         
         if winner_hole_cards is not None and loser_hole_cards is not None and len(loser_hole_cards) > 0:
             result = ShowdownResult(winner_hole_cards, loser_hole_cards, board_cards)
-            print("Updating filter with this showdown result:")
+            t0 = time.time()
             self._pf.update(result)
-            print(result)
-            print("Filter now has %d nonzero permutations" % self._pf.nonzero())
+            elapsed = time.time() - t0
+            print("Updated filter in {} sec, now has {} particles".format(elapsed, self._pf.nonzero()))
 
-            if self._pf.nonzero() < 0.5*self._pf._num_particles:
+            if self._pf.nonzero() < self._next_resample_nparticles:
                 t0 = time.time()
-                self._pf.resample()
+                self._pf.resample(self._next_resample_nparticles)
                 elapsed = time.time() - t0
-                print("Did resample in {} sec".format(elapsed))
+                unique = self._pf.unique()
+                print("Did resample in {} sec, {} unique particles".format(elapsed, unique))
+                self._next_resample_nparticles = min(int(1.5 * unique), 1000)
+
+                if unique <= 5:
+                    print("\n ================= FILTER CONVERGED ================")
+                    for p in self._pf._particles:
+                        print(p)
 
     def get_action(self, game_state, round_state, active):
         '''
