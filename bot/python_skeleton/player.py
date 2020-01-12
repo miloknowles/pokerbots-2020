@@ -24,7 +24,10 @@ class Player(Bot):
         Nothing.
         '''
         self._pf = PermutationFilter(10000)
-        self._next_resample_nparticles = 1000
+
+        self._nparticles = 500
+        self._resample_thresh = 500
+        # self._next_resample_nparticles = 500
 
     def handle_new_round(self, game_state, round_state, active):
         '''
@@ -94,15 +97,15 @@ class Player(Bot):
             t0 = time.time()
             self._pf.update(result)
             elapsed = time.time() - t0
-            print("Updated filter in {} sec, now has {} particles".format(elapsed, self._pf.nonzero()))
+            print("Updated filter in {} sec, UNIQUE={}".format(elapsed, self._pf.unique()))
 
-            if self._pf.nonzero() < self._next_resample_nparticles:
+            if self._pf.nonzero() < self._resample_thresh:
                 t0 = time.time()
-                self._pf.resample(self._next_resample_nparticles)
+                self._pf.resample(self._nparticles)
                 elapsed = time.time() - t0
                 unique = self._pf.unique()
-                print("Did resample({}) in {} sec, {} unique particles".format(self._next_resample_nparticles, elapsed, unique))
-                self._next_resample_nparticles = max(500, min(int(1.5 * unique), 1000))
+                print("Did resample({}) in {} sec, UNIQUE={}".format(self._nparticles, elapsed, unique))
+                # self._next_resample_nparticles = max(500, min(int(1.5 * unique), 1000))
 
                 if unique <= 5:
                     print("\n ================= FILTER CONVERGED ================")

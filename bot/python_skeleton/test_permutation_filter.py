@@ -43,7 +43,7 @@ class PermutationFilterTest(unittest.TestCase):
     nresample = 1000
     accept_ctr = 0
     for _ in range(nresample):
-      new_perm = pf.sample_mcmc(original_perm)
+      new_perm, did_accept = pf.sample_mcmc(original_perm)
       if not (new_perm.true_to_perm == original_perm.true_to_perm).all():
         accept_ctr += 1
     elapsed = time.time() - t0
@@ -62,7 +62,7 @@ class PermutationFilterTest(unittest.TestCase):
     nresample = 1000
     accept_ctr = 0
     for _ in range(nresample):
-      new_perm = pf.sample_mcmc(original_perm)
+      new_perm, did_accept = pf.sample_mcmc(original_perm)
       if not (new_perm.true_to_perm == original_perm.true_to_perm).all():
         accept_ctr += 1
     elapsed = time.time() - t0

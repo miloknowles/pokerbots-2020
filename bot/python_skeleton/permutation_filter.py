@@ -1,7 +1,7 @@
 import numpy as np
 import eval7
 from collections import OrderedDict
-import random
+import random, time
 
 
 RANK_STR_TO_VAL = OrderedDict({
@@ -122,6 +122,46 @@ class ShowdownResult(object):
            "Board cards: " + " ".join(self.board_cards)
 
 
+# def is_consistent_with_result(p, result):
+#   board_and_winner_true = [eval7.Card(c) for c in p.map_str(result.board_cards + result.winner_hole_cards)]
+#   board_and_loser_true = [eval7.Card(c) for c in p.map_str(result.board_cards + result.loser_hole_cards)]
+
+#   score_winner = eval7.evaluate(board_and_winner_true)
+#   score_loser = eval7.evaluate(board_and_loser_true)
+
+#   # If the losing hand has a higher score than the winning score, then the permutation is
+#   # inconsistent with observations.
+#   if score_winner <= score_loser:
+#     return False
+#   else:
+#     return True
+
+
+# def satisfies_all_results(p, results):
+#   for r in results:
+#     if not is_consistent_with_result(p, r):
+#       return False
+#   return True
+
+# def valid_permutation_recursive(perm_to_true, i, results, remaining_values):
+#   """
+#   Return a permutation that satisfies all of the results so far.
+
+#   perm_to_true: The permutation so far (valid up until p[i])
+#   """
+#   # If i >= len(perm_to_true), then we've filled in everything without violating constraints.
+#   if i >= len(perm_to_true):
+#     return True, perm_to_true
+
+#   # Otherwise, try every option for perm_to_true[i].
+#   for v in remaining_values:
+#     is_valid, valid_perm_to_true = valid_
+  
+#   if not self.satisfies_all_results()
+
+#   return False, None
+
+
 class PermutationFilter(object):
   def __init__(self, num_particles):
     self._num_particles = num_particles
@@ -130,12 +170,18 @@ class PermutationFilter(object):
     self._weights = np.ones(self._num_particles) / self._num_particles
 
     self._results = []
+    self._lifeline = None
+
+    self._cache = np.load("./samples.npy")
+    print(self._cache)
 
   def update(self, result):
     for i, p in enumerate(self._particles):
       if self._weights[i] > 0:
         if not self.is_consistent_with_result(p, result):
           self._weights[i] = 0
+        else:
+          self._lifeline = p
     self._results.append(result)
 
   def is_consistent_with_result(self, p, result):
@@ -152,10 +198,46 @@ class PermutationFilter(object):
     else:
       return True
 
+  def satisfies_all_results(self, p):
+    for r in self._results:
+      if not self.is_consistent_with_result(p, r):
+        return False
+    return True
+
+  def resample_valid(self, invalid):
+    """
+    Quickly mutate an invalid permutation until it satisfies result.
+    """
+    fixed = invalid.perm_to_true.copy()
+    while not self.satisfies_all_results(Permutation(fixed)):
+      ij = np.random.choice(13, size=2, replace=False)
+      i, j = ij[0], ij[1]
+      oi, oj = fixed[i], fixed[j]
+      fixed[i] = oj
+      fixed[j] = oi 
+    return Permutation(fixed)
+
   def resample(self, nparticles):
     # If we have no valid particles right now, need to do some expensive work to get a valid one.
     if self.nonzero() == 0:
       print("WARNING: EXPENSIVE RESAMPLE")
+      # t0 = time.time()
+      # self._particles[0] = self.resample_valid(self._lifeline)
+      # self._weights[0] = 1
+      # elapsed = time.time() - t0
+      # print("Took {} sec to regenerate a valid perm".format(elapsed))
+      for i in range(len(self._cache)):
+        p = Permutation(self._cache[i])
+        if self.satisfies_all_results(p):
+          self._particles[0] = p
+          self._weights[0] = 1
+          did_get_valid_particle = True
+
+      if did_get_valid_particle:
+        print("Found valid sample in the cache")
+      else:
+        print("Could not find valid in cache, randomly sampling")
+
       did_get_valid_particle = False
       while not did_get_valid_particle:
         p = self.sample_uniform()
@@ -184,8 +266,15 @@ class PermutationFilter(object):
     while len(self._particles) < self._num_particles:
       # original_perm = self._particles[np.random.choice(len(self._particles))]
       original_perm = self._particles[np.random.choice(original_pop)]
-      p = self.sample_mcmc(original_perm)
+
+      # Try a few extra times to get a new sample.
+      did_accept = False
+      for i in range(1):
+        p, did_accept = self.sample_mcmc(original_perm)
+        if did_accept:
+          break
       self._particles.append(p)
+
     self._weights = np.ones(self._num_particles) / self._num_particles
 
   def nonzero(self):
@@ -277,22 +366,38 @@ class PermutationFilter(object):
 
     return p
 
+  def make_proposal(self, p):
+    nswaps = 1
+    proposal = p.perm_to_true.copy()
+
+    for _ in range(nswaps):
+      ij = np.random.choice(13, size=2, replace=False)
+      i, j = ij[0], ij[1]
+
+      # Swap the values at i and j to make a candidate.
+      oi = proposal[i]
+      oj = proposal[j]
+      proposal[i] = oj
+      proposal[j] = oi
+
+    return Permutation(proposal)
+
+  def make_proposal_geometric(self, p):
+    i = np.random.choice(13)
+    j = (i + np.random.geometric(0.25)) % 13
+    proposal = p.perm_to_true.copy()
+    # TODO(milo): can make this shorter
+    oi = proposal[i]
+    oj = proposal[j]
+    proposal[i] = oj
+    proposal[j] = oi
+    return Permutation(proposal)
+
   def sample_mcmc(self, original_perm):
     """
     Samples a new permutation from the posterior distribution given by observed results so far.
     """
-    ij = np.random.choice(13, size=2, replace=False)
-    i, j = ij[0], ij[1]
-
-    # # Swap the values at i and j to make a candidate.
-    oi = original_perm.perm_to_true[i]
-    oj = original_perm.perm_to_true[j]
-
-    proposal_perm_to_true = original_perm.perm_to_true.copy()
-    proposal_perm_to_true[i] = oj
-    proposal_perm_to_true[j] = oi
-    # proposal_perm = self.permute(original_perm)
-    proposal_perm = Permutation(proposal_perm_to_true)
+    proposal_perm = self.make_proposal_geometric(original_perm)
 
     # Check if the proposal satisfies all of the constraints from events seen so far.
     is_valid = True
@@ -308,6 +413,6 @@ class PermutationFilter(object):
       # Accept according to Metropolis-Hastings.
       A_ij = min(1, prior_proposal / prior_original)
       if random.random() < A_ij:
-        return proposal_perm
+        return proposal_perm, True
 
-    return original_perm
+    return original_perm, False
