@@ -73,6 +73,32 @@ class PermutationFilterTest(unittest.TestCase):
     pf = PermutationFilter(1000)
     print(pf.unique())
 
+  def test_convergence(self):
+    results = []
+    with open("./showdown_results_01.txt", "r") as f:
+      for l in f:
+        l = l.replace("\n", "").split(" | ")
+        winning_hand = l[0].split(" ")
+        losing_hand = l[1].split(" ")
+        board_cards = l[2].split(" ")
+        results.append(ShowdownResult(winning_hand, losing_hand, board_cards))
+
+    #  2 3 4 5 6 7 8 9 T J Q K A 
+    # [6 7 8 3 2 4 9 K T A J 5 Q]
+    true_perm = Permutation(np.array([4, 5, 6, 1, 0, 2, 7, 11, 8, 12, 9, 3, 10]))
+
+    pf = PermutationFilter(10000)
+    for i, r in enumerate(results):
+      pf.update(r)
+      has_true_perm = pf.has_particle(true_perm)
+      print("iter={} Has true perm? {}".format(i, has_true_perm))
+
+      if pf.nonzero() < 1000:
+        pf.resample(1000)
+        print("Did resample, now has {} unique".format(pf.unique()))
+    
+    for un in pf.get_unique_permutations():
+      print(un)
 
 if __name__ == "__main__":
   unittest.main()

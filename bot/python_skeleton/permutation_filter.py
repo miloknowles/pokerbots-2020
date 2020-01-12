@@ -155,6 +155,7 @@ class PermutationFilter(object):
   def resample(self, nparticles):
     # If we have no valid particles right now, need to do some expensive work to get a valid one.
     if self.nonzero() == 0:
+      print("WARNING: EXPENSIVE RESAMPLE")
       did_get_valid_particle = False
       while not did_get_valid_particle:
         p = self.sample_uniform()
@@ -178,8 +179,11 @@ class PermutationFilter(object):
     # original number.
     self._num_particles = nparticles
 
+    original_pop = len(self._particles)
+
     while len(self._particles) < self._num_particles:
-      original_perm = self._particles[np.random.choice(len(self._particles))]
+      # original_perm = self._particles[np.random.choice(len(self._particles))]
+      original_perm = self._particles[np.random.choice(original_pop)]
       p = self.sample_mcmc(original_perm)
       self._particles.append(p)
     self._weights = np.ones(self._num_particles) / self._num_particles
@@ -197,12 +201,44 @@ class PermutationFilter(object):
       unique_set.add(s)
     return len(unique_set)
 
+  def get_unique_permutations(self):
+    unique = []
+
+    unique_set = set()
+    for p in self._particles:
+      s = "".join([str(c) for c in p.true_to_perm])
+      if s not in unique_set:
+        unique.append(p)
+        unique_set.add(s)
+    return unique
+
+  def has_particle(self, p):
+    for other in self._particles:
+      if (other.perm_to_true == p.perm_to_true).all():
+        return True
+    return False
+
   def sample_uniform(self):
     """
     Generate a permutation of the true card values.
     """
     # Reversed list from 12 to 0.
     orig_perm = list(range(13))[::-1]
+    prop_perm = []
+
+    # Random offsets to pop from.
+    seed = np.random.geometric(p=0.25, size=13) - 1
+    for s in seed:
+      # Because pop operates from the back of the list, need to subtract length of list to start
+      # popping at the beginning.
+      pop_i = len(orig_perm) - 1 - (s % len(orig_perm))
+      prop_perm.append(orig_perm.pop(pop_i))
+
+    return Permutation(prop_perm)
+
+  def permute(self, p):
+    orig_perm = list(p.perm_to_true)
+    orig_perm.reverse()
     prop_perm = []
 
     # Random offsets to pop from.
@@ -235,7 +271,9 @@ class PermutationFilter(object):
       p1 = 0.25 * (0.75 ** s)
       p2 = 0.25 * (0.75 ** (s + len(remaining)))
       p3 = 0.25 * (0.75 ** (s + 2*len(remaining)))
-      p *= (p1 + p2 + p3)
+      p4 = 0.25 * (0.75 ** (s + 3*len(remaining)))
+      p5 = 0.25 * (0.75 ** (s + 4*len(remaining)))
+      p *= (p1 + p2 + p3 + p4 + p5)
 
     return p
 
@@ -246,13 +284,14 @@ class PermutationFilter(object):
     ij = np.random.choice(13, size=2, replace=False)
     i, j = ij[0], ij[1]
 
-    # Swap the values at i and j to make a candidate.
+    # # Swap the values at i and j to make a candidate.
     oi = original_perm.perm_to_true[i]
     oj = original_perm.perm_to_true[j]
 
     proposal_perm_to_true = original_perm.perm_to_true.copy()
     proposal_perm_to_true[i] = oj
     proposal_perm_to_true[j] = oi
+    # proposal_perm = self.permute(original_perm)
     proposal_perm = Permutation(proposal_perm_to_true)
 
     # Check if the proposal satisfies all of the constraints from events seen so far.
