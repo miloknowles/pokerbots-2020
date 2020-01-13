@@ -15,7 +15,7 @@ class PermutationFilterTest(unittest.TestCase):
 
     num_iters = 100
     for _ in range(num_iters):
-      pf.resample()
+      pf.resample(1000)
 
     elapsed = time.time() - t0
     print("Took {} sec to resample {} times".format(elapsed, num_iters))
@@ -75,30 +75,58 @@ class PermutationFilterTest(unittest.TestCase):
 
   def test_convergence(self):
     results = []
-    with open("./showdown_results_01.txt", "r") as f:
+    with open("./showdown_results_02.txt", "r") as f:
       for l in f:
+        if "|" not in l:
+          continue
         l = l.replace("\n", "").split(" | ")
         winning_hand = l[0].split(" ")
         losing_hand = l[1].split(" ")
         board_cards = l[2].split(" ")
         results.append(ShowdownResult(winning_hand, losing_hand, board_cards))
+    print("Replaying {} results".format(len(results)))
 
     #  2 3 4 5 6 7 8 9 T J Q K A 
     # [6 7 8 3 2 4 9 K T A J 5 Q]
-    true_perm = Permutation(np.array([4, 5, 6, 1, 0, 2, 7, 11, 8, 12, 9, 3, 10]))
+    # true_perm = Permutation(np.array([4, 5, 6, 1, 0, 2, 7, 11, 8, 12, 9, 3, 10]))
+
+    #  2 3 4 5 6 7 8 9 T J Q K A 
+    # [3 4 9 2 8 Q K A 5 6 J T 7]
+    true_perm = Permutation(np.array([1, 2, 7, 0, 6, 10, 11, 12, 3, 4, 9, 8, 5]))
 
     pf = PermutationFilter(10000)
-    for i, r in enumerate(results):
+
+    # Do everything but the last result.
+    prev_unique_particles = None
+
+    for i, r in enumerate(results[:-1]):
       pf.update(r)
       has_true_perm = pf.has_particle(true_perm)
       print("iter={} Has true perm? {}".format(i, has_true_perm))
 
-      if pf.nonzero() < 1000:
-        pf.resample(1000)
-        print("Did resample, now has {} unique".format(pf.unique()))
-    
-    for un in pf.get_unique_permutations():
-      print(un)
+      # if pf.nonzero() < 1000:
+        # pf.resample(1000)
+        # print("Did resample, now has {} unique".format(pf.unique()))
+      print("Updated, particle now has {} unique".format(pf.unique()))
+
+      curr_unique_particles = pf.get_unique_permutations()
+      if len(curr_unique_particles) == 0 and len(prev_unique_particles) > 0:
+        print("================ Last alive particles died off ===============")
+        print(r.mapped_result(true_perm))
+
+        print("\nTrue permutation:")
+        print(true_perm)
+        print("\n")
+
+        for ii, p in enumerate(prev_unique_particles):
+          print("Possible permutation {}".format(ii))
+          print(p)
+          print("Gives result:")
+          print(r.mapped_result(p))
+          print("\n")
+        break
+
+      prev_unique_particles = pf.get_unique_permutations()
 
 if __name__ == "__main__":
   unittest.main()

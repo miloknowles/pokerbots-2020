@@ -47,13 +47,13 @@ class Player(Bot):
         my_cards = round_state.hands[active]  # your cards
         big_blind = bool(active)  # True if you are the big blind
 
-        print("[LOG] [NR] bankroll={} game_clock={} round_num={} my_cards={} big_blind={}".format(
-            my_bankroll,
-            game_clock,
-            round_num,
-            my_cards,
-            big_blind
-        ))
+        # print("[LOG] [NR] bankroll={} game_clock={} round_num={} my_cards={} big_blind={}".format(
+        #     my_bankroll,
+        #     game_clock,
+        #     round_num,
+        #     my_cards,
+        #     big_blind
+        # ))
 
     def handle_round_over(self, game_state, terminal_state, active):
         '''
@@ -74,12 +74,12 @@ class Player(Bot):
         opp_cards = previous_state.hands[1-active]  # opponent's cards or [] if not revealed
         board_cards = previous_state.deck[:street]
 
-        print("[LOG] [RO] my_delta={} street={} my_cards={} opp_cards={}".format(
-            my_delta,
-            street,
-            my_cards,
-            opp_cards
-        ))
+        # print("[LOG] [RO] my_delta={} street={} my_cards={} opp_cards={}".format(
+        #     my_delta,
+        #     street,
+        #     my_cards,
+        #     opp_cards
+        # ))
 
         winner_hole_cards = None
         loser_hole_cards = None
@@ -97,20 +97,20 @@ class Player(Bot):
             t0 = time.time()
             self._pf.update(result)
             elapsed = time.time() - t0
-            print("Updated filter in {} sec, UNIQUE={}".format(elapsed, self._pf.unique()))
+            # print("Updated filter in {} sec, UNIQUE={}".format(elapsed, self._pf.unique()))
 
             if self._pf.nonzero() < self._resample_thresh:
                 t0 = time.time()
                 self._pf.resample(self._nparticles)
                 elapsed = time.time() - t0
                 unique = self._pf.unique()
-                print("Did resample({}) in {} sec, UNIQUE={}".format(self._nparticles, elapsed, unique))
+                # print("Did resample({}) in {} sec, UNIQUE={}".format(self._nparticles, elapsed, unique))
                 # self._next_resample_nparticles = max(500, min(int(1.5 * unique), 1000))
 
-                if unique <= 5:
-                    print("\n ================= FILTER CONVERGED ================")
-                    for p in self._pf.get_unique_permutations():
-                        print(p)
+                # if unique <= 5:
+                #     print("\n ================= FILTER CONVERGED ================")
+                #     for p in self._pf.get_unique_permutations():
+                #         print(p)
 
     def get_action(self, game_state, round_state, active):
         '''
