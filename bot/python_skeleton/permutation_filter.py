@@ -82,31 +82,6 @@ class Permutation(object):
     return ' ' + ' '.join(cards) + ' ' + '\n' + '[' + ' '.join(perm) + ']'
 
 
-class Constraint(object):
-  def __init__(self, predicate, a, b):
-    """
-    Defines a constraint on possible value permutations.
-    NOTE: a and b values should be zero-start (range from 0-13).
-
-    For example, Constraint(">", 5, 9) means that the true value of a 7 is greater than that of a J.
-    """
-    self.predicate = predicate
-    self.a = a
-    self.b = b
-
-  def satisfied(perm):
-    if self.predicate == ">" or "!<":
-      return perm.perm_to_true[self.a] > perm.perm_to_true[self.b]
-    elif self.predicate == "<" or "!>":
-      return perm.perm_to_true[self.a] < perm.perm_to_true[self.b]
-    elif self.predicate == "c" or self.predicate == "!c":
-      is_after = perm.perm_to_true[self.a] == ((perm.perm_to_true[self.b] + 1) % 13)
-      is_before = perm.perm_to_true[self.a] == ((perm.perm_to_true[self.b] - 1) % 13)
-      return (not is_after and not is_before) if self.predicate == "!c" else (is_after or is_before)
-    else:
-      raise NotImplementedError()
-
-
 class ShowdownResult(object):
   def __init__(self, winner_hole_cards, loser_hole_cards, board_cards):
     """
@@ -140,11 +115,7 @@ class PermutationFilter(object):
     self._weights = np.ones(self._num_particles) / self._num_particles
 
     self._results = []
-    self._lifeline = None
-
     self._dead_indices = []
-
-    self._cache = np.load("./samples.npy")
 
   def update(self, result):
     for i, p in enumerate(self._particles):
@@ -193,81 +164,6 @@ class PermutationFilter(object):
         return False
     return True
 
-  def resample_valid(self, invalid):
-    """
-    Quickly mutate an invalid permutation until it satisfies result.
-    """
-    fixed = invalid.perm_to_true.copy()
-    while not self.satisfies_all_results(Permutation(fixed)):
-      ij = np.random.choice(13, size=2, replace=False)
-      i, j = ij[0], ij[1]
-      oi, oj = fixed[i], fixed[j]
-      fixed[i] = oj
-      fixed[j] = oi 
-    return Permutation(fixed)
-
-  def resample(self, nparticles):
-    # If we have no valid particles right now, need to do some expensive work to get a valid one.
-    if self.nonzero() == 0:
-      # print("WARNING: EXPENSIVE RESAMPLE")
-      return # TODO: remove
-      # t0 = time.time()
-      # self._particles[0] = self.resample_valid(self._lifeline)
-      # self._weights[0] = 1
-      # elapsed = time.time() - t0
-      # print("Took {} sec to regenerate a valid perm".format(elapsed))
-      # for i in range(len(self._cache)):
-      #   p = Permutation(self._cache[i])
-      #   if self.satisfies_all_results(p):
-      #     self._particles[0] = p
-      #     self._weights[0] = 1
-      #     did_get_valid_particle = True
-
-      # if did_get_valid_particle:
-      #   print("Found valid sample in the cache")
-      # else:
-      #   print("Could not find valid in cache, randomly sampling")
-
-      # did_get_valid_particle = False
-      # while not did_get_valid_particle:
-      #   p = self.sample_uniform()
-      #   is_valid = True
-      #   for r in self._results:
-      #     if not self.is_consistent_with_result(p, r):
-      #       is_valid = False
-      #       break
-      #   if is_valid:
-      #     self._particles[0] = p
-      #     self._weights[0] = 1
-      #     did_get_valid_particle = True
-    
-    # If we do have some valid particles, randomly choose one and use for MCMC.
-    valid_particles = []
-    for i in self._weights.nonzero()[0][:nparticles]:
-      valid_particles.append(self._particles[i])
-    self._particles = valid_particles
-
-    # NOTE(milo): Number of particles is updated here! We may want to resample fewer than the
-    # original number.
-    self._num_particles = nparticles
-
-    original_pop = len(self._particles)
-
-    while len(self._particles) < self._num_particles:
-      # original_perm = self._particles[np.random.choice(len(self._particles))]
-      original_perm = self._particles[np.random.choice(original_pop)]
-
-      # Try a few extra times to get a new sample.
-      did_accept = False
-      for i in range(1):
-        p, did_accept = self.sample_mcmc(original_perm)
-        if did_accept:
-          break
-      self._particles.append(p)
-
-    self._weights = np.ones(self._num_particles) / self._num_particles
-    self._dead_indices = []
-
   def nonzero(self):
     """
     Returns the number of particles with nonzero probability.
@@ -305,21 +201,6 @@ class PermutationFilter(object):
     """
     # Reversed list from 12 to 0.
     orig_perm = list(range(13))[::-1]
-    prop_perm = []
-
-    # Random offsets to pop from.
-    seed = np.random.geometric(p=0.25, size=13) - 1
-    for s in seed:
-      # Because pop operates from the back of the list, need to subtract length of list to start
-      # popping at the beginning.
-      pop_i = len(orig_perm) - 1 - (s % len(orig_perm))
-      prop_perm.append(orig_perm.pop(pop_i))
-
-    return Permutation(prop_perm)
-
-  def permute(self, p):
-    orig_perm = list(p.perm_to_true)
-    orig_perm.reverse()
     prop_perm = []
 
     # Random offsets to pop from.
@@ -450,6 +331,19 @@ class PermutationFilter(object):
 
     return original_perm, False
 
+  def metropolis_hastings(self, original_perm, proposal_perm):
+    # Check if the proposal satisfies all of the constraints from events seen so far.
+    if self.satisfies_all_results(proposal_perm):
+      prior_proposal = self.compute_prior(proposal_perm)
+      prior_original = self.compute_prior(original_perm)
+
+      # Accept according to Metropolis-Hastings.
+      A_ij = min(1, prior_proposal / prior_original)
+      if random.random() < A_ij:
+        return proposal_perm, True
+
+    return original_perm, False
+
   def sample_mcmc_invalid(self, original_perm, result):
     winner_vals, loser_vals, board_vals = result.get_card_values()
     other_vals = set(range(13))
@@ -461,17 +355,7 @@ class PermutationFilter(object):
       if v in other_vals: other_vals.remove(v)
 
     proposal_perm = self.make_proposal_from_invalid(original_perm, winner_vals, loser_vals, list(other_vals))
-
-    if self.satisfies_all_results(proposal_perm):
-      prior_proposal = self.compute_prior(proposal_perm)
-      prior_original = self.compute_prior(original_perm)
-
-      # Accept according to Metropolis-Hastings.
-      A_ij = min(1, prior_proposal / prior_original)
-      if random.random() < A_ij:
-        return proposal_perm, True
-
-    return original_perm, False
+    return self.metropolis_hastings(original_perm, proposal_perm)
 
   def sample_mcmc_valid(self, original_perm, result):
     """
@@ -480,14 +364,4 @@ class PermutationFilter(object):
     winner_vals, loser_vals, board_vals = result.get_card_values()
 
     proposal_perm = self.make_proposal_from_valid(original_perm, winner_vals, loser_vals, board_vals)
-
-    if self.satisfies_all_results(proposal_perm):
-      prior_proposal = self.compute_prior(proposal_perm)
-      prior_original = self.compute_prior(original_perm)
-
-      # Accept according to Metropolis-Hastings.
-      A_ij = min(1, prior_proposal / prior_original)
-      if random.random() < A_ij:
-        return proposal_perm, True
-
-    return original_perm, False
+    return self.metropolis_hastings(original_perm, proposal_perm)
