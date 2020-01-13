@@ -124,7 +124,7 @@ class PermutationFilter(object):
 
     num_invalid_retries = min(int(5 * self._num_particles / nonzero), 10)
     # num_valid_retries = 2 if nonzero < (0.5 * self._num_particles) else 1
-    num_valid_retries = 1
+    num_valid_retries = 2
     print("Retries: {} {}".format(num_invalid_retries, num_valid_retries))
 
     for i, p in enumerate(self._particles):
