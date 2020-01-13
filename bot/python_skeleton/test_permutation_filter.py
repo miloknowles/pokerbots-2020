@@ -102,7 +102,8 @@ class PermutationFilterTest(unittest.TestCase):
     for i, r in enumerate(results[:-1]):
       pf.update(r)
       has_true_perm = pf.has_particle(true_perm)
-      print("iter={} Has true perm? {} nonzero={}".format(i, has_true_perm, pf.nonzero()))
+      print("iter={} Has true perm? {} nonzero={} invalid_succ_rate={}".format(
+        i, has_true_perm, pf.nonzero(), pf.invalid_retry_success_rate()))
       # print("Updated, particle now has {} unique".format(pf.unique()))
 
       curr_unique_particles = pf.get_unique_permutations()

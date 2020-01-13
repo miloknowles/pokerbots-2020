@@ -61,10 +61,6 @@ class Permutation(object):
                                  that we see corresponds to a true value of j.
     """
     self.perm_to_true = np.array(perm_to_true).astype(int)
-    # self.true_to_perm = np.zeros(13).astype(int)
-
-    # for perm_val, true_val in enumerate(self.perm_to_true):
-      # self.true_to_perm[true_val] = perm_val
 
   def map_str(self, cards_str):
     """
@@ -117,6 +113,12 @@ class PermutationFilter(object):
     self._results = []
     self._dead_indices = []
 
+    self._invalid_tries = 0
+    self._invalid_retry_success = 0
+
+  def invalid_retry_success_rate(self):
+    return self._invalid_retry_success / self._invalid_tries
+
   def update(self, result):
     nonzero = self.nonzero()
 
@@ -131,10 +133,12 @@ class PermutationFilter(object):
         if not self.is_consistent_with_result(p, result):
           # Particle died on this iteration, use the invalid resampling procedure.
           for _ in range(num_invalid_retries):
+            self._invalid_tries += 1
             proposal, is_valid = self.sample_mcmc_invalid(p, result)
             if is_valid:
               self._weights[i] = 1
               self._particles[i] = proposal
+              self._invalid_retry_success += 1
               break
           
           if not is_valid:
@@ -307,14 +311,11 @@ class PermutationFilter(object):
     elif i in board_vals:
       vj = board_vals[np.random.choice(len(board_vals))]
     else:
-      other_vals = set(range(13))
-      for v in winner_vals:
-        if v in other_vals: other_vals.remove(v)
-      for v in loser_vals:
-        if v in other_vals: other_vals.remove(v)
-      for v in board_vals:
-        if v in other_vals: other_vals.remove(v)
-      vj = np.random.choice(list(other_vals))
+      other_vals = np.ones(13)
+      for vals_to_remove in (winner_vals, loser_vals, board_vals):
+        other_vals[vals_to_remove] = 0
+      other_vals = other_vals.nonzero()[0]
+      vj = np.random.choice(other_vals)
 
     proposal = p.perm_to_true.copy()
     ti, tj = p.perm_to_true[i], p.perm_to_true[vj]
@@ -324,27 +325,23 @@ class PermutationFilter(object):
     return Permutation(proposal)
 
   def metropolis_hastings(self, original_perm, proposal_perm):
-    # Check if the proposal satisfies all of the constraints from events seen so far.
-    if self.satisfies_all_results(proposal_perm):
-      prior_proposal = self.compute_prior(proposal_perm)
-      prior_original = self.compute_prior(original_perm)
+    prior_proposal = self.compute_prior(proposal_perm)
+    prior_original = self.compute_prior(original_perm)
 
-      # Accept according to Metropolis-Hastings.
-      A_ij = min(1, prior_proposal / prior_original)
-      if random.random() < A_ij:
+    # Do the A_ij check first to avoid the expensive call to check all results.
+    A_ij = min(1, prior_proposal / prior_original)
+    if random.random() < A_ij:
+      if self.satisfies_all_results(proposal_perm):
         return proposal_perm, True
 
     return original_perm, False
 
   def sample_mcmc_invalid(self, original_perm, result):
     winner_vals, loser_vals, board_vals = result.get_card_values()
-    other_vals = set(range(13))
-    for v in winner_vals:
-      if v in other_vals: other_vals.remove(v)
-    for v in loser_vals:
-      if v in other_vals: other_vals.remove(v)
-    for v in board_vals:
-      if v in other_vals: other_vals.remove(v)
+    other_vals = np.ones(13)
+    for vals_to_remove in (winner_vals, loser_vals, board_vals):
+      other_vals[vals_to_remove] = 0
+    other_vals = other_vals.nonzero()[0]
 
     proposal_perm = self.make_proposal_from_invalid(original_perm, winner_vals, loser_vals, list(other_vals))
     return self.metropolis_hastings(original_perm, proposal_perm)
