@@ -61,10 +61,10 @@ class Permutation(object):
                                  that we see corresponds to a true value of j.
     """
     self.perm_to_true = np.array(perm_to_true).astype(int)
-    self.true_to_perm = np.zeros(13).astype(int)
+    # self.true_to_perm = np.zeros(13).astype(int)
 
-    for perm_val, true_val in enumerate(self.perm_to_true):
-      self.true_to_perm[true_val] = perm_val
+    # for perm_val, true_val in enumerate(self.perm_to_true):
+      # self.true_to_perm[true_val] = perm_val
 
   def map_str(self, cards_str):
     """
@@ -118,12 +118,19 @@ class PermutationFilter(object):
     self._dead_indices = []
 
   def update(self, result):
+    nonzero = self.nonzero()
+
+    num_invalid_retries = min(int(5 * self._num_particles / nonzero), 10)
+    # num_valid_retries = 2 if nonzero < (0.5 * self._num_particles) else 1
+    num_valid_retries = 1
+    print("Retries: {} {}".format(num_invalid_retries, num_valid_retries))
+
     for i, p in enumerate(self._particles):
       # Only update particles that are still alive.
       if self._weights[i] > 0:
         if not self.is_consistent_with_result(p, result):
           # Particle died on this iteration, use the invalid resampling procedure.
-          for _ in range(5):
+          for _ in range(num_invalid_retries):
             proposal, is_valid = self.sample_mcmc_invalid(p, result)
             if is_valid:
               self._weights[i] = 1
@@ -136,11 +143,15 @@ class PermutationFilter(object):
 
         # If the particle is alive after update, make some samples from it.
         else:
-          proposal, is_valid = self.sample_mcmc_valid(p, result)
-          if is_valid and len(self._dead_indices) > 0:
-            dead_index_to_replace = self._dead_indices.pop()
-            self._weights[dead_index_to_replace] = 1
-            self._particles[dead_index_to_replace] = proposal
+          for _ in range(num_valid_retries):
+            if len(self._dead_indices) == 0:
+              break
+            proposal, is_valid = self.sample_mcmc_valid(p, result)
+            if is_valid:
+              dead_index_to_replace = self._dead_indices.pop()
+              self._weights[dead_index_to_replace] = 1
+              self._particles[dead_index_to_replace] = proposal
+              break
 
     self._results.append(result)
 
@@ -174,7 +185,7 @@ class PermutationFilter(object):
     unique_set = set()
     for i, p in enumerate(self._particles):
       if self._weights[i] > 0:
-        s = "".join([str(c) for c in p.true_to_perm])
+        s = "".join([str(c) for c in p.perm_to_true])
         unique_set.add(s)
     return len(unique_set)
 
@@ -183,7 +194,7 @@ class PermutationFilter(object):
     unique_set = set()
     for i, p in enumerate(self._particles):
       if self._weights[i] > 0:
-        s = "".join([str(c) for c in p.true_to_perm])
+        s = "".join([str(c) for c in p.perm_to_true])
         if s not in unique_set:
           unique.append(p)
           unique_set.add(s)
@@ -311,25 +322,6 @@ class PermutationFilter(object):
     proposal[vj] = ti
 
     return Permutation(proposal)
-
-  def sample_mcmc(self, original_perm, original_is_valid=True):
-    """
-    Samples a new permutation from the posterior distribution given by observed results so far.
-    """
-    # proposal_perm = self.make_proposal_geometric(original_perm)
-    proposal_perm = self.make_proposal(original_perm)
-
-    # Check if the proposal satisfies all of the constraints from events seen so far.
-    if self.satisfies_all_results(proposal_perm):
-      prior_proposal = self.compute_prior(proposal_perm)
-      prior_original = self.compute_prior(original_perm)
-
-      # Accept according to Metropolis-Hastings.
-      A_ij = min(1, prior_proposal / prior_original)
-      if random.random() < A_ij:
-        return proposal_perm, True
-
-    return original_perm, False
 
   def metropolis_hastings(self, original_perm, proposal_perm):
     # Check if the proposal satisfies all of the constraints from events seen so far.

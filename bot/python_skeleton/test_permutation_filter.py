@@ -44,7 +44,7 @@ class PermutationFilterTest(unittest.TestCase):
     accept_ctr = 0
     for _ in range(nresample):
       new_perm, did_accept = pf.sample_mcmc(original_perm)
-      if not (new_perm.true_to_perm == original_perm.true_to_perm).all():
+      if not (new_perm.perm_to_true == original_perm.perm_to_true).all():
         accept_ctr += 1
     elapsed = time.time() - t0
     accept_frac = accept_ctr / nresample
@@ -63,7 +63,7 @@ class PermutationFilterTest(unittest.TestCase):
     accept_ctr = 0
     for _ in range(nresample):
       new_perm, did_accept = pf.sample_mcmc(original_perm)
-      if not (new_perm.true_to_perm == original_perm.true_to_perm).all():
+      if not (new_perm.perm_to_true == original_perm.perm_to_true).all():
         accept_ctr += 1
     elapsed = time.time() - t0
     accept_frac = accept_ctr / nresample
@@ -94,7 +94,7 @@ class PermutationFilterTest(unittest.TestCase):
     # [3 4 9 2 8 Q K A 5 6 J T 7]
     true_perm = Permutation(np.array([1, 2, 7, 0, 6, 10, 11, 12, 3, 4, 9, 8, 5]))
 
-    pf = PermutationFilter(10000)
+    pf = PermutationFilter(5000)
 
     # Do everything but the last result.
     prev_unique_particles = None
@@ -102,12 +102,8 @@ class PermutationFilterTest(unittest.TestCase):
     for i, r in enumerate(results[:-1]):
       pf.update(r)
       has_true_perm = pf.has_particle(true_perm)
-      print("iter={} Has true perm? {}".format(i, has_true_perm))
-
-      # if pf.nonzero() < 1000:
-        # pf.resample(1000)
-        # print("Did resample, now has {} unique".format(pf.unique()))
-      print("Updated, particle now has {} unique".format(pf.unique()))
+      print("iter={} Has true perm? {} nonzero={}".format(i, has_true_perm, pf.nonzero()))
+      # print("Updated, particle now has {} unique".format(pf.unique()))
 
       curr_unique_particles = pf.get_unique_permutations()
       if len(curr_unique_particles) == 0 and len(prev_unique_particles) > 0:
