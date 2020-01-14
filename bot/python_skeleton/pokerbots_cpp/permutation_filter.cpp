@@ -194,4 +194,74 @@ std::pair<Permutation, bool> PermutationFilter::MetropolisHastings(const Permuta
   return std::make_pair<Permutation, bool>(Permutation(orig_perm), false);
 }
 
+
+std::pair<Permutation, bool> PermutationFilter::SampleMCMCInvalid(const Permutation& orig_perm, const ShowdownResult& r) {
+  const Permutation& prop_perm = MakeProposalFromInvalid(orig_perm, r);
+  return MetropolisHastings(orig_perm, prop_perm);
 }
+
+
+std::pair<Permutation, bool> PermutationFilter::SampleMCMCValid(const Permutation& orig_perm, const ShowdownResult& r) {
+  const Permutation& prop_perm = MakeProposalFromValid(orig_perm, r);
+  return MetropolisHastings(orig_perm, prop_perm);
+}
+
+
+void PermutationFilter::Update(const ShowdownResult& r) {
+  const int nonzero = Nonzero();
+
+  const int num_invalid_retries = std::min(10, static_cast<int>(5 * N_ / nonzero));
+  const int num_valid_retries = 1;
+
+  for (int i = 0; i < particles_.size(); ++i) {
+    // Skip particles that have zero weight (dead).
+    if (weights_.at(i) <= 0) {
+      continue;
+    }
+  
+    const Permutation& p = particles_.at(i);
+
+    // If this result will kill particle, try to fix it a few times before giving up.
+    if (!SatisfiesResult(p, r)) {
+      bool did_save = false;
+      for (int rt = 0; rt < num_invalid_retries; ++rt) {
+        const auto& mcmc_sample = SampleMCMCInvalid(p, r);
+        const bool did_save = mcmc_sample.second;
+
+        // Successful fix!
+        if (did_save) {
+          weights_.at(i) = 1;
+          particles_.at(i) = mcmc_sample.first;
+          break;
+        }
+      }
+
+      if (!did_save) {
+        weights_.at(i) = 0;
+        dead_indices_.emplace_back(i);
+      }
+    
+    // Result doesn't kill particle, use it to make some more samples.
+    } else {
+      for (int rt = 0; rt < num_valid_retries; ++rt) {
+        if (dead_indices_.size() == 0) {
+          break;
+        }
+
+        const auto& mcmc_sample = SampleMCMCValid(p, r);
+        if (mcmc_sample.second) {
+          const int dead_idx_to_replace = dead_indices_.back();
+          dead_indices_.pop_back();
+
+          weights_.at(dead_idx_to_replace) = 1;
+          particles_.at(dead_idx_to_replace) = mcmc_sample.first;
+          break;
+        }
+      }
+    }
+  }
+
+  results_.emplace_back(r);
+}
+
+} // namespace pb

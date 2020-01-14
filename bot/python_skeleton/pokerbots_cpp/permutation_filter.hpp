@@ -145,6 +145,11 @@ class PermutationFilter {
   // Do Metropolis-Hastings rejection sampling on a proposed permutation.
   std::pair<Permutation, bool> MetropolisHastings(const Permutation& orig_perm, const Permutation& prop_perm);
 
+  std::pair<Permutation, bool> SampleMCMCInvalid(const Permutation& orig_perm, const ShowdownResult& r);
+  std::pair<Permutation, bool> SampleMCMCValid(const Permutation& orig_perm, const ShowdownResult& r);
+
+  void Update(const ShowdownResult& r);
+
  private:
   int N_;
 
@@ -153,7 +158,7 @@ class PermutationFilter {
   int nonzero_ = 0;
   std::vector<ShowdownResult> results_ = {};
 
-  std::vector<std::size_t> dead_indices_ = {};
+  std::vector<int> dead_indices_ = {};
 
   std::default_random_engine generator_{};
   std::random_device rd_{};
