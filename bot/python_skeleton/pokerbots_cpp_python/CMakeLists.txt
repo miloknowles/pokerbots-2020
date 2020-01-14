@@ -7,6 +7,7 @@ add_compile_options(-std=c++11)
 find_package(Boost REQUIRED COMPONENTS python)
 # include_directories(/usr/include/python3.5m/)
 include_directories(/usr/include/python2.7/)
+include_directories()
 
 add_library(${PROJECT_NAME} SHARED
   permutation_filter.cpp
@@ -48,3 +49,20 @@ add_custom_command(
   COMMAND ${CMAKE_COMMAND} -E copy
           ${CMAKE_CURRENT_BINARY_DIR}/lib${PROJECT_NAME}.so
           ${CMAKE_SOURCE_DIR}/lib${PROJECT_NAME}.so)
+
+enable_testing()  
+
+# Uncomment this to collect all source files in this directory.
+# Currently not used because certain tests need to be excluded.
+# file(GLOB TEST_SOURCES "*.cpp")
+set(TEST_SOURCES
+  test_permutation_filter.cpp)
+
+# Make a single executable for all tests.
+# Can use --gtest_filter option to run specific tests.
+add_executable(${PROJECT_NAME}_test ${TEST_SOURCES} ./gtest/gtest-all.cc)
+target_link_libraries(${PROJECT_NAME}_test
+  ${PROJECT_NAME}
+  pthread)
+set_target_properties(${PROJECT_NAME}_test PROPERTIES COMPILE_FLAGS "-std=c++11")
+add_test(NAME ${PROJECT_NAME}_test COMMAND ${PROJECT_NAME}_test --gtest_color=yes)

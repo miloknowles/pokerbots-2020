@@ -1,18 +1,7 @@
 #include "./permutation_filter.hpp"
-
 #include "pbots_calc.h"
-#include <set>
 
 namespace pb {
-
-
-static void PrintPermutation(const Permutation& p) {
-  assert(p.size() == 13);
-  for (int i = 0; i < p.size(); ++i) {
-    std::cout << static_cast<int>(p.at(i)) << " ";
-  }
-  std::cout << "\n";
-}
 
 
 static void PrintResult(const ShowdownResult& r) {
@@ -31,19 +20,6 @@ static void PrintValues(const HandValues& w, const HandValues& l, const BoardVal
     std::cout << static_cast<int>(bv) << " ";
   }
   std::cout << "\n";
-}
-
-
-static bool PermutationIsValid(const Permutation& p) {
-  std::set<uint8_t> s;
-  for (const uint8_t v : p) {
-    if (v < 0 || v > 12) {
-      return false;
-    }
-    s.insert(v);
-  }
-
-  return (s.size() == 13);
 }
 
 
@@ -117,7 +93,7 @@ double PermutationFilter::ComputePrior(const Permutation& p) const {
   std::vector<uint8_t> orig_perm = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12 };
 
   for (uint8_t perm_val = 0; perm_val < 13; ++perm_val) {
-    const uint8_t true_val = p[perm_val];
+    const uint8_t true_val = p.at(perm_val);
     const auto& it = std::find(orig_perm.begin(), orig_perm.end(), true_val);
     const size_t idx = std::distance(orig_perm.begin(), it);
     if (orig_perm.size() > 1) { orig_perm.erase(it); }
@@ -201,7 +177,6 @@ Permutation PermutationFilter::MakeProposalFromInvalid(const Permutation& p, con
   for (const uint8_t v : los_hand) { other_mask[v] = false; }
   for (const uint8_t v : board) { other_mask[v] = false; }
   std::vector<uint8_t> other_vals;
-
   for (uint8_t i = 0; i < other_mask.size(); ++i) {
     if (other_mask[i]) { other_vals.emplace_back(i); }
   }
@@ -217,26 +192,21 @@ Permutation PermutationFilter::MakeProposalFromInvalid(const Permutation& p, con
 
   // Swap winner hand with others.
   if (real(gen_) < 0.5) {
-    vi = win_hand[i];
+    vi = win_hand.at(i);
     other_vals.insert(other_vals.end(), win_hand.begin(), win_hand.end());
-    vj = other_vals[j];
+    vj = other_vals.at(j);
   // Swap loser hand with others.
   } else {
-    vi = los_hand[i];
+    vi = los_hand.at(i);
     other_vals.insert(other_vals.end(), los_hand.begin(), los_hand.end());
-    vj = other_vals[j];
+    vj = other_vals.at(j);
   }
 
-  Permutation prop = p;
-  const uint8_t ti = prop[vi];
-  const uint8_t tj = prop[vj];
-  prop[vi] = tj;
-  prop[vj] = ti;
-
-  // if (!PermutationIsValid(prop)) {
-  //   PrintPermutation(prop);
-  //   assert(false);
-  // }
+  Permutation prop(p);
+  const uint8_t ti = prop.at(vi);
+  const uint8_t tj = prop.at(vj);
+  prop.at(vi) = tj;
+  prop.at(vj) = ti;
 
   return prop;
 }

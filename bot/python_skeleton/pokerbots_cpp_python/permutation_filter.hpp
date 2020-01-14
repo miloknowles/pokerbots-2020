@@ -10,6 +10,7 @@
 #include <random>
 #include <algorithm>
 #include <utility>
+#include <set>
 
 
 namespace pb {
@@ -175,5 +176,43 @@ class PermutationFilter {
   std::random_device rd_{};
   std::mt19937 gen_;
 };
+
+
+inline std::vector<uint8_t> PermutationToVector(const Permutation& p) {
+  std::vector<uint8_t> out;
+  for (const uint8_t v : p) {
+    out.emplace_back(v);
+  }
+  return out;
+}
+
+
+inline void PrintPermutation(const Permutation& p) {
+  assert(p.size() == 13);
+  for (int i = 0; i < p.size(); ++i) {
+    std::cout << static_cast<int>(p.at(i)) << " ";
+  }
+  std::cout << "\n";
+}
+
+
+inline void PrintVector(const std::vector<uint8_t>& vec) {
+  for (const uint8_t t : vec) {
+    std::cout << static_cast<int>(t) << " ";
+  }
+  std::cout << "\n";
+}
+
+
+inline bool PermutationIsValid(const Permutation& p) {
+  std::set<uint8_t> s;
+  for (const uint8_t v : p) {
+    if (v < 0 || v > 12) {
+      return false;
+    }
+    s.insert(v);
+  }
+  return (s.size() == 13);
+}
 
 }
