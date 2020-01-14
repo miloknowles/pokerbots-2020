@@ -125,5 +125,6 @@ class PermutationFilterTest(unittest.TestCase):
 
       prev_unique_particles = pf.get_unique_permutations()
 
+
 if __name__ == "__main__":
   unittest.main()

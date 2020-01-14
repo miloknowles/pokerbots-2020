@@ -43,7 +43,9 @@ float PbotsCalcEquity(const std::string& query,
 inline std::vector<uint8_t> MapToTrueValues(const Permutation& p, const std::vector<uint8_t>& values) {
   std::vector<uint8_t> values_mapped(values.size());
   for (int i = 0; i < values.size(); ++i) {
-    values_mapped[i] = p[values[i]];
+    const uint8_t mapped = p.at(values.at(i));
+    assert(mapped >= 0 && mapped <= 12);
+    values_mapped.at(i) = mapped;
   }
   return values_mapped;
 }
@@ -51,9 +53,12 @@ inline std::vector<uint8_t> MapToTrueValues(const Permutation& p, const std::vec
 // Pass in concatenated cards like AcAd4s5h6d.
 inline std::string MapToTrueStrings(const Permutation& p, const std::string& strs) {
   std::string out;
+
   for (int i = 0; i < strs.size(); i += 2) {
-    const char mapped_rank = p.at(RANK_STR_TO_VAL.at(strs[i]));
-    out += (std::string(1, mapped_rank) + strs.at(i + 1));
+    const uint8_t mapped_val = p.at(RANK_STR_TO_VAL.at(strs[i]));
+    assert(mapped_val >= 0 && mapped_val <= 12);
+    const char mapped_rank = RANK_VAL_TO_STR.at(mapped_val);
+    out += (std::string(1, mapped_rank) + std::string(1, strs[i + 1]));
   }
   return out;
 }
@@ -75,21 +80,25 @@ struct ShowdownResult {
   HandValues GetWinnerValues() const {
     HandValues out;
     out[0] = RANK_STR_TO_VAL[winner_hole_cards[0]];
-    out[1] = RANK_STR_TO_VAL[winner_hole_cards[1]];
+    out[1] = RANK_STR_TO_VAL[winner_hole_cards[2]];
+    assert(out[0] >= 0 && out[1] <= 12);
     return out;
   }
 
   HandValues GetLoserValues() const {
     HandValues out;
     out[0] = RANK_STR_TO_VAL[loser_hole_cards[0]];
-    out[1] = RANK_STR_TO_VAL[loser_hole_cards[1]];
+    out[1] = RANK_STR_TO_VAL[loser_hole_cards[2]];
+    assert(out[0] >= 0 && out[1] <= 12);
     return out;
   }
 
   BoardValues GetBoardValues() const {
     BoardValues out;
-    for (int i = 0; i < 10; i += 2) {
-      out[i] = RANK_STR_TO_VAL[board_cards[i]];
+    for (int i = 0; i < 5; ++i) {
+      const uint8_t val = RANK_STR_TO_VAL[board_cards.at(2*i)];
+      assert(val >= 0 && val <= 12); 
+      out.at(i) = val;
     }
     return out;
   }
@@ -107,6 +116,7 @@ class PermutationFilter {
     // Sample the initial population of particles.
     for (int i = 0; i < N; ++i) {
       particles_.at(i) = PriorSample();
+      weights_.at(i) = 1.0;
     }
   }
 
@@ -120,7 +130,7 @@ class PermutationFilter {
 
   // Does this permutations p satisfy the showdown result r?
   bool SatisfiesResult(const Permutation& p, const ShowdownResult& r) const {
-    const std::string query = MapToTrueStrings(p, r.winner_hole_cards) + ":" + MapToTrueStrings(p, r.loser_hole_cards);
+    const std::string& query = MapToTrueStrings(p, r.winner_hole_cards) + ":" + MapToTrueStrings(p, r.loser_hole_cards);
     const std::string& board = MapToTrueStrings(p, r.board_cards);
     const bool loser_wins = PbotsCalcEquity(query, board, "", 1);
     return !loser_wins;

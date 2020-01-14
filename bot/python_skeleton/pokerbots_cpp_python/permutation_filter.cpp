@@ -1,11 +1,50 @@
 #include "./permutation_filter.hpp"
 
 #include "pbots_calc.h"
-
-#include <poker-eval/enumdefs.h>
-#include <poker-eval/poker_defs.h>
+#include <set>
 
 namespace pb {
+
+
+static void PrintPermutation(const Permutation& p) {
+  assert(p.size() == 13);
+  for (int i = 0; i < p.size(); ++i) {
+    std::cout << static_cast<int>(p.at(i)) << " ";
+  }
+  std::cout << "\n";
+}
+
+
+static void PrintResult(const ShowdownResult& r) {
+  std::cout << "Winner hand: " << r.winner_hole_cards << " Loser hand: " << r.loser_hole_cards << " Board: " << r.board_cards << std::endl;
+}
+
+
+static void PrintValues(const HandValues& w, const HandValues& l, const BoardValues& b) {
+  for (const uint8_t wv : w) {
+    std::cout << static_cast<int>(wv) << " ";
+  }
+  for (const uint8_t lv : l) {
+    std::cout << static_cast<int>(lv) << " ";
+  }
+  for (const uint8_t bv : b) {
+    std::cout << static_cast<int>(bv) << " ";
+  }
+  std::cout << "\n";
+}
+
+
+static bool PermutationIsValid(const Permutation& p) {
+  std::set<uint8_t> s;
+  for (const uint8_t v : p) {
+    if (v < 0 || v > 12) {
+      return false;
+    }
+    s.insert(v);
+  }
+
+  return (s.size() == 13);
+}
 
 
 float PbotsCalcEquity(const std::string& query,
@@ -22,8 +61,12 @@ float PbotsCalcEquity(const std::string& query,
   board_c[board.size()] = '\0';
   dead_c[dead.size()] = '\0';
 
+  char* query_c = new char[query.size() + 1];
+  std::copy(query.begin(), query.end(), query_c);
+  query_c[query.size()] = '\0';
+
   // Query pbots_calc.
-  calc(query.c_str(), board_c, dead_c, iters, res);
+  calc(query_c, board_c, dead_c, iters, res);
   const float ev = res->ev[0];
 
   // Free memory after allocating.
@@ -35,7 +78,7 @@ float PbotsCalcEquity(const std::string& query,
 
 
 Permutation PermutationFilter::PriorSample() {
-  std::vector<uint8_t> orig_perm = { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12 };
+  std::vector<uint8_t> orig_perm = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12 };
   std::vector<uint8_t> prop_perm;
 
   std::geometric_distribution<uint8_t> distribution(0.25);
@@ -58,6 +101,11 @@ Permutation PermutationFilter::PriorSample() {
   for (int i = 0; i < 13; ++i) {
     out[i] = prop_perm[i];
   }
+
+  // if (!PermutationIsValid(out)) {
+  //   PrintPermutation(out);
+  //   assert(false);
+  // }
   
   return out;
 }
@@ -66,7 +114,7 @@ Permutation PermutationFilter::PriorSample() {
 double PermutationFilter::ComputePrior(const Permutation& p) const {
   double prob = 1.0;
 
-  std::vector<uint8_t> orig_perm = { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12 };
+  std::vector<uint8_t> orig_perm = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12 };
 
   for (uint8_t perm_val = 0; perm_val < 13; ++perm_val) {
     const uint8_t true_val = p[perm_val];
@@ -88,17 +136,21 @@ double PermutationFilter::ComputePrior(const Permutation& p) const {
 
 
 Permutation PermutationFilter::MakeProposalFromValid(const Permutation& p, const ShowdownResult& r) {
-  const HandValues& win_hand = r.GetWinnerValues();
-  const HandValues& los_hand = r.GetLoserValues();
-  const BoardValues& board = r.GetBoardValues();
+  const HandValues win_hand = r.GetWinnerValues();
+  const HandValues los_hand = r.GetLoserValues();
+  const BoardValues board = r.GetBoardValues();
 
   // std::uniform_int_distribution<> sampler13(0, 12);
   std::uniform_int_distribution<> sampler9(0, 8);
   std::uniform_int_distribution<> sampler4(0, 3);
   std::uniform_int_distribution<> sampler5(0, 4);
 
+  // assert(win_hand.size() == 2);
+  // assert(los_hand.size() == 2);
+  // assert(board.size() == 5);
+
   const int which = sampler9(gen_);
-  int vi, vj;
+  uint8_t vi, vj;
 
   // Swap winner values.
   if (which < 2) {
@@ -128,14 +180,20 @@ Permutation PermutationFilter::MakeProposalFromValid(const Permutation& p, const
   prop[vi] = tj;
   prop[vj] = ti;
 
+  // if (!PermutationIsValid(prop)) {
+  //   // std::cout << "invalid in make valid" << std::endl;
+  //   PrintPermutation(prop);
+  //   assert(false);
+  // }
+
   return prop;
 }
 
 
 Permutation PermutationFilter::MakeProposalFromInvalid(const Permutation& p, const ShowdownResult& r) {
-  const HandValues& win_hand = r.GetWinnerValues();
-  const HandValues& los_hand = r.GetLoserValues();
-  const BoardValues& board = r.GetBoardValues();
+  const HandValues win_hand = r.GetWinnerValues();
+  const HandValues los_hand = r.GetLoserValues();
+  const BoardValues board = r.GetBoardValues();
 
   std::array<bool, 13> other_mask;
   other_mask.fill(true);
@@ -175,6 +233,11 @@ Permutation PermutationFilter::MakeProposalFromInvalid(const Permutation& p, con
   prop[vi] = tj;
   prop[vj] = ti;
 
+  // if (!PermutationIsValid(prop)) {
+  //   PrintPermutation(prop);
+  //   assert(false);
+  // }
+
   return prop;
 }
 
@@ -210,8 +273,14 @@ std::pair<Permutation, bool> PermutationFilter::SampleMCMCValid(const Permutatio
 void PermutationFilter::Update(const ShowdownResult& r) {
   const int nonzero = Nonzero();
 
+  if (nonzero == 0) {
+    return;
+  }
+
   const int num_invalid_retries = std::min(10, static_cast<int>(5 * N_ / nonzero));
   const int num_valid_retries = 1;
+
+  std::cout << num_invalid_retries << " " << num_valid_retries << std::endl;
 
   for (int i = 0; i < particles_.size(); ++i) {
     // Skip particles that have zero weight (dead).
