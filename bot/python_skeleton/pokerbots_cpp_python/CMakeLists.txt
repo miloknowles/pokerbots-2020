@@ -9,6 +9,14 @@ find_package(Boost REQUIRED COMPONENTS python)
 include_directories(/usr/include/python2.7/)
 include_directories()
 
+if(NOT CMAKE_BUILD_TYPE)
+  set(CMAKE_BUILD_TYPE Release)
+endif()
+
+# set(CMAKE_CXX_FLAGS "-Wall -Wextra")
+set(CMAKE_CXX_FLAGS_DEBUG "-g")
+set(CMAKE_CXX_FLAGS_RELEASE "-Ofast")
+
 add_library(${PROJECT_NAME} SHARED
   permutation_filter.cpp
   permutation_filter.hpp)
