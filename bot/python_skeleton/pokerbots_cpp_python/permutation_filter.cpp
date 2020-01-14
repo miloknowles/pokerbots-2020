@@ -60,7 +60,7 @@ Permutation PermutationFilter::PriorSample() {
   std::geometric_distribution<uint8_t> distribution(0.25);
   Permutation seed;
   for (int i = 0; i < 13; ++i) {
-    seed[i] = distribution(generator_) - 1;
+    seed[i] = distribution(generator_);
   }
 
   for (const uint8_t s : seed) {
@@ -69,6 +69,8 @@ Permutation PermutationFilter::PriorSample() {
     if (orig_perm.size() > 1) {
       const auto it = std::next(orig_perm.begin(), pop_i);
       orig_perm.erase(it);
+
+      // PrintVector(orig_perm);
     }
   }
 
@@ -78,11 +80,6 @@ Permutation PermutationFilter::PriorSample() {
     out[i] = prop_perm[i];
   }
 
-  // if (!PermutationIsValid(out)) {
-  //   PrintPermutation(out);
-  //   assert(false);
-  // }
-  
   return out;
 }
 
@@ -97,6 +94,8 @@ double PermutationFilter::ComputePrior(const Permutation& p) const {
     const auto& it = std::find(orig_perm.begin(), orig_perm.end(), true_val);
     const size_t idx = std::distance(orig_perm.begin(), it);
     if (orig_perm.size() > 1) { orig_perm.erase(it); }
+
+    // PrintVector(orig_perm);
 
     const double s = static_cast<double>(idx);
     const double p1 = 0.25 * std::pow(0.75, s);
@@ -116,16 +115,12 @@ Permutation PermutationFilter::MakeProposalFromValid(const Permutation& p, const
   const HandValues los_hand = r.GetLoserValues();
   const BoardValues board = r.GetBoardValues();
 
-  // std::uniform_int_distribution<> sampler13(0, 12);
-  std::uniform_int_distribution<> sampler9(0, 8);
+  std::uniform_int_distribution<> sampler13(0, 12);
+  // std::uniform_int_distribution<> sampler9(0, 8);
   std::uniform_int_distribution<> sampler4(0, 3);
   std::uniform_int_distribution<> sampler5(0, 4);
 
-  // assert(win_hand.size() == 2);
-  // assert(los_hand.size() == 2);
-  // assert(board.size() == 5);
-
-  const int which = sampler9(gen_);
+  const int which = sampler13(gen_);
   uint8_t vi, vj;
 
   // Swap winner values.
@@ -141,14 +136,26 @@ Permutation PermutationFilter::MakeProposalFromValid(const Permutation& p, const
     vj = los_hand[(i + 1) % 2];
 
   // Swap board values.
-  } else {
+  } else if (which < 9) {
     const int i = sampler5(gen_);
     const int j = sampler5(gen_);
     vi = board[i];
     vj = board[j];
+  } else {
+    std::array<bool, 13> other_mask;
+    other_mask.fill(true);
+    for (const uint8_t v : win_hand) { other_mask[v] = false; }
+    for (const uint8_t v : los_hand) { other_mask[v] = false; }
+    for (const uint8_t v : board) { other_mask[v] = false; }
+    std::vector<uint8_t> other_vals;
+    for (uint8_t i = 0; i < other_mask.size(); ++i) {
+      if (other_mask[i]) { other_vals.emplace_back(i); }
+    }
+    const int i = sampler4(gen_);
+    const int j = sampler4(gen_);
+    vi = other_vals[i];
+    vj = other_vals[j];
   }
-
-  // TODO(milo): Swap remaining 4 values if performance is worse.
 
   Permutation prop = p;
   const uint8_t ti = prop[vi];
@@ -181,8 +188,8 @@ Permutation PermutationFilter::MakeProposalFromInvalid(const Permutation& p, con
     if (other_mask[i]) { other_vals.emplace_back(i); }
   }
 
-  std::uniform_int_distribution<> sampler4(0, 4);
-  std::uniform_int_distribution<> sampler6(0, 6);
+  std::uniform_int_distribution<> sampler4(0, 3);
+  std::uniform_int_distribution<> sampler6(0, 5);
   const int i = sampler4(gen_) % 2;
   const int j = sampler6(gen_);
 
@@ -249,8 +256,7 @@ void PermutationFilter::Update(const ShowdownResult& r) {
 
   const int num_invalid_retries = std::min(10, static_cast<int>(5 * N_ / nonzero));
   const int num_valid_retries = 1;
-
-  std::cout << num_invalid_retries << " " << num_valid_retries << std::endl;
+  printf("RETRIES: invalid=%d valid=%d\n", num_invalid_retries, num_valid_retries);
 
   for (int i = 0; i < particles_.size(); ++i) {
     // Skip particles that have zero weight (dead).
@@ -259,16 +265,23 @@ void PermutationFilter::Update(const ShowdownResult& r) {
     }
   
     const Permutation& p = particles_.at(i);
+    // std::cout << i << std::endl;
+    // PrintPermutation(p);
 
     // If this result will kill particle, try to fix it a few times before giving up.
     if (!SatisfiesResult(p, r)) {
+      // std::cout << "Permutation violates result" << std::endl;
       bool did_save = false;
       for (int rt = 0; rt < num_invalid_retries; ++rt) {
         const auto& mcmc_sample = SampleMCMCInvalid(p, r);
-        const bool did_save = mcmc_sample.second;
+        did_save = mcmc_sample.second;
+
+        // std::cout << "Retry did save: " << did_save << std::endl;
+        // PrintPermutation(mcmc_sample.first);
 
         // Successful fix!
         if (did_save) {
+          // std::cout << "did save" << std::endl;
           weights_.at(i) = 1;
           particles_.at(i) = mcmc_sample.first;
           break;
@@ -276,21 +289,26 @@ void PermutationFilter::Update(const ShowdownResult& r) {
       }
 
       if (!did_save) {
+        // std::cout << "No retry saved, setting weight to zero" << std::endl;
         weights_.at(i) = 0;
         dead_indices_.emplace_back(i);
       }
     
     // Result doesn't kill particle, use it to make some more samples.
     } else {
+      // std::cout << "Particle wasn't killed by update" << std::endl;
       for (int rt = 0; rt < num_valid_retries; ++rt) {
         if (dead_indices_.size() == 0) {
+          // std::cout << "no dead indices to revive, doing nothing" << std::endl;
           break;
         }
 
         const auto& mcmc_sample = SampleMCMCValid(p, r);
         if (mcmc_sample.second) {
+          // std::cout << "generated a unique new sample to revive with" << std::endl;
           const int dead_idx_to_replace = dead_indices_.back();
           dead_indices_.pop_back();
+          // std::cout << "replacing idx: " << dead_idx_to_replace << std::endl;
 
           weights_.at(dead_idx_to_replace) = 1;
           particles_.at(dead_idx_to_replace) = mcmc_sample.first;

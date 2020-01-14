@@ -133,8 +133,10 @@ class PermutationFilter {
   bool SatisfiesResult(const Permutation& p, const ShowdownResult& r) const {
     const std::string& query = MapToTrueStrings(p, r.winner_hole_cards) + ":" + MapToTrueStrings(p, r.loser_hole_cards);
     const std::string& board = MapToTrueStrings(p, r.board_cards);
-    const bool loser_wins = PbotsCalcEquity(query, board, "", 1);
-    return !loser_wins;
+    const float ev = PbotsCalcEquity(query, board, "", 1);
+    // std::cout << ev << std::endl;
+    return ev > 0;
+    // return !loser_wins;
   }
 
   // Does permutation p satisfy ALL results seen so far?
@@ -145,7 +147,14 @@ class PermutationFilter {
     return true;
   }
 
-  int Nonzero() const { return N_ - dead_indices_.size(); }
+  int Nonzero() const {
+    int ctr = 0;
+    for (const double w : weights_) {
+      if (w > 0) { ++ctr; }
+    }
+    return ctr;
+    // return (N_ - dead_indices_.size());
+  }
 
   // For a permutation that satisfies all constraints, we don't want to swap values between the
   // hands or the hand and board. Instead, swap cards within hands or within the board.

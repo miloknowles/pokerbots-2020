@@ -27,7 +27,7 @@ def test_converge_cpp():
   # [3 4 9 2 8 Q K A 5 6 J T 7]
   # true_perm = Permutation(np.array([1, 2, 7, 0, 6, 10, 11, 12, 3, 4, 9, 8, 5]))
 
-  pf = cpp.PermutationFilter(10000)
+  pf = cpp.PermutationFilter(5000)
 
   # Do everything but the last result.
   # prev_unique_particles = None
@@ -35,6 +35,9 @@ def test_converge_cpp():
   for i, r in enumerate(results):
     pf.Update(r)
     print("Filter has %s nonzero" % pf.Nonzero())
+    if (i > 100):
+      print("Did 100 showdowns, assume converged")
+      break
   #   has_true_perm = pf.has_particle(true_perm)
   #   print("iter={} Has true perm? {} nonzero={} invalid_succ_rate={}".format(
   #     i, has_true_perm, pf.nonzero(), pf.invalid_retry_success_rate()))

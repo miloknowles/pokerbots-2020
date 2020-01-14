@@ -22,9 +22,9 @@ TEST(PermutationFilterTest, testMapToTrueValues) {
 }
 
 TEST(PermutationFilterTest, testPriorSample) {
-  PermutationFilter pf(100);
+  PermutationFilter pf(0);
 
-  for (int i = 0; i < 1000000; ++i) {
+  for (int i = 0; i < 1; ++i) {
     const Permutation& p = pf.PriorSample();
     // PrintPermutation(p);
     const double prior = pf.ComputePrior(p);
@@ -73,9 +73,47 @@ TEST(PermutationFilterTest, testMakeProposalFromInvalid) {
   const Permutation original = pf.PriorSample();
   const ShowdownResult r("AsKd", "2h3c", "2c3c4c5c6c");
 
-  for (int i = 0; i < 10000; ++i) {
+  for (int i = 0; i < 100000; ++i) {
     const Permutation p = pf.MakeProposalFromInvalid(original, r);
     const double prior = pf.ComputePrior(p);
     // std::cout << prior << std::endl;
   }
+}
+
+TEST(PermutationFilterTest, testMakeProposalFromValid) {
+  PermutationFilter pf(100);
+  const Permutation original = pf.PriorSample();
+  const ShowdownResult r("AsKd", "2h3s", "2c3c4c5c6c");
+
+  for (int i = 0; i < 100000; ++i) {
+    const Permutation p = pf.MakeProposalFromValid(original, r);
+    const double prior = pf.ComputePrior(p);
+    // std::cout << prior << std::endl;
+  }
+}
+
+TEST(PermutationFilterTest, testUpdate) {
+  PermutationFilter pf(100);
+  const ShowdownResult r("AsKd", "2h3s", "2c3c4c5c6c");
+  pf.Update(r);
+}
+
+TEST(PermutationFilterTest, testSatisfiesResult) {
+  PermutationFilter pf(100);
+  const Permutation true_perm = { 1, 2, 7, 0, 6, 10, 11, 12, 3, 4, 9, 8, 5 };
+  const ShowdownResult r("8sJh", "Td8h", "AdKs6sQcJc");
+  // 8sJh|Td8h|AdKs6sQcJc
+  // Th9h|9sJs|8hTcKh4d5c
+  // Ts3c|KsAd|4d6s9d3h8h
+  // 8c4c|7s3h|8sQhJs5c7h
+  // 4c4s|7d4h|ThJsJd3s6c
+  // 9h6s|9s2s|8cAhJc5sTc
+  // Ad7s|4hTh|8c9h5h8s3s
+  // 5dTh|Ad7s|5c3c9c3h2h
+  // Ac9c|KcJc|4c9hTs5h2d
+  // 2c2h|3c4c|Qc2s3hJdJh
+  // 5c6d|5sKs|2h7s6c3dJs
+  // JcTd|AsKd|Ts3h3dKcTc
+  // 2c3s|QcKd|5h9c3cJdJh
+  EXPECT_TRUE(pf.SatisfiesResult(true_perm, r));
 }
