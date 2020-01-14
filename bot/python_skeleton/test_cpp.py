@@ -26,6 +26,9 @@ def test_converge_cpp():
   #  2 3 4 5 6 7 8 9 T J Q K A 
   # [3 4 9 2 8 Q K A 5 6 J T 7]
   # true_perm = Permutation(np.array([1, 2, 7, 0, 6, 10, 11, 12, 3, 4, 9, 8, 5]))
+  true_perm_vl = cpp.ValueList()
+  for v in [1, 2, 7, 0, 6, 10, 11, 12, 3, 4, 9, 8, 5]:
+    true_perm_vl.append(v)
 
   pf = cpp.PermutationFilter(5000)
 
@@ -34,33 +37,14 @@ def test_converge_cpp():
 
   for i, r in enumerate(results):
     pf.Update(r)
-    print("Filter has %s nonzero" % pf.Nonzero())
-    if (i > 100):
-      print("Did 100 showdowns, assume converged")
+    print("%d: Filter has %s nonzero" % (i, pf.Nonzero()))
+
+    if pf.HasPermutation(true_perm_vl):
+      print("Found true permutation!")
       break
-  #   has_true_perm = pf.has_particle(true_perm)
-  #   print("iter={} Has true perm? {} nonzero={} invalid_succ_rate={}".format(
-  #     i, has_true_perm, pf.nonzero(), pf.invalid_retry_success_rate()))
-  #   # print("Updated, particle now has {} unique".format(pf.unique()))
-
-  #   curr_unique_particles = pf.get_unique_permutations()
-  #   if len(curr_unique_particles) == 0 and len(prev_unique_particles) > 0:
-  #     print("================ Last alive particles died off ===============")
-  #     print(r.mapped_result(true_perm))
-
-  #     print("\nTrue permutation:")
-  #     print(true_perm)
-  #     print("\n")
-
-  #     for ii, p in enumerate(prev_unique_particles):
-  #       print("Possible permutation {}".format(ii))
-  #       print(p)
-  #       print("Gives result:")
-  #       print(r.mapped_result(p))
-  #       print("\n")
-  #     break
-
-  #   prev_unique_particles = pf.get_unique_permutations()
-
+    # if (i > 100):
+    #   print("Did 100 showdowns, assume converged")
+    #   break
+ 
 if __name__ == "__main__":
   test_converge_cpp()

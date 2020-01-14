@@ -163,12 +163,6 @@ Permutation PermutationFilter::MakeProposalFromValid(const Permutation& p, const
   prop[vi] = tj;
   prop[vj] = ti;
 
-  // if (!PermutationIsValid(prop)) {
-  //   // std::cout << "invalid in make valid" << std::endl;
-  //   PrintPermutation(prop);
-  //   assert(false);
-  // }
-
   return prop;
 }
 
@@ -254,7 +248,7 @@ void PermutationFilter::Update(const ShowdownResult& r) {
     return;
   }
 
-  const int num_invalid_retries = std::min(10, static_cast<int>(5 * N_ / nonzero));
+  const int num_invalid_retries = std::min(3, static_cast<int>(5 * N_ / nonzero));
   const int num_valid_retries = 1;
   printf("RETRIES: invalid=%d valid=%d\n", num_invalid_retries, num_valid_retries);
 
@@ -265,23 +259,16 @@ void PermutationFilter::Update(const ShowdownResult& r) {
     }
   
     const Permutation& p = particles_.at(i);
-    // std::cout << i << std::endl;
-    // PrintPermutation(p);
 
     // If this result will kill particle, try to fix it a few times before giving up.
     if (!SatisfiesResult(p, r)) {
-      // std::cout << "Permutation violates result" << std::endl;
       bool did_save = false;
       for (int rt = 0; rt < num_invalid_retries; ++rt) {
         const auto& mcmc_sample = SampleMCMCInvalid(p, r);
         did_save = mcmc_sample.second;
 
-        // std::cout << "Retry did save: " << did_save << std::endl;
-        // PrintPermutation(mcmc_sample.first);
-
         // Successful fix!
         if (did_save) {
-          // std::cout << "did save" << std::endl;
           weights_.at(i) = 1;
           particles_.at(i) = mcmc_sample.first;
           break;
@@ -289,26 +276,21 @@ void PermutationFilter::Update(const ShowdownResult& r) {
       }
 
       if (!did_save) {
-        // std::cout << "No retry saved, setting weight to zero" << std::endl;
         weights_.at(i) = 0;
         dead_indices_.emplace_back(i);
       }
     
     // Result doesn't kill particle, use it to make some more samples.
     } else {
-      // std::cout << "Particle wasn't killed by update" << std::endl;
       for (int rt = 0; rt < num_valid_retries; ++rt) {
         if (dead_indices_.size() == 0) {
-          // std::cout << "no dead indices to revive, doing nothing" << std::endl;
           break;
         }
 
         const auto& mcmc_sample = SampleMCMCValid(p, r);
         if (mcmc_sample.second) {
-          // std::cout << "generated a unique new sample to revive with" << std::endl;
           const int dead_idx_to_replace = dead_indices_.back();
           dead_indices_.pop_back();
-          // std::cout << "replacing idx: " << dead_idx_to_replace << std::endl;
 
           weights_.at(dead_idx_to_replace) = 1;
           particles_.at(dead_idx_to_replace) = mcmc_sample.first;

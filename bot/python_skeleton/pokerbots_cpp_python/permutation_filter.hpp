@@ -31,6 +31,14 @@ std::map<uint8_t, char> RANK_VAL_TO_STR = {
 };
 
 
+inline bool Equals(const Permutation& p1, const Permutation& p2) {
+  for (int i = 0; i < p1.size(); ++i) {
+    if (p1[i] != p2[i]) { return false; }
+  }
+  return true;
+}
+
+
 /**
  * @brief Wrapper around pbots_calc library to remove some boilerplate code.
  */
@@ -134,9 +142,7 @@ class PermutationFilter {
     const std::string& query = MapToTrueStrings(p, r.winner_hole_cards) + ":" + MapToTrueStrings(p, r.loser_hole_cards);
     const std::string& board = MapToTrueStrings(p, r.board_cards);
     const float ev = PbotsCalcEquity(query, board, "", 1);
-    // std::cout << ev << std::endl;
     return ev > 0;
-    // return !loser_wins;
   }
 
   // Does permutation p satisfy ALL results seen so far?
@@ -148,12 +154,7 @@ class PermutationFilter {
   }
 
   int Nonzero() const {
-    int ctr = 0;
-    for (const double w : weights_) {
-      if (w > 0) { ++ctr; }
-    }
-    return ctr;
-    // return (N_ - dead_indices_.size());
+    return (N_ - dead_indices_.size());
   }
 
   // For a permutation that satisfies all constraints, we don't want to swap values between the
@@ -171,6 +172,22 @@ class PermutationFilter {
   std::pair<Permutation, bool> SampleMCMCValid(const Permutation& orig_perm, const ShowdownResult& r);
 
   void Update(const ShowdownResult& r);
+
+  bool HasPermutation(const Permutation& query) const {
+    for (const Permutation& p : particles_) {
+      if (Equals(query, p)) { return true; }
+    }
+    return false;
+  }
+
+  // bool HasPermutationStr(const std::string& str) const {
+  //   assert(str.size() == 13);
+  //   Permutation parsed;
+  //   for (int i = 0; i < 13; ++i) {
+  //     parsed.at(i) = static_cast<uint8_t>(std::stoi(std::string(1, str.at(i))));
+  //   }
+  //   return HasPermutation(parsed);
+  // }
 
  private:
   int N_;
