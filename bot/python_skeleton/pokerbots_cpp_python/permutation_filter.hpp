@@ -103,12 +103,14 @@ struct ShowdownResult {
 
 class PermutationFilter {
  public:
-  PermutationFilter(int N) : N_(N), particles_(N), weights_(N), nonzero_(N), gen_(rd_()) {
+  PermutationFilter(int N) : N_(N), particles_(N), weights_(N), gen_(rd_()) {
     // Sample the initial population of particles.
     for (int i = 0; i < N; ++i) {
       particles_.at(i) = PriorSample();
     }
   }
+
+  PermutationFilter(const PermutationFilter&) = delete;
 
   // Generate a random permutation from the prior distribution.
   Permutation PriorSample();
@@ -132,7 +134,7 @@ class PermutationFilter {
     return true;
   }
 
-  int Nonzero() const { return nonzero_; }
+  int Nonzero() const { return N_ - dead_indices_.size(); }
 
   // For a permutation that satisfies all constraints, we don't want to swap values between the
   // hands or the hand and board. Instead, swap cards within hands or within the board.
@@ -155,7 +157,6 @@ class PermutationFilter {
 
   std::vector<Permutation> particles_;
   std::vector<double> weights_;
-  int nonzero_ = 0;
   std::vector<ShowdownResult> results_ = {};
 
   std::vector<int> dead_indices_ = {};

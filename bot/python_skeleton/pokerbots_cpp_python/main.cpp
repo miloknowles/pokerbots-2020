@@ -17,4 +17,10 @@ int main(int argc, char const *argv[]) {
   const pb::Permutation& perm = pf.PriorSample();
   const double prior = pf.ComputePrior(perm);
   std::cout << "Prior: " << prior << std::endl;
+
+  const pb::ShowdownResult result("KcKd", "AdAs", "2s3s4s5s7s");
+  std::cout << "Nonzero before: " << pf.Nonzero() << std::endl;
+  pf.Update(result);
+
+  std::cout << "Nonzero after: " << pf.Nonzero() << std::endl;
 }
