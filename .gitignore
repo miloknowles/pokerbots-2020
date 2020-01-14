@@ -2,3 +2,5 @@ __pycache__
 memory/
 training_logs/
 *.pyc
+*.npy
+bot/python_skeleton/pokerbots_cpp/build/
