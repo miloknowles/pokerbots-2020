@@ -13,6 +13,7 @@
 #include <set>
 #include <chrono>
 
+#include <omp/HandEvaluator.h>
 
 namespace pb {
 
@@ -29,6 +30,11 @@ std::map<char, uint8_t> RANK_STR_TO_VAL = {
 std::map<uint8_t, char> RANK_VAL_TO_STR = {
   {0, '2'}, {1, '3'}, {2, '4'}, {3, '5'}, {4, '6'}, {5, '7'}, {6, '8'},
   {7, '9'}, {8, 'T'}, {9, 'J'}, {10, 'Q'}, {11, 'K'}, {12, 'A'}
+};
+
+// Defined by OMPEval.
+std::map<char, uint8_t> SUIT_STR_TO_VAL = {
+  {'s', 0}, {'h', 1}, {'c', 2}, {'d', 3}
 };
 
 
@@ -60,6 +66,31 @@ inline std::vector<uint8_t> MapToTrueValues(const Permutation& p, const std::vec
   return values_mapped;
 }
 
+
+// TODO: make more concise.
+inline std::vector<uint8_t> MapToTrueValues(const Permutation& p, const HandValues& values) {
+  std::vector<uint8_t> values_mapped(values.size());
+  for (int i = 0; i < values.size(); ++i) {
+    const uint8_t mapped = p.at(values.at(i));
+    assert(mapped >= 0 && mapped <= 12);
+    values_mapped.at(i) = mapped;
+  }
+  return values_mapped;
+}
+
+
+// TODO: make more concise.
+inline std::vector<uint8_t> MapToTrueValues(const Permutation& p, const BoardValues& values) {
+  std::vector<uint8_t> values_mapped(values.size());
+  for (int i = 0; i < values.size(); ++i) {
+    const uint8_t mapped = p.at(values.at(i));
+    assert(mapped >= 0 && mapped <= 12);
+    values_mapped.at(i) = mapped;
+  }
+  return values_mapped;
+}
+
+
 // Pass in concatenated cards like AcAd4s5h6d.
 inline std::string MapToTrueStrings(const Permutation& p, const std::string& strs) {
   std::string out;
@@ -72,16 +103,6 @@ inline std::string MapToTrueStrings(const Permutation& p, const std::string& str
   }
   return out;
 }
-
-
-// std::size_t operator()(std::vector<uint32_t> const& vec) const {
-//   std::size_t seed = vec.size();
-//   for(auto& i : vec) {
-//     seed ^= i + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-//   }
-//   return seed;
-// }
-
 
 struct ShowdownResult {
  public:
@@ -186,7 +207,7 @@ class PermutationFilter {
   bool SatisfiesAll(const Permutation& p) {
     Timer timer;
     for (const ShowdownResult& r : results_) {
-      if (!SatisfiesResult(p, r)) { return false; }
+      if (!SatisfiesResultOmp(p, r)) { return false; }
     }
     UpdateProfile("SatisfiesAll", timer.Elapsed());
     return true;
@@ -240,6 +261,30 @@ class PermutationFilter {
     time_.at(fn) += elapsed;
   }
 
+  bool SatisfiesResultOmp(const Permutation&p, const ShowdownResult& r) {
+    omp::Hand win = omp::Hand::empty();
+    const std::string win_and_board = r.winner_hole_cards + r.board_cards;
+    assert(win_and_board.size() == 14);
+    for (int i = 0; i < 7; ++i) {
+      const uint8_t code = 4 * p[RANK_STR_TO_VAL[win_and_board[2*i]]] + SUIT_STR_TO_VAL[win_and_board[2*i+1]];
+      win += omp::Hand(code);
+    }
+    assert(win.count() == 7);
+    const uint16_t win_score = omp_.evaluate(win);
+
+    omp::Hand lose = omp::Hand::empty();
+    const std::string lose_and_board = r.loser_hole_cards + r.board_cards;
+    assert(lose_and_board.size() == 14);
+    for (int i = 0; i < 7; ++i) {
+      const uint8_t code = 4 * p[RANK_STR_TO_VAL[lose_and_board[2*i]]] + SUIT_STR_TO_VAL[lose_and_board[2*i+1]];
+      lose += omp::Hand(code);
+    }
+    assert(lose.count() == 7);
+    const uint16_t lose_score = omp_.evaluate(lose);
+
+    return win_score >= lose_score;
+  }
+
  private:
   int N_;
 
@@ -255,6 +300,7 @@ class PermutationFilter {
 
   // std::unordered_map<Permutation, double> prior_cache_;
   std::array<double, 40> pow_precompute_;
+  omp::HandEvaluator omp_;
 
   std::unordered_map<std::string, double> time_;
   std::unordered_map<std::string, int> counts_;

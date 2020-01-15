@@ -120,6 +120,26 @@ TEST(PermutationFilterTest, testSatisfiesResult) {
   EXPECT_TRUE(pf.SatisfiesResult(true_perm, r));
 }
 
+TEST(PermutationFilterTest, testSatisfiesResultOmp) {
+  PermutationFilter pf(100);
+  const Permutation true_perm = { 1, 2, 7, 0, 6, 10, 11, 12, 3, 4, 9, 8, 5 };
+  const ShowdownResult r("8sJh", "Td8h", "AdKs6sQcJc");
+  // 8sJh|Td8h|AdKs6sQcJc
+  // Th9h|9sJs|8hTcKh4d5c
+  // Ts3c|KsAd|4d6s9d3h8h
+  // 8c4c|7s3h|8sQhJs5c7h
+  // 4c4s|7d4h|ThJsJd3s6c
+  // 9h6s|9s2s|8cAhJc5sTc
+  // Ad7s|4hTh|8c9h5h8s3s
+  // 5dTh|Ad7s|5c3c9c3h2h
+  // Ac9c|KcJc|4c9hTs5h2d
+  // 2c2h|3c4c|Qc2s3hJdJh
+  // 5c6d|5sKs|2h7s6c3dJs
+  // JcTd|AsKd|Ts3h3dKcTc
+  // 2c3s|QcKd|5h9c3cJdJh
+  EXPECT_TRUE(pf.SatisfiesResultOmp(true_perm, r));
+}
+
 TEST(PermutationFilterTest, testConvergence) {
   std::ifstream f("/home/milo/pokerbots-2020/bot/python_skeleton/showdown_results_02.txt");
   if (!f.is_open()) {

@@ -258,7 +258,7 @@ void PermutationFilter::Update(const ShowdownResult& r) {
     return;
   }
 
-  const int num_invalid_retries = std::min(3, static_cast<int>(5 * N_ / nonzero));
+  const int num_invalid_retries = std::min(5, static_cast<int>(5 * N_ / nonzero));
   const int num_valid_retries = 1;
   printf("RETRIES: invalid=%d valid=%d\n", num_invalid_retries, num_valid_retries);
 
@@ -271,7 +271,7 @@ void PermutationFilter::Update(const ShowdownResult& r) {
     const Permutation& p = particles_.at(i);
 
     // If this result will kill particle, try to fix it a few times before giving up.
-    if (!SatisfiesResult(p, r)) {
+    if (!SatisfiesResultOmp(p, r)) {
       bool did_save = false;
       for (int rt = 0; rt < num_invalid_retries; ++rt) {
         const auto& mcmc_sample = SampleMCMCInvalid(p, r);
