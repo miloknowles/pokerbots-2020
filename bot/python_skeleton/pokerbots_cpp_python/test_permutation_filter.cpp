@@ -1,3 +1,5 @@
+#include <fstream>
+
 #include "./gtest/gtest.h"
 #include "./permutation_filter.hpp"
 
@@ -116,4 +118,21 @@ TEST(PermutationFilterTest, testSatisfiesResult) {
   // JcTd|AsKd|Ts3h3dKcTc
   // 2c3s|QcKd|5h9c3cJdJh
   EXPECT_TRUE(pf.SatisfiesResult(true_perm, r));
+}
+
+TEST(PermutationFilterTest, testConvergence) {
+  std::ifstream f("/home/milo/pokerbots-2020/bot/python_skeleton/showdown_results_02.txt");
+  if (!f.is_open()) {
+    return;
+  }
+
+  std::string line;
+  while (getline(f, line)) {
+    if (line.size() < 2) {
+      continue;
+    }
+    std::cout << line << std::endl;
+  }
+
+  f.close();
 }

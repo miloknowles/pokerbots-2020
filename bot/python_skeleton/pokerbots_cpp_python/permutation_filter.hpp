@@ -2,6 +2,7 @@
 
 #include <vector>
 #include <map>
+#include <unordered_map>
 #include <array>
 #include <iostream>
 #include <string>
@@ -10,6 +11,7 @@
 #include <algorithm>
 #include <utility>
 #include <set>
+#include <chrono>
 
 
 namespace pb {
@@ -72,6 +74,15 @@ inline std::string MapToTrueStrings(const Permutation& p, const std::string& str
 }
 
 
+// std::size_t operator()(std::vector<uint32_t> const& vec) const {
+//   std::size_t seed = vec.size();
+//   for(auto& i : vec) {
+//     seed ^= i + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+//   }
+//   return seed;
+// }
+
+
 struct ShowdownResult {
  public:
   ShowdownResult(const std::string& winner_hole_cards,
@@ -117,6 +128,24 @@ struct ShowdownResult {
   std::string board_cards;
 };
 
+// Useful for profiling.
+class Timer {
+ public:
+  Timer() : start_(std::chrono::steady_clock::now()) {}
+
+  void Reset() { start_ = std::chrono::steady_clock::now(); }
+  void Stop() { end_ = std::chrono::steady_clock::now(); }
+
+  double Elapsed() {
+    end_ = std::chrono::steady_clock::now();
+    return std::chrono::duration_cast<std::chrono::microseconds>(end_ - start_).count();
+  }
+
+ private:
+  std::chrono::steady_clock::time_point start_;
+  std::chrono::steady_clock::time_point end_;
+};
+
 
 class PermutationFilter {
  public:
@@ -126,6 +155,11 @@ class PermutationFilter {
       particles_.at(i) = PriorSample();
       weights_.at(i) = 1.0;
     }
+
+    // Precompute pow for some speedups.
+    for (int i = 0; i < pow_precompute_.size(); ++i) {
+      pow_precompute_.at(i) = std::pow(0.75, i);
+    }
   }
 
   PermutationFilter(const PermutationFilter&) = delete;
@@ -134,21 +168,27 @@ class PermutationFilter {
   Permutation PriorSample();
 
   // Compute the prior probability of sampling Permutation p.
-  double ComputePrior(const Permutation& p) const;
+  double ComputePrior(const Permutation& p);
 
   // Does this permutations p satisfy the showdown result r?
-  bool SatisfiesResult(const Permutation& p, const ShowdownResult& r) const {
+  bool SatisfiesResult(const Permutation& p, const ShowdownResult& r) {
+    Timer timer;
+
     const std::string& query = MapToTrueStrings(p, r.winner_hole_cards) + ":" + MapToTrueStrings(p, r.loser_hole_cards);
     const std::string& board = MapToTrueStrings(p, r.board_cards);
     const float ev = PbotsCalcEquity(query, board, "", 1);
+
+    UpdateProfile("SatisfiesResult", timer.Elapsed());
     return ev > 0;
   }
 
   // Does permutation p satisfy ALL results seen so far?
-  bool SatisfiesAll(const Permutation& p) const {
+  bool SatisfiesAll(const Permutation& p) {
+    Timer timer;
     for (const ShowdownResult& r : results_) {
       if (!SatisfiesResult(p, r)) { return false; }
     }
+    UpdateProfile("SatisfiesAll", timer.Elapsed());
     return true;
   }
 
@@ -179,14 +219,26 @@ class PermutationFilter {
     return false;
   }
 
-  // bool HasPermutationStr(const std::string& str) const {
-  //   assert(str.size() == 13);
-  //   Permutation parsed;
-  //   for (int i = 0; i < 13; ++i) {
-  //     parsed.at(i) = static_cast<uint8_t>(std::stoi(std::string(1, str.at(i))));
-  //   }
-  //   return HasPermutation(parsed);
-  // }
+  void Profile() const {
+    std::unordered_map<std::string, double> avg_time;
+    for (const auto& it : time_) {
+      const std::string fn = it.first;
+      const double total_t = it.second;
+      const int ct = counts_.at(fn);
+      const double avg_t = total_t / static_cast<double>(ct);
+      std::cout << fn << std::endl;
+      printf(" | TOTAL=%lf | COUNT=%d | AVG=%lf\n", total_t, ct, avg_t);
+    }
+  }
+
+  void UpdateProfile(const std::string& fn, const double elapsed) {
+    if (counts_.count(fn) == 0) {
+      counts_.emplace(fn, 0);
+      time_.emplace(fn, 0);
+    }
+    ++counts_.at(fn);
+    time_.at(fn) += elapsed;
+  }
 
  private:
   int N_;
@@ -200,6 +252,12 @@ class PermutationFilter {
   std::default_random_engine generator_{};
   std::random_device rd_{};
   std::mt19937 gen_;
+
+  // std::unordered_map<Permutation, double> prior_cache_;
+  std::array<double, 40> pow_precompute_;
+
+  std::unordered_map<std::string, double> time_;
+  std::unordered_map<std::string, int> counts_;
 };
 
 

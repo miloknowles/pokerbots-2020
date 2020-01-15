@@ -40,5 +40,6 @@ BOOST_PYTHON_MODULE(pokerbots_cpp_python)
   class_<PyPermutationFilter, boost::noncopyable>("PermutationFilter", init<int>())
     .def("Nonzero", &PyPermutationFilter::Nonzero)
     .def("Update", &PyPermutationFilter::Update)
+    .def("Profile", &PyPermutationFilter::Profile)
     .def("HasPermutation", &PyPermutationFilter::PyHasPermutation);
 }

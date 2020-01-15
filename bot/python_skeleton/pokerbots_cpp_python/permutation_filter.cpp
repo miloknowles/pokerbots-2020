@@ -69,8 +69,6 @@ Permutation PermutationFilter::PriorSample() {
     if (orig_perm.size() > 1) {
       const auto it = std::next(orig_perm.begin(), pop_i);
       orig_perm.erase(it);
-
-      // PrintVector(orig_perm);
     }
   }
 
@@ -84,33 +82,39 @@ Permutation PermutationFilter::PriorSample() {
 }
 
 
-double PermutationFilter::ComputePrior(const Permutation& p) const {
+double PermutationFilter::ComputePrior(const Permutation& p) {
+  Timer timer;
   double prob = 1.0;
 
-  std::vector<uint8_t> orig_perm = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12 };
-
+  Permutation queue_pos = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12 };
   for (uint8_t perm_val = 0; perm_val < 13; ++perm_val) {
-    const uint8_t true_val = p.at(perm_val);
-    const auto& it = std::find(orig_perm.begin(), orig_perm.end(), true_val);
-    const size_t idx = std::distance(orig_perm.begin(), it);
-    if (orig_perm.size() > 1) { orig_perm.erase(it); }
+    const uint8_t true_val = p[perm_val];
 
-    // PrintVector(orig_perm);
+    // Everything in the queue after the popped item gets moved forward.
+    for (uint8_t i = true_val + 1; i < 13; ++i) {
+      queue_pos[i] -= 1;
+    }
 
-    const double s = static_cast<double>(idx);
-    const double p1 = 0.25 * std::pow(0.75, s);
-    const double p2 = 0.25 * std::pow(0.75, s + 2 * orig_perm.size());
-    const double p3 = 0.25 * std::pow(0.75, s + 3 * orig_perm.size());
-    const double p4 = 0.25 * std::pow(0.75, s + 4 * orig_perm.size());
-    const double p5 = 0.25 * std::pow(0.75, s + 5 * orig_perm.size());
-    prob *= (p1 + p2 + p3 + p4 + p5);
+    const int s = static_cast<int>(queue_pos[true_val]);
+    const int queue_size = static_cast<int>(13 - perm_val);
+    double prob_sum = 0;
+    for (int i = 0; i < 5; ++i) {
+      const int s_wrap = s + (i * queue_size);
+      if (s_wrap < pow_precompute_.size()) {
+        prob_sum += 0.25 * pow_precompute_[s_wrap];
+      }
+    }
+    prob *= prob_sum;
   }
 
+  UpdateProfile("ComputePrior", timer.Elapsed());
   return prob;
 }
 
 
 Permutation PermutationFilter::MakeProposalFromValid(const Permutation& p, const ShowdownResult& r) {
+  Timer timer;
+
   const HandValues win_hand = r.GetWinnerValues();
   const HandValues los_hand = r.GetLoserValues();
   const BoardValues board = r.GetBoardValues();
@@ -163,11 +167,14 @@ Permutation PermutationFilter::MakeProposalFromValid(const Permutation& p, const
   prop[vi] = tj;
   prop[vj] = ti;
 
+  UpdateProfile("MakeProposalFromValid", timer.Elapsed());
   return prop;
 }
 
 
 Permutation PermutationFilter::MakeProposalFromInvalid(const Permutation& p, const ShowdownResult& r) {
+  Timer timer;
+
   const HandValues win_hand = r.GetWinnerValues();
   const HandValues los_hand = r.GetLoserValues();
   const BoardValues board = r.GetBoardValues();
@@ -209,11 +216,13 @@ Permutation PermutationFilter::MakeProposalFromInvalid(const Permutation& p, con
   prop.at(vi) = tj;
   prop.at(vj) = ti;
 
+  UpdateProfile("MakeProposalFromInvalid", timer.Elapsed());
   return prop;
 }
 
 
 std::pair<Permutation, bool> PermutationFilter::MetropolisHastings(const Permutation& orig_perm, const Permutation& prop_perm) {
+  Timer timer;
   const double prior_prop = ComputePrior(prop_perm);
   const double prior_orig = ComputePrior(orig_perm);
 
@@ -225,6 +234,7 @@ std::pair<Permutation, bool> PermutationFilter::MetropolisHastings(const Permuta
     }
   }
 
+  UpdateProfile("MetropolisHastings", timer.Elapsed());
   return std::make_pair<Permutation, bool>(Permutation(orig_perm), false);
 }
 

@@ -30,7 +30,7 @@ def test_converge_cpp():
   for v in [1, 2, 7, 0, 6, 10, 11, 12, 3, 4, 9, 8, 5]:
     true_perm_vl.append(v)
 
-  pf = cpp.PermutationFilter(5000)
+  pf = cpp.PermutationFilter(10000)
 
   # Do everything but the last result.
   # prev_unique_particles = None
@@ -45,6 +45,7 @@ def test_converge_cpp():
     # if (i > 100):
     #   print("Did 100 showdowns, assume converged")
     #   break
+  pf.Profile()
  
 if __name__ == "__main__":
   test_converge_cpp()
