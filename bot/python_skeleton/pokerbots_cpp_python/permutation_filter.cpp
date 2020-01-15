@@ -258,7 +258,8 @@ void PermutationFilter::Update(const ShowdownResult& r) {
     return;
   }
 
-  const int num_invalid_retries = std::min(5, static_cast<int>(5 * N_ / nonzero));
+  // const int num_invalid_retries = std::min(5, static_cast<int>(5 * N_ / nonzero));
+  const int num_invalid_retries = 5;
   const int num_valid_retries = 1;
   printf("RETRIES: invalid=%d valid=%d\n", num_invalid_retries, num_valid_retries);
 

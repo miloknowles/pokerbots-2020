@@ -298,7 +298,6 @@ class PermutationFilter {
   std::random_device rd_{};
   std::mt19937 gen_;
 
-  // std::unordered_map<Permutation, double> prior_cache_;
   std::array<double, 40> pow_precompute_;
   omp::HandEvaluator omp_;
 

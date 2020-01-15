@@ -30,7 +30,7 @@ def test_converge_cpp():
   for v in [1, 2, 7, 0, 6, 10, 11, 12, 3, 4, 9, 8, 5]:
     true_perm_vl.append(v)
 
-  pf = cpp.PermutationFilter(10000)
+  pf = cpp.PermutationFilter(20000)
 
   # Do everything but the last result.
   # prev_unique_particles = None
