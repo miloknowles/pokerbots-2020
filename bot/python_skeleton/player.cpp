@@ -24,6 +24,7 @@ void Player::handle_new_round(GameState* game_state, RoundState* round_state, in
   //bool big_blind = (bool) active;  // true if you are the big blind
 
   street_ev_.clear();
+  street_num_raises_.clear();
 }
 
 /**
@@ -50,7 +51,7 @@ void Player::handle_round_over(GameState* game_state, TerminalState* terminal_st
     board += s;
   }
 
-  if (lose_hand.size() < 4) {
+  if (lose_hand.size() < 4 || win_hand.size() < 4) {
     return;
   }
 
@@ -151,11 +152,13 @@ Action Player::get_action(GameState* game_state, RoundState* round_state, int ac
         const int max_raise = round_state->raise_bounds()[1];
         const int raise_amt = std::min(std::max(pot_size, min_raise), max_raise);
         return RaiseAction(max_raise);
-      } if (EV >= 0.9) {
+      } else if (EV >= 0.9) {
         const int min_raise = round_state->raise_bounds()[0];
         const int max_raise = round_state->raise_bounds()[1];
         const int raise_amt = std::min(std::max(2*pot_size, min_raise), max_raise);
         return RaiseAction(max_raise);
+      } else {
+        return CallAction();
       }
     }
   }

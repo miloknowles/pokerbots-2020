@@ -14,7 +14,7 @@
 #include <chrono>
 
 #include <omp/HandEvaluator.h>
-#include <omp/EquityCalculator.h>
+// #include <omp/EquityCalculator.h>
 
 namespace pb {
 
@@ -56,21 +56,21 @@ float PbotsCalcEquity(const std::string& query,
                      const size_t iters = 10000);
 
 
-inline float OmpCalcEquity(const std::string& hand_str,
-                    const std::string& board_str,
-                    const std::string& dead_str) {
-  omp::EquityCalculator eq;
-  std::vector<omp::CardRange> ranges = { hand_str, "random" };
-  uint64_t board = omp::CardRange::getCardMask(board_str);
-  uint64_t dead = omp::CardRange::getCardMask(dead_str);
-  double stdErrMargin = 0.1;
-  double updateInterval = 1.0;
-  unsigned threads = 1;
-  eq.start(ranges, board, dead, false, stdErrMargin, nullptr, updateInterval, threads);
-  eq.wait();
-  auto r = eq.getResults();
-  return r.equity[0];
-}
+// inline float OmpCalcEquity(const std::string& hand_str,
+//                     const std::string& board_str,
+//                     const std::string& dead_str) {
+//   omp::EquityCalculator eq;
+//   std::vector<omp::CardRange> ranges = { hand_str, "random" };
+//   uint64_t board = omp::CardRange::getCardMask(board_str);
+//   uint64_t dead = omp::CardRange::getCardMask(dead_str);
+//   double stdErrMargin = 0.1;
+//   double updateInterval = 1.0;
+//   unsigned threads = 1;
+//   eq.start(ranges, board, dead, false, stdErrMargin, nullptr, updateInterval, threads);
+//   eq.wait();
+//   auto r = eq.getResults();
+//   return r.equity[0];
+// }
 
 
 // Maps a vector of card values to their true values, as defined by permutation p.

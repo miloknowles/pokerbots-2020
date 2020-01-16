@@ -20,6 +20,7 @@ class Player : public Bot {
     int num_showdowns_converge_ = 120;
 
     std::unordered_map<int, float> street_ev_{};
+    std::unordered_map<int, int> street_num_raises_{};
 
   public:
     /**
