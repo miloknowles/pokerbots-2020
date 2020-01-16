@@ -1,26 +1,12 @@
-# cmake_minimum_required(VERSION 3.0.0 FATAL_ERROR)
-
-# project(pokerbots_cpp VERSION 0.1.0 LANGUAGES CXX)
-# add_compile_options(-std=c++11)
-
-# if(NOT CMAKE_BUILD_TYPE)
-#   set(CMAKE_BUILD_TYPE Release)
-# endif()
-
-# # set(CMAKE_CXX_FLAGS "-Wall -Wextra")
-# set(CMAKE_CXX_FLAGS_DEBUG "-g")
-# set(CMAKE_CXX_FLAGS_RELEASE "-Ofast")
-
 # Needed to find pyconfig.h
 find_package(Boost REQUIRED COMPONENTS python system program_options)
 # include_directories(/usr/include/python2.7/)
 include_directories(/usr/include/python3.5/)
-# include_directories(/usr/local)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/OMPEval/)
 link_directories(${CMAKE_CURRENT_SOURCE_DIR})
 link_directories(/usr/local/lib/)
 
-# set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread")
+# Build the OMPEval library.
 set(OMP_SOURCE_FILES
   OMPEval/omp/CardRange.cpp
   OMPEval/omp/CardRange.h
@@ -41,6 +27,7 @@ target_link_libraries(ompeval
   pthread)
 set_target_properties(ompeval PROPERTIES LINKER_LANGUAGE CXX)
 
+# Build the main c++ library.
 add_library(${PROJECT_NAME} SHARED
   permutation_filter.cpp
   permutation_filter.hpp)
@@ -49,38 +36,34 @@ target_link_libraries(${PROJECT_NAME}
   ompeval)
 set_target_properties(${PROJECT_NAME} PROPERTIES LINKER_LANGUAGE CXX)
 
-add_library(${PROJECT_NAME}_python SHARED
-  bindings.cpp)
-target_link_libraries(${PROJECT_NAME}_python
-  ompeval
-  ${PROJECT_NAME}
-  ${Boost_LIBRARIES})
-set_target_properties(${PROJECT_NAME}_python PROPERTIES LINKER_LANGUAGE CXX)
+# Optionally build the python wrappers.
+if (BUILD_PYTHON_WRAPPER)
+  message(STATUS "BUILD_PYTHON_WRAPPER is ON, building the wrappers")
+  add_library(${PROJECT_NAME}_python SHARED
+    bindings.cpp)
+  target_link_libraries(${PROJECT_NAME}_python
+    ompeval
+    ${PROJECT_NAME}
+    ${Boost_LIBRARIES})
+  set_target_properties(${PROJECT_NAME}_python PROPERTIES LINKER_LANGUAGE CXX)
 
-# add_executable(main
-#   main.cpp)
-# target_link_libraries(main
-#   ${PROJECT_NAME}
-#   ompeval)
-# set_target_properties(main PROPERTIES LINKER_LANGUAGE CXX)
+  # Suppress prefix "lib" because Python does not allow this prefix
+  set_target_properties(${PROJECT_NAME}_python PROPERTIES PREFIX "")
 
-# Suppress prefix "lib" because Python does not allow this prefix
-set_target_properties(${PROJECT_NAME}_python PROPERTIES PREFIX "")
+  # Copy libraries to directory above.
+  add_custom_command(
+    TARGET ${PROJECT_NAME}_python POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy
+            ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}_python.so
+            ${CMAKE_SOURCE_DIR}/${PROJECT_NAME}_python.so)
 
-# Copy libraries to directory above.
-add_custom_command(
-  TARGET ${PROJECT_NAME}_python POST_BUILD
-  COMMAND ${CMAKE_COMMAND} -E copy
-          ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}_python.so
-          ${CMAKE_SOURCE_DIR}/${PROJECT_NAME}_python.so)
+  add_custom_command(
+    TARGET ${PROJECT_NAME}_python POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy
+            ${CMAKE_CURRENT_BINARY_DIR}/lib${PROJECT_NAME}.so
+            ${CMAKE_SOURCE_DIR}/lib${PROJECT_NAME}.so)
+endif()
 
-add_custom_command(
-  TARGET ${PROJECT_NAME}_python POST_BUILD
-  COMMAND ${CMAKE_COMMAND} -E copy
-          ${CMAKE_CURRENT_BINARY_DIR}/lib${PROJECT_NAME}.so
-          ${CMAKE_SOURCE_DIR}/lib${PROJECT_NAME}.so)
-
-set(BUILD_TESTS OFF)
 if(BUILD_TESTS)
   enable_testing()  
   set(TEST_SOURCES

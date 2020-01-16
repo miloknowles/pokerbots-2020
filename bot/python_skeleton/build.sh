@@ -1,13 +1,6 @@
-# DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
-# DIR=`dirname $0`
-# echo "The directory is ${DIR}"
-
-# rm -rf ./pokerbots_cpp_python/build && mkdir ./pokerbots_cpp_python/build
-# cd ./pokerbots_cpp_python/build && cmake .. && make -j8
-
-# Return to original directory.
-# cd $DIR
-# cd ../../
-
+# This script will be run from the top level directory of the bot.
 rm -rf build/ && mkdir build && cd build
-cmake .. && make -j8
+
+# For pure C++ bot turn these off.
+cmake .. -DBUILD_PYTHON_WRAPPER=OFF -DBUILD_TESTS=OFF
+make -j8
