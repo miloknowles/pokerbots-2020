@@ -7,7 +7,7 @@ namespace pb {
 /**
  * Called when a new game starts. Called exactly once.
  */
-Player::Player() : pf_(20000) {}
+Player::Player() : pf_(25000) {}
 
 /**
  * Called when a new round starts. Called NUM_ROUNDS times.
@@ -46,16 +46,17 @@ void Player::handle_round_over(GameState* game_state, TerminalState* terminal_st
   const std::string win_hand = my_delta >= 0 ? my_cards[0] + my_cards[1] : opp_cards[0] + opp_cards[1];
   const std::string lose_hand = my_delta >= 0 ? opp_cards[0] + opp_cards[1] : my_cards[0] + my_cards[1];
   std::string board = "";
-
   for (const std::string s : board_cards) {
     board += s;
   }
 
+  // Can't do inference if we don't see one of the hands.
   if (lose_hand.size() < 4 || win_hand.size() < 4) {
     return;
   }
 
   ++num_showdowns_seen_;
+
   if (pf_.Nonzero() <= 0 || num_showdowns_seen_ > num_showdowns_converge_) {
     if (pf_.Nonzero() <= 0) {
       std::cout << "WARNING: PermutationFilter particles all died" << std::endl;
@@ -92,14 +93,25 @@ Action Player::get_action(GameState* game_state, RoundState* round_state, int ac
   const int my_contribution = STARTING_STACK - my_stack;  // the number of chips you have contributed to the pot
   const int opp_contribution = STARTING_STACK - opp_stack;  // the number of chips your opponent has contributed to the pot
 
+  // Check fold if no particles left.
+  if (pf_.Nonzero() <= 0) {
+    std::cout << "Particle filter empty, check-folding" << std::endl;
+    return (CHECK_ACTION_TYPE & legal_actions) ? CheckAction() : FoldAction();
+  }
+
+  const bool did_converge = (num_showdowns_seen_ > num_showdowns_converge_);
+
   // If EV hasn't been computed for this street, do it here.
   if (street_ev_.count(street) == 0) {
     std::string board_str;
     for (int i = 0; i < street; ++i) {
       board_str += board_cards[i];
     }
-    std::cout << board_str << std::endl;
-    const float ev_this_street = pf_.ComputeEvRandom(my_cards[0] + my_cards[1], board_str, "", compute_ev_samples_, compute_ev_iters_);
+
+    // If converged, only sample ONE permutation.
+    const int nsamples = did_converge ? 1 : compute_ev_samples_;
+    const float ev_this_street = pf_.ComputeEvRandom(
+        my_cards[0] + my_cards[1], board_str, "", nsamples, compute_ev_iters_);
     street_ev_[street] = ev_this_street;
   }
 
