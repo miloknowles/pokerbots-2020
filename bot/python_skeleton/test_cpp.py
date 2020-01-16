@@ -39,6 +39,10 @@ def test_converge_cpp():
     pf.Update(r)
     print("%d: Filter has %s nonzero" % (i, pf.Nonzero()))
 
+    # ev_vs_random = pf.ComputeEvRandom("9c9s", "7d8h2s4s3s", "", 100, 100)
+    ev_vs_random = pf.ComputeEvRandom("9c9s", "", "", 50, 100)
+    print("EV:", ev_vs_random)
+
     if pf.HasPermutation(true_perm_vl):
       print("Found true permutation!")
       break

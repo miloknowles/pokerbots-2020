@@ -14,6 +14,7 @@
 #include <chrono>
 
 #include <omp/HandEvaluator.h>
+#include <omp/EquityCalculator.h>
 
 namespace pb {
 
@@ -53,6 +54,23 @@ float PbotsCalcEquity(const std::string& query,
                      const std::string& board,
                      const std::string& dead,
                      const size_t iters = 10000);
+
+
+inline float OmpCalcEquity(const std::string& hand_str,
+                    const std::string& board_str,
+                    const std::string& dead_str) {
+  omp::EquityCalculator eq;
+  std::vector<omp::CardRange> ranges = { hand_str, "random" };
+  uint64_t board = omp::CardRange::getCardMask(board_str);
+  uint64_t dead = omp::CardRange::getCardMask(dead_str);
+  double stdErrMargin = 0.1;
+  double updateInterval = 1.0;
+  unsigned threads = 1;
+  eq.start(ranges, board, dead, false, stdErrMargin, nullptr, updateInterval, threads);
+  eq.wait();
+  auto r = eq.getResults();
+  return r.equity[0];
+}
 
 
 // Maps a vector of card values to their true values, as defined by permutation p.
@@ -176,7 +194,6 @@ class PermutationFilter {
       particles_.at(i) = PriorSample();
       weights_.at(i) = 1.0;
     }
-
     // Precompute pow for some speedups.
     for (int i = 0; i < pow_precompute_.size(); ++i) {
       pow_precompute_.at(i) = std::pow(0.75, i);
@@ -192,30 +209,12 @@ class PermutationFilter {
   double ComputePrior(const Permutation& p);
 
   // Does this permutations p satisfy the showdown result r?
-  bool SatisfiesResult(const Permutation& p, const ShowdownResult& r) {
-    Timer timer;
-
-    const std::string& query = MapToTrueStrings(p, r.winner_hole_cards) + ":" + MapToTrueStrings(p, r.loser_hole_cards);
-    const std::string& board = MapToTrueStrings(p, r.board_cards);
-    const float ev = PbotsCalcEquity(query, board, "", 1);
-
-    UpdateProfile("SatisfiesResult", timer.Elapsed());
-    return ev > 0;
-  }
+  bool SatisfiesResult(const Permutation& p, const ShowdownResult& r);
 
   // Does permutation p satisfy ALL results seen so far?
-  bool SatisfiesAll(const Permutation& p) {
-    Timer timer;
-    for (const ShowdownResult& r : results_) {
-      if (!SatisfiesResultOmp(p, r)) { return false; }
-    }
-    UpdateProfile("SatisfiesAll", timer.Elapsed());
-    return true;
-  }
+  bool SatisfiesAll(const Permutation& p);
 
-  int Nonzero() const {
-    return (N_ - dead_indices_.size());
-  }
+  int Nonzero() const { return (N_ - dead_indices_.size()); }
 
   // For a permutation that satisfies all constraints, we don't want to swap values between the
   // hands or the hand and board. Instead, swap cards within hands or within the board.
@@ -234,56 +233,22 @@ class PermutationFilter {
   void Update(const ShowdownResult& r);
 
   bool HasPermutation(const Permutation& query) const {
-    for (const Permutation& p : particles_) {
-      if (Equals(query, p)) { return true; }
-    }
+    for (const Permutation& p : particles_) { if (Equals(query, p)) { return true; } }
     return false;
   }
 
-  void Profile() const {
-    std::unordered_map<std::string, double> avg_time;
-    for (const auto& it : time_) {
-      const std::string fn = it.first;
-      const double total_t = it.second;
-      const int ct = counts_.at(fn);
-      const double avg_t = total_t / static_cast<double>(ct);
-      std::cout << fn << std::endl;
-      printf(" | TOTAL=%lf | COUNT=%d | AVG=%lf\n", total_t, ct, avg_t);
-    }
-  }
+  void Profile() const;
+  void UpdateProfile(const std::string& fn, const double elapsed);
 
-  void UpdateProfile(const std::string& fn, const double elapsed) {
-    if (counts_.count(fn) == 0) {
-      counts_.emplace(fn, 0);
-      time_.emplace(fn, 0);
-    }
-    ++counts_.at(fn);
-    time_.at(fn) += elapsed;
-  }
+  // Faster result checking.
+  bool SatisfiesResultOmp(const Permutation&p, const ShowdownResult& r);
 
-  bool SatisfiesResultOmp(const Permutation&p, const ShowdownResult& r) {
-    omp::Hand win = omp::Hand::empty();
-    const std::string win_and_board = r.winner_hole_cards + r.board_cards;
-    assert(win_and_board.size() == 14);
-    for (int i = 0; i < 7; ++i) {
-      const uint8_t code = 4 * p[RANK_STR_TO_VAL[win_and_board[2*i]]] + SUIT_STR_TO_VAL[win_and_board[2*i+1]];
-      win += omp::Hand(code);
-    }
-    assert(win.count() == 7);
-    const uint16_t win_score = omp_.evaluate(win);
-
-    omp::Hand lose = omp::Hand::empty();
-    const std::string lose_and_board = r.loser_hole_cards + r.board_cards;
-    assert(lose_and_board.size() == 14);
-    for (int i = 0; i < 7; ++i) {
-      const uint8_t code = 4 * p[RANK_STR_TO_VAL[lose_and_board[2*i]]] + SUIT_STR_TO_VAL[lose_and_board[2*i+1]];
-      lose += omp::Hand(code);
-    }
-    assert(lose.count() == 7);
-    const uint16_t lose_score = omp_.evaluate(lose);
-
-    return win_score >= lose_score;
-  }
+  // Compute expected value of a hand vs. a randomly drawn opponent across all permutation samples.
+  float ComputeEvRandom(const std::string& hand,
+                        const std::string& board,
+                        const std::string& dead,
+                        const int nsamples,
+                        const int iters);
 
  private:
   int N_;

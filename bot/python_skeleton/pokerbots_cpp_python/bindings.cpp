@@ -41,5 +41,6 @@ BOOST_PYTHON_MODULE(pokerbots_cpp_python)
     .def("Nonzero", &PyPermutationFilter::Nonzero)
     .def("Update", &PyPermutationFilter::Update)
     .def("Profile", &PyPermutationFilter::Profile)
+    .def("ComputeEvRandom", &PyPermutationFilter::ComputeEvRandom)
     .def("HasPermutation", &PyPermutationFilter::PyHasPermutation);
 }

@@ -1,4 +1,4 @@
 {
-    "build": [],
-    "run": ["python3", "player.py"]
+    "build": ["sh", "build.sh"],
+    "run": ["sh", "run.sh"]
 }

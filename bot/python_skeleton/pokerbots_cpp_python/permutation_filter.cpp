@@ -111,6 +111,26 @@ double PermutationFilter::ComputePrior(const Permutation& p) {
   return prob;
 }
 
+bool PermutationFilter::SatisfiesResult(const Permutation& p, const ShowdownResult& r) {
+  Timer timer;
+
+  const std::string& query = MapToTrueStrings(p, r.winner_hole_cards) + ":" + MapToTrueStrings(p, r.loser_hole_cards);
+  const std::string& board = MapToTrueStrings(p, r.board_cards);
+  const float ev = PbotsCalcEquity(query, board, "", 1);
+
+  UpdateProfile("SatisfiesResult", timer.Elapsed());
+  return ev > 0;
+}
+
+bool PermutationFilter::SatisfiesAll(const Permutation& p) {
+  Timer timer;
+  for (const ShowdownResult& r : results_) {
+    if (!SatisfiesResultOmp(p, r)) { return false; }
+  }
+  UpdateProfile("SatisfiesAll", timer.Elapsed());
+  return true;
+}
+
 
 Permutation PermutationFilter::MakeProposalFromValid(const Permutation& p, const ShowdownResult& r) {
   Timer timer;
@@ -312,6 +332,84 @@ void PermutationFilter::Update(const ShowdownResult& r) {
   }
 
   results_.emplace_back(r);
+}
+
+void PermutationFilter::Profile() const {
+  std::unordered_map<std::string, double> avg_time;
+  for (const auto& it : time_) {
+    const std::string fn = it.first;
+    const double total_t = it.second;
+    const int ct = counts_.at(fn);
+    const double avg_t = total_t / static_cast<double>(ct);
+    std::cout << fn << std::endl;
+    printf(" | TOTAL=%lf | COUNT=%d | AVG=%lf\n", total_t, ct, avg_t);
+  }
+}
+
+void PermutationFilter::UpdateProfile(const std::string& fn, const double elapsed) {
+  if (counts_.count(fn) == 0) {
+    counts_.emplace(fn, 0);
+    time_.emplace(fn, 0);
+  }
+  ++counts_.at(fn);
+  time_.at(fn) += elapsed;
+}
+
+bool PermutationFilter::SatisfiesResultOmp(const Permutation&p, const ShowdownResult& r) {
+  omp::Hand win = omp::Hand::empty();
+  const std::string win_and_board = r.winner_hole_cards + r.board_cards;
+  assert(win_and_board.size() == 14);
+  for (int i = 0; i < 7; ++i) {
+    const uint8_t code = 4 * p[RANK_STR_TO_VAL[win_and_board[2*i]]] + SUIT_STR_TO_VAL[win_and_board[2*i+1]];
+    win += omp::Hand(code);
+  }
+  assert(win.count() == 7);
+  const uint16_t win_score = omp_.evaluate(win);
+
+  omp::Hand lose = omp::Hand::empty();
+  const std::string lose_and_board = r.loser_hole_cards + r.board_cards;
+  assert(lose_and_board.size() == 14);
+  for (int i = 0; i < 7; ++i) {
+    const uint8_t code = 4 * p[RANK_STR_TO_VAL[lose_and_board[2*i]]] + SUIT_STR_TO_VAL[lose_and_board[2*i+1]];
+    lose += omp::Hand(code);
+  }
+  assert(lose.count() == 7);
+  const uint16_t lose_score = omp_.evaluate(lose);
+
+  return win_score >= lose_score;
+}
+
+float PermutationFilter::ComputeEvRandom(const std::string& hand,
+                                        const std::string& board,
+                                        const std::string& dead,
+                                        const int nsamples,
+                                        const int iters) {
+  float ev = 0;
+
+  // Get indices of nonzero particles.
+  std::vector<int> valid_idx;
+  for (int i = 0; i < weights_.size(); ++i) {
+    if (weights_[i] > 0) { valid_idx.emplace_back(i); }
+  }
+  if (valid_idx.size() < nsamples) {
+    std::cout << "WARNING: not enough valid particles to sample" << std::endl;
+    return -1.0f;
+  }
+
+  std::uniform_int_distribution<> sampler(0, valid_idx.size()-1);
+
+  for (int si = 0; si < nsamples; ++si) {
+    const int unif_int = sampler(gen_);
+    const int rand_idx = valid_idx.at(unif_int);
+    const Permutation& perm = particles_.at(rand_idx);
+    const std::string& query_m = MapToTrueStrings(perm, hand) + ":xx";
+    const std::string& board_m = MapToTrueStrings(perm, board);
+    const std::string& dead_m = MapToTrueStrings(perm, dead);
+    ev += PbotsCalcEquity(query_m, board_m, dead_m, iters);
+    // ev += OmpCalcEquity(MapToTrueStrings(perm, hand), board_m, dead_m);
+  }
+
+  return (ev / nsamples);
 }
 
 } // namespace pb
