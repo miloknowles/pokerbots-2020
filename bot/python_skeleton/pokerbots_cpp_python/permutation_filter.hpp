@@ -3,6 +3,7 @@
 #include <vector>
 #include <map>
 #include <unordered_map>
+#include <unordered_set>
 #include <array>
 #include <iostream>
 #include <string>
@@ -193,6 +194,7 @@ class PermutationFilter {
     for (int i = 0; i < N; ++i) {
       particles_.at(i) = PriorSample();
       weights_.at(i) = 1.0;
+      MaybeAddUnique(particles_.at(i));
     }
     // Precompute pow for some speedups.
     for (int i = 0; i < pow_precompute_.size(); ++i) {
@@ -250,10 +252,38 @@ class PermutationFilter {
                         const int nsamples,
                         const int iters);
 
+  void MaybeAddUnique(const Permutation& p) {
+    std::string hash = "";
+    for (int i = 0; i < p.size(); ++i) {
+      hash += std::to_string(p[i]);
+    }
+    // std::cout << hash << std::endl;
+    if (unique_.count(hash) == 0) {
+      unique_.emplace(hash, 0);
+    }
+    ++unique_.at(hash);
+  }
+
+  void MaybeRemoveUnique(const Permutation& p) {
+    std::string hash = "";
+    for (int i = 0; i < p.size(); ++i) {
+      hash += std::to_string(p[i]);
+    }
+    if (unique_.count(hash) > 0) {
+      unique_.at(hash) -= 1;
+      if (unique_[hash] <= 0) {
+        unique_.erase(hash);
+      }
+    }
+  }
+
+  int Unique() const { return unique_.size(); }
+
  private:
   int N_;
 
   std::vector<Permutation> particles_;
+  std::unordered_map<std::string, int> unique_;
   std::vector<double> weights_;
   std::vector<ShowdownResult> results_ = {};
 

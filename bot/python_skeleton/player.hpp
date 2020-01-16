@@ -12,12 +12,12 @@ namespace pb {
 
 class Player : public Bot {
   private:
-    PermutationFilter pf_;
-    int compute_ev_samples_ = 5;
+    PermutationFilter pf_{25000};
+    int compute_ev_samples_ = 1;
     int compute_ev_iters_ = 1000;
 
     int num_showdowns_seen_ = 0;
-    int num_showdowns_converge_ = 200;
+    int num_showdowns_converge_ = 120;
 
     std::unordered_map<int, float> street_ev_{};
     std::unordered_map<int, int> street_num_raises_{};

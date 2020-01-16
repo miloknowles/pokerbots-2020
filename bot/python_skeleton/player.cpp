@@ -7,7 +7,7 @@ namespace pb {
 /**
  * Called when a new game starts. Called exactly once.
  */
-Player::Player() : pf_(25000) {}
+Player::Player() {}
 
 /**
  * Called when a new round starts. Called NUM_ROUNDS times.
@@ -18,11 +18,11 @@ Player::Player() : pf_(25000) {}
  */
 void Player::handle_new_round(GameState* game_state, RoundState* round_state, int active) {
   //int my_bankroll = game_state->bankroll;  // the total number of chips you've gained or lost from the beginning of the game to the start of this round
-  //float game_clock = game_state->game_clock;  // the total number of seconds your bot has left to play this game
+  float game_clock = game_state->game_clock;  // the total number of seconds your bot has left to play this game
   //int round_num = game_state->round_num;  // the round number from 1 to NUM_ROUNDS
   //std::array<std::string, 2> my_cards = round_state->hands[active];  // your cards
   //bool big_blind = (bool) active;  // true if you are the big blind
-
+  std::cout << "CLOCK: " << game_clock << std::endl;
   street_ev_.clear();
   street_num_raises_.clear();
 }
@@ -38,6 +38,7 @@ void Player::handle_round_over(GameState* game_state, TerminalState* terminal_st
   const int my_delta = terminal_state->deltas[active];  // your bankroll change from this round
   RoundState* previous_state = (RoundState*) terminal_state->previous_state;  // RoundState before payoffs
   const int street = previous_state->street;  // 0, 3, 4, or 5 representing when this round ended
+  const int round_num = game_state->round_num;
 
   const std::array<std::string, 2> my_cards = previous_state->hands[active];  // your cards
   const std::array<std::string, 2> opp_cards = previous_state->hands[1-active];  // opponent's cards or "" if not revealed
@@ -50,25 +51,31 @@ void Player::handle_round_over(GameState* game_state, TerminalState* terminal_st
     board += s;
   }
 
-  // Can't do inference if we don't see one of the hands.
-  if (lose_hand.size() < 4 || win_hand.size() < 4) {
-    return;
+  // Print out the profiling results on the last round.
+  if (round_num == 999) {
+    pf_.Profile();
   }
 
-  ++num_showdowns_seen_;
+  const bool did_see_showdown = lose_hand.size() == 4 && win_hand.size() == 4;
+  if (did_see_showdown) {
+    ++num_showdowns_seen_;
 
-  if (pf_.Nonzero() <= 0 || num_showdowns_seen_ > num_showdowns_converge_) {
-    if (pf_.Nonzero() <= 0) {
-      std::cout << "WARNING: PermutationFilter particles all died" << std::endl;
-    } else {
-      std::cout << "SUCCESS: Permutation filter CONVERGED" << std::endl;
+    const bool did_converge = pf_.Unique() == 1 && num_showdowns_seen_ > num_showdowns_converge_;
+
+    if (pf_.Nonzero() <= 0 || did_converge) {
+      if (pf_.Nonzero() <= 0) {
+        std::cout << "FAILURE: PermutationFilter particles all died" << std::endl;
+      } else {
+        std::cout << "SUCCESS: Permutation filter converged" << std::endl;
+      }
+      return;
     }
-    return;
-  }
 
-  const ShowdownResult result(win_hand, lose_hand, board);
-  pf_.Update(result);
-  std::cout << "Updated with showdown result" << std::endl;
+    const ShowdownResult result(win_hand, lose_hand, board);
+    pf_.Update(result);
+    std::cout << "Updated with showdown result" << std::endl;
+    std::cout << "Particle filter nonzero = " << pf_.Nonzero() << std::endl;
+  }
 }
 
 /**
@@ -95,9 +102,11 @@ Action Player::get_action(GameState* game_state, RoundState* round_state, int ac
 
   // Check fold if no particles left.
   if (pf_.Nonzero() <= 0) {
-    std::cout << "Particle filter empty, check-folding" << std::endl;
+    std::cout << "[FAILURE] Particle filter empty, check-folding" << std::endl;
     return (CHECK_ACTION_TYPE & legal_actions) ? CheckAction() : FoldAction();
   }
+
+  std::cout << "Particle filter unique = " << pf_.Unique() << std::endl;
 
   const bool did_converge = (num_showdowns_seen_ > num_showdowns_converge_);
 

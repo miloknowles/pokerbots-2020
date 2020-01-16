@@ -281,7 +281,6 @@ void PermutationFilter::Update(const ShowdownResult& r) {
   // const int num_invalid_retries = std::min(5, static_cast<int>(5 * N_ / nonzero));
   const int num_invalid_retries = 5;
   const int num_valid_retries = 1;
-  printf("RETRIES: invalid=%d valid=%d\n", num_invalid_retries, num_valid_retries);
 
   for (int i = 0; i < particles_.size(); ++i) {
     // Skip particles that have zero weight (dead).
@@ -293,6 +292,8 @@ void PermutationFilter::Update(const ShowdownResult& r) {
 
     // If this result will kill particle, try to fix it a few times before giving up.
     if (!SatisfiesResultOmp(p, r)) {
+      MaybeRemoveUnique(p);
+      
       bool did_save = false;
       for (int rt = 0; rt < num_invalid_retries; ++rt) {
         const auto& mcmc_sample = SampleMCMCInvalid(p, r);
@@ -302,6 +303,7 @@ void PermutationFilter::Update(const ShowdownResult& r) {
         if (did_save) {
           weights_.at(i) = 1;
           particles_.at(i) = mcmc_sample.first;
+          MaybeAddUnique(mcmc_sample.first);
           break;
         }
       }
@@ -325,6 +327,7 @@ void PermutationFilter::Update(const ShowdownResult& r) {
 
           weights_.at(dead_idx_to_replace) = 1;
           particles_.at(dead_idx_to_replace) = mcmc_sample.first;
+          MaybeAddUnique(mcmc_sample.first);
           break;
         }
       }
@@ -335,7 +338,7 @@ void PermutationFilter::Update(const ShowdownResult& r) {
 }
 
 void PermutationFilter::Profile() const {
-  std::unordered_map<std::string, double> avg_time;
+  std::cout << "\n*** PROFILING RESULTS ***" << std::endl;
   for (const auto& it : time_) {
     const std::string fn = it.first;
     const double total_t = it.second;
