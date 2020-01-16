@@ -88,6 +88,7 @@ void Player::handle_round_over(GameState* game_state, TerminalState* terminal_st
  * @return Your action.
  */
 Action Player::get_action(GameState* game_state, RoundState* round_state, int active) {
+  const int round_num = game_state->round_num;
   const int legal_actions = round_state->legal_actions();  // mask representing the actions you are allowed to take
   const int street = round_state->street;  // 0, 3, 4, or 5 representing pre-flop, flop, turn, or river respectively
   const std::array<std::string, 2> my_cards = round_state->hands[active];  // your cards
@@ -107,7 +108,6 @@ Action Player::get_action(GameState* game_state, RoundState* round_state, int ac
   }
 
   std::cout << "Particle filter unique = " << pf_.Unique() << std::endl;
-
   const bool did_converge = (num_showdowns_seen_ > num_showdowns_converge_);
 
   // If EV hasn't been computed for this street, do it here.
@@ -125,6 +125,8 @@ Action Player::get_action(GameState* game_state, RoundState* round_state, int ac
   }
 
   const float EV = street_ev_.at(street);
+  
+  printf("\n==> ACTION round=%d street=%d ev=%f\n", round_num, street, EV);
 
   // Check fold if no particles left.
   if (pf_.Nonzero() <= 0) {
@@ -140,6 +142,7 @@ Action Player::get_action(GameState* game_state, RoundState* round_state, int ac
   if (check_is_allowed) {
     // Just check if neutral odds.
     if (EV < 0.6 || !raise_is_allowed) {
+      std::cout << "(CheckAllowed) EV < 0.6 || !raise_is_allowed ==> CheckAction" << std::endl;
       return CheckAction();
   
     // If EV is pretty good (60-80%), do a pot raise.
@@ -147,6 +150,7 @@ Action Player::get_action(GameState* game_state, RoundState* round_state, int ac
       const int min_raise = round_state->raise_bounds()[0];
       const int max_raise = round_state->raise_bounds()[1];
       const int raise_amt = std::min(std::max(pot_size, min_raise), max_raise);
+      std::cout << "(CheckAllowed) EV <= 0.8 ==> PotRaise" << std::endl;
       return RaiseAction(raise_amt);
 
     // If EV above 0.8, do two pot raise.
@@ -154,6 +158,7 @@ Action Player::get_action(GameState* game_state, RoundState* round_state, int ac
       const int min_raise = round_state->raise_bounds()[0];
       const int max_raise = round_state->raise_bounds()[1];
       const int raise_amt = std::min(std::max(2*pot_size, min_raise), max_raise);
+      std::cout << "(CheckAllowed) EV above 0.8 ==> TwoPotRaise" << std::endl;
       return RaiseAction(max_raise);
     }
 
@@ -162,8 +167,11 @@ Action Player::get_action(GameState* game_state, RoundState* round_state, int ac
     const int pot_after_call = 2 * opp_contribution;
     const int equity = EV * pot_after_call;
 
+    std::cout << "pot_after_call=" << pot_after_call << " equity=" << equity << std::endl;
+
     // Not worth it to continue.
     if (equity < continue_cost) {
+      std::cout << "(CallRequired) not worth it ==> FoldAction" << std::endl;
       return FoldAction();
 
     // Worth it - do bet sizing.
@@ -172,13 +180,16 @@ Action Player::get_action(GameState* game_state, RoundState* round_state, int ac
         const int min_raise = round_state->raise_bounds()[0];
         const int max_raise = round_state->raise_bounds()[1];
         const int raise_amt = std::min(std::max(pot_size, min_raise), max_raise);
+        std::cout << "(CallRequired) worth it, EV >= 0.7 ==> PotRaise" << std::endl;
         return RaiseAction(max_raise);
       } else if (EV >= 0.9) {
         const int min_raise = round_state->raise_bounds()[0];
         const int max_raise = round_state->raise_bounds()[1];
         const int raise_amt = std::min(std::max(2*pot_size, min_raise), max_raise);
+        std::cout << "(CallRequired) worth it, EV >= 0.9 ==> TwoPotRaise" << std::endl;
         return RaiseAction(max_raise);
       } else {
+        std::cout << "(CallRequired) worth it, but EV not >= 0.7 ==> CallAction" << std::endl;
         return CallAction();
       }
     }
