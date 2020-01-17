@@ -325,6 +325,19 @@ inline void PrintVector(const std::vector<int>& vec) {
 }
 
 
+inline void PrintHistory(const std::vector<int>& vec) {
+  const int actions_per = vec.size() / 4;
+
+  for (int st = 0; st < 4; ++st) {
+    for (int i = 0; i < actions_per; ++i) {
+      std::cout << vec.at(st*actions_per + i) << " ";
+    }
+    std::cout << "| ";
+  }
+  std::cout << std::endl;
+}
+
+
 inline bool PermutationIsValid(const Permutation& p) {
   std::set<uint8_t> s;
   for (const uint8_t v : p) {

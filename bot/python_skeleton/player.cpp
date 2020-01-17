@@ -30,15 +30,18 @@ Player::Player() {}
 void Player::handle_new_round(GameState* game_state, RoundState* round_state, int active) {
   //int my_bankroll = game_state->bankroll;  // the total number of chips you've gained or lost from the beginning of the game to the start of this round
   float game_clock = game_state->game_clock;  // the total number of seconds your bot has left to play this game
-  //int round_num = game_state->round_num;  // the round number from 1 to NUM_ROUNDS
+  int round_num = game_state->round_num;  // the round number from 1 to NUM_ROUNDS
   //std::array<std::string, 2> my_cards = round_state->hands[active];  // your cards
   
   bool big_blind = static_cast<bool>(active);
 
-  std::cout << "CLOCK: " << game_clock << std::endl;
+  printf("\n================== NEW ROUND: %d ==================\n", round_num);
+  std::cout << "*** TIME REMAINING: " << game_clock << std::endl;
+  printf("*** Big blind: %d\n", big_blind);
+
   street_ev_.clear();
 
-  // Next action is for the small blind.
+  // Reset history-related stuff.
   next_action_idx_ = 2;
   history_ = std::array<int, 4*kMaxActionsPerStreet>();
   history_[0] = 1;
@@ -100,12 +103,13 @@ void Player::handle_round_over(GameState* game_state, TerminalState* terminal_st
 
     const ShowdownResult result(win_hand, lose_hand, board);
     pf_.Update(result);
-    std::cout << "Updated with showdown result" << std::endl;
-    std::cout << "Particle filter nonzero = " << pf_.Nonzero() << std::endl;
+    std::cout << "[ROUNDOVER] Updated with showdown result" << std::endl;
+    std::cout << "[ROUNDOVER] Particle filter nonzero = " << pf_.Nonzero() << std::endl;
   }
 
-  std::cout << "\nFinal history:" << std::endl;
-  PrintVector(std::vector<int>(history_.begin(), history_.end()));
+  std::cout << "\n[ROUNDOVER] Final history:" << std::endl;
+  PrintHistory(std::vector<int>(history_.begin(), history_.end()));
+  // PrintVector(std::vector<int>(history_.begin(), history_.end()));
   std::cout << std::endl;
 }
 
@@ -117,8 +121,8 @@ void Player::UpdateHistory(int my_contrib, int opp_contrib, int street) {
   assert(opp_contrib >= contributions_[1]);
 
   if (did_start_new_street) {
-    std::cout << "[HISTORY] Started new street: " << street << std::endl;
-    std::cout << "[HISTORY] prev_street=" << prev_street_ << std::endl;
+    // std::cout << "[HISTORY] Started new street: " << street << std::endl;
+    // std::cout << "[HISTORY] prev_street=" << prev_street_ << std::endl;
     prev_street_ = street;
 
     // If we don't have a previous street, don't need to do call detection below.
@@ -129,8 +133,8 @@ void Player::UpdateHistory(int my_contrib, int opp_contrib, int street) {
 
       // The amount that was put in the pot by each player during the last street.
       const int prev_street_pip = std::min(my_contrib, opp_contrib) - prev_street_contrib_;
-      printf("[HISTORY] this_street_off=%d | prev_street_off=%d | prev_street_pip=%d\n",
-          this_street_off, prev_street_off, prev_street_pip);
+      // printf("[HISTORY] this_street_off=%d | prev_street_off=%d | prev_street_pip=%d\n",
+      //     this_street_off, prev_street_off, prev_street_pip);
 
       std::array<int, 2> pips = { 0, 0 };
 
@@ -142,7 +146,7 @@ void Player::UpdateHistory(int my_contrib, int opp_contrib, int street) {
           // const int remaining_amt = (prev_street_contrib - pips[i % 2])
           // const int call_amt = std::abs(pips[0] - pips[1]); 
           history_.at(i) = remaining_amt;
-          printf("[HISTORY] Corrected the final call of %d at action %d\n", remaining_amt, i);
+          // printf("[HISTORY] Corrected the final call of %d at action %d\n", remaining_amt, i);
         }
         pips.at(i % 2) += history_.at(i);
         if (pips[0] == prev_street_pip && pips[1] == prev_street_pip) {
@@ -155,17 +159,17 @@ void Player::UpdateHistory(int my_contrib, int opp_contrib, int street) {
 
       contributions_[0] = std::min(my_contrib, opp_contrib);
       contributions_[1] = std::min(my_contrib, opp_contrib);
-      printf("Both players starting out new street with contributions: US=%d | OPP=%d\n",
-          contributions_[0], contributions_[1]);
+      // printf("Both players starting out new street with contributions: US=%d | OPP=%d\n",
+          // contributions_[0], contributions_[1]);
       prev_street_contrib_ = std::min(my_contrib, opp_contrib);
     }
   }
 
-  printf("[HISTORY] Updating with latest action(s) my_contrib=%d | opp_contrib=%d\n", my_contrib, opp_contrib);
+  // printf("[HISTORY] Updating with latest action(s) my_contrib=%d | opp_contrib=%d\n", my_contrib, opp_contrib);
 
   // If the opp_contrib has increased, an opponent action must have happened since our last action.
   if (opp_contrib > contributions_[1]) {
-    printf("[HISTORY] opp_contrib > contributions_[1] (%d and %d)\n", opp_contrib, contributions_[1]);
+    // printf("[HISTORY] opp_contrib > contributions_[1] (%d and %d)\n", opp_contrib, contributions_[1]);
     const int add_amt = (opp_contrib - contributions_[1]);
     history_.at(next_action_idx_) = add_amt;
     contributions_[1] = opp_contrib;
@@ -175,12 +179,12 @@ void Player::UpdateHistory(int my_contrib, int opp_contrib, int street) {
     const int parity = next_action_idx_ % 2;
     const int max_idx_this_street = kMaxActionsPerStreet * (GetStreet0123(street) + 1);
     next_action_idx_ = std::min(next_action_idx_, max_idx_this_street - 2 + parity);
-    printf("Updated opp action, next_action_idx=%d\n", next_action_idx_);
+    // printf("Updated opp action, next_action_idx=%d\n", next_action_idx_);
   }
 
   // If my_contrib has increased, we must have taken an action.
   if (my_contrib > contributions_[0]) {
-    printf("[HISTORY] my_contrib > contributions_[0] (%d and %d)\n", my_contrib, contributions_[0]);
+    // printf("[HISTORY] my_contrib > contributions_[0] (%d and %d)\n", my_contrib, contributions_[0]);
     history_.at(next_action_idx_) = (my_contrib - contributions_[0]);
     contributions_[0] = my_contrib;
 
@@ -189,7 +193,7 @@ void Player::UpdateHistory(int my_contrib, int opp_contrib, int street) {
     const int parity = next_action_idx_ % 2;
     const int max_idx_this_street = kMaxActionsPerStreet * (GetStreet0123(street) + 1);
     next_action_idx_ = std::min(next_action_idx_, max_idx_this_street - 2 + parity);
-    printf("Updated our action, next_action_idx=%d\n", next_action_idx_);
+    // printf("Updated our action, next_action_idx=%d\n", next_action_idx_);
   }
 }
 
@@ -220,12 +224,12 @@ Action Player::get_action(GameState* game_state, RoundState* round_state, int ac
 
   // Check fold if no particles left.
   if (pf_.Nonzero() <= 0) {
-    std::cout << "[FAILURE] Particle filter empty, check-folding" << std::endl;
+    std::cout << "[GETACTION] [FAILURE] Particle filter empty, check-folding" << std::endl;
     return (CHECK_ACTION_TYPE & legal_actions) ? CheckAction() : FoldAction();
   }
 
   const bool did_converge = (num_showdowns_seen_ > num_showdowns_converge_) && pf_.Unique() < 10;
-  printf("Did converge? %d (unique=%d)\n", did_converge, pf_.Unique());
+  printf("[GETACTION] Did converge? %d (unique=%d)\n", did_converge, pf_.Unique());
 
   // If EV hasn't been computed for this street, do it here.
   if (street_ev_.count(street) == 0) {
@@ -242,7 +246,7 @@ Action Player::get_action(GameState* game_state, RoundState* round_state, int ac
   const float EV = street_ev_.at(street);
 
   const int pot_size = my_contribution + opp_contribution;
-  printf("\n==> ACTION | round=%d | street=%d | ev=%f | pot_size=%d | continue_cost=%d\n",
+  printf("[GETACTION] round=%d | street=%d | ev=%f | pot_size=%d | continue_cost=%d\n",
       round_num, street, EV, pot_size, continue_cost);
   
   const int min_raise = round_state->raise_bounds()[0];
