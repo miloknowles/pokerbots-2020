@@ -7,11 +7,12 @@
 #include "./cpp_skeleton/bot.hpp"
 
 #include "./pokerbots_cpp_python/permutation_filter.hpp"
+#include "./history_tracker.hpp"
 
 namespace pb {
 
 // 4 betting actions per player.
-static constexpr int kMaxActionsPerStreet = 8;
+// static constexpr int kMaxActionsPerStreet = 8;
 
 class Player : public Bot {
   private:
@@ -22,18 +23,10 @@ class Player : public Bot {
     int num_showdowns_seen_ = 0;
     int num_showdowns_converge_ = 50;
 
+    HistoryTracker history_{false};
+
     // Keep track of some info for betting.
-    int prev_street_ = -1;
-
-    // 0 is us, 1 is opp.
-    std::array<int, 2> contributions_;
-    int prev_street_contrib_;
     std::unordered_map<int, float> street_ev_{};
-
-    // Encodes the actions taken so far (bets as % of pot).
-    int next_action_idx_;
-    std::array<int, 4*kMaxActionsPerStreet> history_{};
-    // std::unordered_map<int, int> street_num_raises_{};
 
   public:
     /**
@@ -70,15 +63,17 @@ class Player : public Bot {
      */
     Action get_action(GameState* game_state, RoundState* round_state, int active);
 
-    Action HandleActionConverged(float ev, int round_num, int street, int pot_size, int continue_cost,
-                                 int legal_actions, int min_raise, int max_raise, int my_contribution,
-                                 int opp_contribution);
+    Action HandleActionPreflop(float ev, int round_num, int street, int pot_size, int continue_cost,
+                               int legal_actions, int min_raise, int max_raise, int my_contribution,
+                               int opp_contribution, bool is_big_blind);
 
-    Action HandleActionNotConverged(float ev, int round_num, int street, int pot_size, int continue_cost,
-                                 int legal_actions, int min_raise, int max_raise, int my_contribution,
-                                 int opp_contribution);
+    Action HandleActionFlop(float ev, int round_num, int street, int pot_size, int continue_cost,
+                               int legal_actions, int min_raise, int max_raise, int my_contribution,
+                               int opp_contribution, bool is_big_blind);
     
-    void UpdateHistory(int my_contrib, int opp_contrib, int street);
+    Action HandleActionTurn(float ev, int round_num, int street, int pot_size, int continue_cost,
+                               int legal_actions, int min_raise, int max_raise, int my_contribution,
+                               int opp_contribution, bool is_big_blind);
 };
 
 }

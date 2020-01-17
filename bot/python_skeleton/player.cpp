@@ -11,10 +11,6 @@ static int MakeRelativeBet(const float frac, const int pot_size, const int min_r
   return clamped;
 }
 
-static int GetStreet0123(const int street_sz) {
-  return street_sz == 0 ? 0 : (street_sz - 2);
-}
-
 /**
  * Called when a new game starts. Called exactly once.
  */
@@ -41,15 +37,7 @@ void Player::handle_new_round(GameState* game_state, RoundState* round_state, in
 
   street_ev_.clear();
 
-  // Reset history-related stuff.
-  next_action_idx_ = 2;
-  history_ = std::array<int, 4*kMaxActionsPerStreet>();
-  history_[0] = 1;
-  history_[1] = 2;
-  contributions_[0] = big_blind ? 2 : 1;
-  contributions_[1] = big_blind ? 1 : 2;
-  prev_street_ = -1;
-  prev_street_contrib_ = 0;
+  history_ = HistoryTracker(big_blind);
 }
 
 /**
@@ -68,7 +56,7 @@ void Player::handle_round_over(GameState* game_state, TerminalState* terminal_st
   const int opp_stack = previous_state->stacks[1-active];  // the number of chips your opponent has remaining
   const int my_contribution = STARTING_STACK - my_stack;  // the number of chips you have contributed to the pot
   const int opp_contribution = STARTING_STACK - opp_stack;  // the number of chips your opponent has contributed to the pot
-  UpdateHistory(my_contribution, opp_contribution, street);
+  history_.Update(my_contribution, opp_contribution, street);
 
   const std::array<std::string, 2> my_cards = previous_state->hands[active];  // your cards
   const std::array<std::string, 2> opp_cards = previous_state->hands[1-active];  // opponent's cards or "" if not revealed
@@ -108,93 +96,8 @@ void Player::handle_round_over(GameState* game_state, TerminalState* terminal_st
   }
 
   std::cout << "\n[ROUNDOVER] Final history:" << std::endl;
-  PrintHistory(std::vector<int>(history_.begin(), history_.end()));
-  // PrintVector(std::vector<int>(history_.begin(), history_.end()));
+  history_.Print();
   std::cout << std::endl;
-}
-
-// This is always called when it's my action.
-void Player::UpdateHistory(int my_contrib, int opp_contrib, int street) {
-  const bool did_start_new_street = (prev_street_ != street);
-
-  assert(my_contrib >= contributions_[0]);
-  assert(opp_contrib >= contributions_[1]);
-
-  if (did_start_new_street) {
-    // std::cout << "[HISTORY] Started new street: " << street << std::endl;
-    // std::cout << "[HISTORY] prev_street=" << prev_street_ << std::endl;
-    prev_street_ = street;
-
-    // If we don't have a previous street, don't need to do call detection below.
-    if (street > 0) {
-      // Make sure the previous street has equal pot contributions.
-      const int this_street_off = kMaxActionsPerStreet * GetStreet0123(street);
-      const int prev_street_off = this_street_off - kMaxActionsPerStreet;
-
-      // The amount that was put in the pot by each player during the last street.
-      const int prev_street_pip = std::min(my_contrib, opp_contrib) - prev_street_contrib_;
-      // printf("[HISTORY] this_street_off=%d | prev_street_off=%d | prev_street_pip=%d\n",
-      //     this_street_off, prev_street_off, prev_street_pip);
-
-      std::array<int, 2> pips = { 0, 0 };
-
-      // We're looking for the call that ended the previous round of betting.
-      for (int i = prev_street_off; i < this_street_off; ++i) {
-        const int add_amt = history_.at(i);
-        const int remaining_amt = (prev_street_pip - pips[i % 2]);
-        if (add_amt == 0 && remaining_amt > 0) {
-          // const int remaining_amt = (prev_street_contrib - pips[i % 2])
-          // const int call_amt = std::abs(pips[0] - pips[1]); 
-          history_.at(i) = remaining_amt;
-          // printf("[HISTORY] Corrected the final call of %d at action %d\n", remaining_amt, i);
-        }
-        pips.at(i % 2) += history_.at(i);
-        if (pips[0] == prev_street_pip && pips[1] == prev_street_pip) {
-          break;
-        }
-      }
-
-      // The next action idx should be the first of the new street.
-      next_action_idx_ = kMaxActionsPerStreet * GetStreet0123(street);
-
-      contributions_[0] = std::min(my_contrib, opp_contrib);
-      contributions_[1] = std::min(my_contrib, opp_contrib);
-      // printf("Both players starting out new street with contributions: US=%d | OPP=%d\n",
-          // contributions_[0], contributions_[1]);
-      prev_street_contrib_ = std::min(my_contrib, opp_contrib);
-    }
-  }
-
-  // printf("[HISTORY] Updating with latest action(s) my_contrib=%d | opp_contrib=%d\n", my_contrib, opp_contrib);
-
-  // If the opp_contrib has increased, an opponent action must have happened since our last action.
-  if (opp_contrib > contributions_[1]) {
-    // printf("[HISTORY] opp_contrib > contributions_[1] (%d and %d)\n", opp_contrib, contributions_[1]);
-    const int add_amt = (opp_contrib - contributions_[1]);
-    history_.at(next_action_idx_) = add_amt;
-    contributions_[1] = opp_contrib;
-    
-    // If we surpass kMaxActionsPerStreet, keeping adding contributions to the LAST betting action.
-    ++next_action_idx_;
-    const int parity = next_action_idx_ % 2;
-    const int max_idx_this_street = kMaxActionsPerStreet * (GetStreet0123(street) + 1);
-    next_action_idx_ = std::min(next_action_idx_, max_idx_this_street - 2 + parity);
-    // printf("Updated opp action, next_action_idx=%d\n", next_action_idx_);
-  }
-
-  // If my_contrib has increased, we must have taken an action.
-  if (my_contrib > contributions_[0]) {
-    // printf("[HISTORY] my_contrib > contributions_[0] (%d and %d)\n", my_contrib, contributions_[0]);
-    history_.at(next_action_idx_) = (my_contrib - contributions_[0]);
-    contributions_[0] = my_contrib;
-
-    // If we surpass kMaxActionsPerStreet, keeping adding contributions to the LAST betting action.
-    ++next_action_idx_;
-    const int parity = next_action_idx_ % 2;
-    const int max_idx_this_street = kMaxActionsPerStreet * (GetStreet0123(street) + 1);
-    next_action_idx_ = std::min(next_action_idx_, max_idx_this_street - 2 + parity);
-    // printf("Updated our action, next_action_idx=%d\n", next_action_idx_);
-  }
 }
 
 /**
@@ -220,7 +123,7 @@ Action Player::get_action(GameState* game_state, RoundState* round_state, int ac
   const int my_contribution = STARTING_STACK - my_stack;  // the number of chips you have contributed to the pot
   const int opp_contribution = STARTING_STACK - opp_stack;  // the number of chips your opponent has contributed to the pot
 
-  UpdateHistory(my_contribution, opp_contribution, street);
+  history_.Update(my_contribution, opp_contribution, street);
 
   // Check fold if no particles left.
   if (pf_.Nonzero() <= 0) {
@@ -252,21 +155,129 @@ Action Player::get_action(GameState* game_state, RoundState* round_state, int ac
   const int min_raise = round_state->raise_bounds()[0];
   const int max_raise = round_state->raise_bounds()[1];
 
-  // if (did_converge) {
-  const Action action = HandleActionConverged(
-      EV, round_num, street, pot_size, continue_cost, legal_actions,
-      min_raise, max_raise, my_contribution, opp_contribution);
-
-  return action;
+  const bool is_bb = static_cast<bool>(active);
+  if (street == 0) {
+    return HandleActionPreflop(EV, round_num, street, pot_size, continue_cost, legal_actions,
+                               min_raise, max_raise, my_contribution, opp_contribution, is_bb);
+  } else if (street == 3) {
+    return HandleActionFlop(EV, round_num, street, pot_size, continue_cost, legal_actions,
+                            min_raise, max_raise, my_contribution, opp_contribution, is_bb);
+  } else {
+    return HandleActionTurn(EV, round_num, street, pot_size, continue_cost, legal_actions,
+                            min_raise, max_raise, my_contribution, opp_contribution, is_bb);
+  }
 }
 
-Action Player::HandleActionConverged(float EV, int round_num, int street, int pot_size,
-                                     int continue_cost, int legal_actions, int min_raise,
-                                     int max_raise, int my_contribution, int opp_contribution) {
+
+Action Player::HandleActionPreflop(float EV, int round_num, int street, int pot_size,
+                                   int continue_cost, int legal_actions, int min_raise,
+                                   int max_raise, int my_contribution, int opp_contribution,
+                                   bool is_big_blind) {
   const bool check_is_allowed = CHECK_ACTION_TYPE & legal_actions;
+  const bool must_pay_to_continue = continue_cost > 0;
   const bool raise_is_allowed = RAISE_ACTION_TYPE & legal_actions;
 
-  printf("check_is_allowed=%d | raise_is_allowed=%d\n", check_is_allowed, raise_is_allowed);
+  const bool is_our_first_action = (is_big_blind && my_contribution == BIG_BLIND) || (!is_big_blind && my_contribution == SMALL_BLIND);
+
+  if (is_our_first_action) {
+    // CASE 1: First action and we are SMALL.
+    if (!is_big_blind) {
+      printf("First action for SB, ev=%f\n", EV);
+      assert(continue_cost > 0);
+      if (EV >= 0.60 && raise_is_allowed) {
+        return RaiseAction(2 * BIG_BLIND);
+      } else if (EV >= 0.70 && raise_is_allowed) {
+        return RaiseAction(4 * BIG_BLIND);
+      } else if (EV >= 0.80 && raise_is_allowed) {
+        return RaiseAction(6 * BIG_BLIND);
+      } else {
+        return FoldAction();
+      }
+    // CASE 2: First action and we are BIG.
+    } else {
+      printf("First action for BB, ev=%f\n", EV);
+      const bool other_player_did_raise = (continue_cost > 0);
+
+      // If other player DID raise, consider reraising.
+      if (other_player_did_raise) {
+        const int pot_after_call = 2 * opp_contribution;
+        const int equity = EV * pot_after_call;
+        if (equity > 3 * continue_cost) {
+          return RaiseAction(3 * BIG_BLIND);
+        } else if (equity > 2 * continue_cost) {
+          return CallAction();
+        } else {
+          return FoldAction();
+        }
+      
+      // Other player called but didn't raise.
+      } else {
+        // Try to make the other player fold.
+        if (EV >= 0.75 && raise_is_allowed) {
+          return RaiseAction(2 * BIG_BLIND);
+        } else if (EV > 0.90 && raise_is_allowed) {
+          return RaiseAction(4 * BIG_BLIND);
+        } else {
+          return CheckAction();
+        }
+      }
+    }
+  
+  // Not our first action, limit the number of re-raises we'll do.
+  } else {
+    // const int num_betting_rounds = next_action_idx_ / 2;
+    const int num_betting_rounds = history_.NumBettingRounds();
+    printf("Num bettings rounds so far: %d\n", num_betting_rounds);
+
+    // CASE 3: Not our first action, must pay to continue.
+    const bool other_player_did_raise = (continue_cost > 0);
+    if (other_player_did_raise) {
+      printf("Not first action, other player RAISED\n");
+      const int pot_after_call = 2 * opp_contribution;
+      const int equity = EV * pot_after_call;
+      
+      // Raise again only if pot odds are really good.
+      if (equity > 5 * continue_cost) {
+        return RaiseAction(2 * BIG_BLIND);
+    
+      // Otherwise, stay in it if it's barely worth it.
+      } else if (equity > continue_cost) {
+        return CallAction();
+      } else {
+        return FoldAction();
+      }
+    
+    // CASE 4: Not our first action, don't need to pay to continue.
+    } else {
+      printf("Not first action, other player CHECKED/CALLED\n");
+      // const int num_betting_rounds = next_action_idx_ / 2;
+      const int num_betting_rounds = history_.NumBettingRounds();
+      if (num_betting_rounds > 3) {
+        return CheckAction();
+      } else {
+        // Try to make the other player fold.
+        if (EV >= 0.75 && raise_is_allowed) {
+          return RaiseAction(2 * BIG_BLIND);
+        } else if (EV > 0.90 && raise_is_allowed) {
+          return RaiseAction(4 * BIG_BLIND);
+        } else {
+          return CheckAction();
+        }
+      }
+    }
+  }
+
+  std::cout << "WARNING: betting logic didn't handle a case, doing check-fold" << std::endl;
+  return (CHECK_ACTION_TYPE & legal_actions) ? CheckAction() : FoldAction();
+}
+
+Action Player::HandleActionFlop(float EV, int round_num, int street, int pot_size,
+                                int continue_cost, int legal_actions, int min_raise,
+                                int max_raise, int my_contribution, int opp_contribution,
+                                bool is_big_blind) {
+  const bool check_is_allowed = CHECK_ACTION_TYPE & legal_actions;
+  const bool raise_is_allowed = RAISE_ACTION_TYPE & legal_actions;
+  // printf("check_is_allowed=%d | raise_is_allowed=%d\n", check_is_allowed, raise_is_allowed);
 
   // Don't need to pay to continue.
   if (check_is_allowed) {
@@ -320,28 +331,31 @@ Action Player::HandleActionConverged(float EV, int round_num, int street, int po
   return (CHECK_ACTION_TYPE & legal_actions) ? CheckAction() : FoldAction();
 }
 
-// Bet less agressively, but also lower the thresholds for calling so that we are more likely to
-// see a showdown and gather information.
-Action Player::HandleActionNotConverged(float EV, int round_num, int street, int pot_size,
-                                     int continue_cost, int legal_actions, int min_raise,
-                                     int max_raise, int my_contribution, int opp_contribution) {
-  std::cout << "HandleActionNotConverged" << std::endl;
+Action Player::HandleActionTurn(float EV, int round_num, int street, int pot_size,
+                                int continue_cost, int legal_actions, int min_raise,
+                                int max_raise, int my_contribution, int opp_contribution,
+                                bool is_big_blind) {
   const bool check_is_allowed = CHECK_ACTION_TYPE & legal_actions;
   const bool raise_is_allowed = RAISE_ACTION_TYPE & legal_actions;
-
-  printf("check_is_allowed=%d | raise_is_allowed=%d\n", check_is_allowed, raise_is_allowed);
+  // printf("check_is_allowed=%d | raise_is_allowed=%d\n", check_is_allowed, raise_is_allowed);
 
   // Don't need to pay to continue.
   if (check_is_allowed) {
     // Just check if neutral odds.
-    if (EV < 0.7 || !raise_is_allowed) {
-      std::cout << "[WAITING] (CheckAllowed) EV < 0.7 || !raise_is_allowed ==> CheckAction" << std::endl;
+    if (EV < 0.6 || !raise_is_allowed) {
+      std::cout << "[CONVERGED] (CheckAllowed) EV < 0.6 || !raise_is_allowed ==> CheckAction" << std::endl;
       return CheckAction();
   
-    // If hand is really good, do a pot raise.
-    } else {
-      std::cout << "[WAITING] (CheckAllowed) EV >= 0.7 ==> PotRaise" << std::endl;
+    // If EV is pretty good (60-80%), do a pot raise.
+    } else if (EV <= 0.8) {
       const int raise_amt = MakeRelativeBet(1.0, pot_size, min_raise, max_raise);
+      std::cout << "[CONVERGED] (CheckAllowed) EV <= 0.8 ==> PotRaise" << std::endl;
+      return RaiseAction(raise_amt);
+
+    // If EV above 0.8, do two pot raise.
+    } else {
+      const int raise_amt = MakeRelativeBet(2.0, pot_size, min_raise, max_raise);
+      std::cout << "[CONVERGED] (CheckAllowed) EV above 0.8 ==> TwoPotRaise" << std::endl;
       return RaiseAction(raise_amt);
     }
 
@@ -349,21 +363,25 @@ Action Player::HandleActionNotConverged(float EV, int round_num, int street, int
   } else {
     const int pot_after_call = 2 * opp_contribution;
     const int equity = EV * pot_after_call;
-    printf("[WAITING] Call equity | equity=%d | pot_after_call=%d | continue_cost=%d\n", equity, pot_after_call, continue_cost);
+    printf("[CONVERGED] Call equity | equity=%d | pot_after_call=%d | continue_cost=%d\n", equity, pot_after_call, continue_cost);
 
     // Not worth it to continue.
-    if (equity < (1.2 * continue_cost)) {
-      std::cout << "[WAITING] (CallRequired) not worth it ==> FoldAction" << std::endl;
+    if (equity < (1.8 * continue_cost)) {
+      std::cout << "[CONVERGED] (CallRequired) not worth it ==> FoldAction" << std::endl;
       return FoldAction();
 
     // Worth it - do bet sizing.
     } else {
       if (EV >= 0.7) {
         const int raise_amt = MakeRelativeBet(1.0, pot_size, min_raise, max_raise);
-        std::cout << "[WAITING] (CallRequired) worth it, EV >= 0.8 ==> PotRaise" << std::endl;
+        std::cout << "[CONVERGED] (CallRequired) worth it, EV >= 0.7 ==> PotRaise" << std::endl;
+        return raise_is_allowed ? RaiseAction(raise_amt) : CallAction();
+      } else if (EV >= 0.9) {
+        const int raise_amt = MakeRelativeBet(2.0, pot_size, min_raise, max_raise);
+        std::cout << "[CONVERGED] (CallRequired) worth it, EV >= 0.9 ==> TwoPotRaise" << std::endl;
         return raise_is_allowed ? RaiseAction(raise_amt) : CallAction();
       } else {
-        std::cout << "[WAITING] (CallRequired) worth it, but EV not >= 0.8 ==> CallAction" << std::endl;
+        std::cout << "[CONVERGED] (CallRequired) worth it, but EV not >= 0.7 ==> CallAction" << std::endl;
         return CallAction();
       }
     }
