@@ -189,18 +189,7 @@ class Timer {
 
 class PermutationFilter {
  public:
-  PermutationFilter(int N) : N_(N), particles_(N), weights_(N), gen_(rd_()) {
-    // Sample the initial population of particles.
-    for (int i = 0; i < N; ++i) {
-      particles_.at(i) = PriorSample();
-      weights_.at(i) = 1.0;
-      MaybeAddUnique(particles_.at(i));
-    }
-    // Precompute pow for some speedups.
-    for (int i = 0; i < pow_precompute_.size(); ++i) {
-      pow_precompute_.at(i) = std::pow(0.75, i);
-    }
-  }
+  PermutationFilter(int N);
 
   PermutationFilter(const PermutationFilter&) = delete;
 
@@ -295,6 +284,7 @@ class PermutationFilter {
 
   std::array<double, 40> pow_precompute_;
   omp::HandEvaluator omp_;
+  std::unordered_map<std::string, float> preflop_ev_{};
 
   std::unordered_map<std::string, double> time_;
   std::unordered_map<std::string, int> counts_;
@@ -322,6 +312,14 @@ inline void PrintPermutation(const Permutation& p) {
 inline void PrintVector(const std::vector<uint8_t>& vec) {
   for (const uint8_t t : vec) {
     std::cout << static_cast<int>(t) << " ";
+  }
+  std::cout << "\n";
+}
+
+
+inline void PrintVector(const std::vector<int>& vec) {
+  for (const int t : vec) {
+    std::cout << t << " ";
   }
   std::cout << "\n";
 }

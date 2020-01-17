@@ -33,4 +33,12 @@ if (NOT BUILD_PYTHON_WRAPPER)
   target_link_libraries(cpp_player
     ${Boost_LIBRARIES}
     pokerbots_cpp) 
+
+  # Copy necessary files to final executable directory.
+  add_custom_command(
+    TARGET cpp_player POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy
+            ${CMAKE_SOURCE_DIR}/pokerbots_cpp_python/preflop_equity.txt
+            ${CMAKE_CURRENT_BINARY_DIR}/preflop_equity.txt)
+
 endif()

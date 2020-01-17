@@ -6,27 +6,6 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/OMPEval/)
 link_directories(${CMAKE_CURRENT_SOURCE_DIR})
 link_directories(/usr/local/lib/)
 
-# Build the OMPEval library.
-# set(OMP_SOURCE_FILES
-#   OMPEval/omp/CardRange.cpp
-#   OMPEval/omp/CardRange.h
-#   OMPEval/omp/CombinedRange.cpp
-#   OMPEval/omp/CombinedRange.h
-#   OMPEval/omp/Constants.h
-#   OMPEval/omp/EquityCalculator.cpp
-#   OMPEval/omp/EquityCalculator.h
-#   OMPEval/omp/Hand.h
-#   OMPEval/omp/HandEvaluator.cpp
-#   OMPEval/omp/HandEvaluator.h
-#   OMPEval/omp/Random.h
-#   OMPEval/omp/Util.h
-#   OMPEval/libdivide/libdivide.h)
-# add_library(ompeval SHARED
-#   ${OMP_SOURCE_FILES})
-# target_link_libraries(ompeval
-#   pthread)
-# set_target_properties(ompeval PROPERTIES LINKER_LANGUAGE CXX)
-
 # Build the main c++ library.
 add_library(${PROJECT_NAME} SHARED
   OMPEval/omp/CardRange.cpp

@@ -1,3 +1,5 @@
+#include <fstream>
+
 #include "./permutation_filter.hpp"
 #include "pbots_calc.h"
 
@@ -50,6 +52,29 @@ float PbotsCalcEquity(const std::string& query,
   delete[] board_c;
   delete[] dead_c;
   return ev;
+}
+
+
+PermutationFilter::PermutationFilter(int N) : N_(N), particles_(N), weights_(N), gen_(rd_()) {
+  // Sample the initial population of particles.
+  for (int i = 0; i < N; ++i) {
+    particles_.at(i) = PriorSample();
+    weights_.at(i) = 1.0;
+    MaybeAddUnique(particles_.at(i));
+  }
+  // Precompute pow for some speedups.
+  for (int i = 0; i < pow_precompute_.size(); ++i) {
+    pow_precompute_.at(i) = std::pow(0.75, i);
+  }
+  // Load in the preflop equities.
+  std::string hand;
+  float ev;
+  // NOTE: this must be copied to same location as the executable.
+  std::ifstream in("./preflop_equity.txt");
+  while (in >> hand >> ev) {
+    preflop_ev_.emplace(hand, ev);
+  }
+  assert(preflop_ev_.size() == 2652);
 }
 
 
@@ -387,6 +412,7 @@ float PermutationFilter::ComputeEvRandom(const std::string& hand,
                                         const std::string& dead,
                                         const int nsamples,
                                         const int iters) {
+  Timer timer;
   float ev = 0;
 
   // Get indices of nonzero particles.
@@ -405,14 +431,20 @@ float PermutationFilter::ComputeEvRandom(const std::string& hand,
     const int unif_int = sampler(gen_);
     const int rand_idx = valid_idx.at(unif_int);
     const Permutation& perm = particles_.at(rand_idx);
-    const std::string& query_m = MapToTrueStrings(perm, hand) + ":xx";
     const std::string& board_m = MapToTrueStrings(perm, board);
-    const std::string& dead_m = MapToTrueStrings(perm, dead);
-    ev += PbotsCalcEquity(query_m, board_m, dead_m, iters);
-    // ev += OmpCalcEquity(MapToTrueStrings(perm, hand), board_m, dead_m);
+
+    // For preflop, use lookup table.
+    if (board_m.size() == 0) {
+      ev += preflop_ev_.at(MapToTrueStrings(perm, hand));
+    } else {
+      const std::string& query_m = MapToTrueStrings(perm, hand) + ":xx";
+      const std::string& dead_m = MapToTrueStrings(perm, dead);
+      ev += PbotsCalcEquity(query_m, board_m, dead_m, iters);
+    }
   }
 
-  return (ev / nsamples);
+  UpdateProfile("ComputeEvRandom", timer.Elapsed());
+  return (ev / static_cast<float>(nsamples));
 }
 
 } // namespace pb
