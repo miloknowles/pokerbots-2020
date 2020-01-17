@@ -13,6 +13,8 @@ TEST(HistoryTrackerTest, testUpdateSb) {
   EXPECT_EQ(1, v0[0]);
   EXPECT_EQ(2, v0[1]);
 
+  tracker_.Update(1, 2, 0);
+
   // Make the SB call, BB bet.
   tracker_.Update(2, 6, 0);
   const auto& v1 = tracker_.Vector();
@@ -87,4 +89,33 @@ TEST(HistoryTrackerTest, testUpdateBb) {
   EXPECT_EQ(10, v3[5]);
   EXPECT_EQ(0, v3[8]);
   tracker_.Print();
+}
+
+TEST(HistoryTrackerTest, test_01) {
+  // B posts the blind of 1
+  // A posts the blind of 2
+  // B dealt Th Ts [9h 9s]
+  // A dealt 5c 5d [4c 4d]
+  // B calls
+  // A checks
+  // Flop 8h Ad Qs [3h Kd 8s], B (2), A (2)
+  // A checks
+  // B bets 2
+  // A calls
+  // Turn 8h Ad Qs 9s [3h Kd 8s As], B (4), A (4)
+  // A checks
+  // B checks
+  // River 8h Ad Qs 9s 4d [3h Kd 8s As 5d], B (4), A (4)
+  // A checks
+  // B bets 2
+  // A calls
+  // B shows Th Ts [9h 9s]
+  // A shows 5c 5d [4c 4d]
+  // B awarded 6
+  // A awarded -6
+  HistoryTracker tracker(true);
+  tracker.Update(2, 2, 0);
+  tracker.Update(2, 2, 3);
+  tracker.Update(2, 4, 3);
+  tracker.Print();
 }

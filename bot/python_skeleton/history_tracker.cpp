@@ -44,14 +44,22 @@ void HistoryTracker::Update(int my_contrib, int opp_contrib, int street) {
     }
   }
   const bool we_go_first_this_street = ((street == 0) && !is_big_blind_) || (street > 0 && is_big_blind_);
-  const bool first_of_street = (next_action_idx_ % kMaxActionsPerStreet == 0) ||
-                               (street == 0 && next_action_idx_ % kMaxActionsPerStreet == 2);
+  // const bool first_of_street = ((next_action_idx_ % kMaxActionsPerStreet) == 0) ||
+  //                              (street == 0 && next_action_idx_ == 2);
+  bool first_of_street = did_start_new_street;
   
+  // printf("idx=%d | ME=%d OPP=%d\n", next_action_idx_, my_contrib, opp_contrib);
+
+  // If the opponent goes first and this is the first update we're doing for this street,
+  // then ONLY an opponent action has been performed.
   if (!we_go_first_this_street && first_of_street) {
     UpdateOpponent(opp_contrib,  street);
   } else {
-    UpdatePlayer(my_contrib, street);
-    UpdateOpponent(opp_contrib, street);
+    // If we we go first and its the first action, then no updates yet.
+    if (!first_of_street) {
+      UpdatePlayer(my_contrib, street);
+      UpdateOpponent(opp_contrib, street);
+    }
   }
 }
 
