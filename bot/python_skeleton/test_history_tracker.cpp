@@ -54,6 +54,12 @@ TEST(HistoryTrackerTest, testUpdateSb) {
   EXPECT_EQ(0, v4[12]);
   EXPECT_EQ(20, v4[16]);
   tracker_.Print();
+
+  const auto& info = tracker_.GetBettingInfo(0);
+  const BettingInfo& ply = info.first;
+  const BettingInfo& opp = info.second;
+  printf("PLAYER INFO (PREFLOP): bets=%d raises=%d calls=%d\n", ply.num_bets, ply.num_raises, ply.num_calls);
+  printf("OPPONENT INFO (PREFLOP): bets=%d raises=%d calls=%d\n", opp.num_bets, opp.num_raises, opp.num_calls);
 }
 
 

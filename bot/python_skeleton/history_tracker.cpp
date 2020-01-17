@@ -1,3 +1,4 @@
+#include <iostream>
 #include "history_tracker.hpp"
 
 namespace pb {
@@ -84,6 +85,50 @@ void HistoryTracker::UpdateOpponent(int opp_contrib, int street) {
   const int parity = next_action_idx_ % 2;
   const int max_idx_this_street = kMaxActionsPerStreet * (GetStreet0123(street) + 1);
   next_action_idx_ = std::min(next_action_idx_, max_idx_this_street - 2 + parity);
+}
+
+std::pair<BettingInfo, BettingInfo> HistoryTracker::GetBettingInfo(int street) const {
+  BettingInfo ply;
+  BettingInfo opp;
+  const int player_parity = (street == 0) ? is_big_blind_ : !is_big_blind_;
+
+  std::array<int, 2> pips = { 0, 0 };
+  for (int i = kMaxActionsPerStreet*street; i < kMaxActionsPerStreet*(street+1); ++i) {
+    const int add_amt = history_.at(i);
+    if ((i % 2) == player_parity) {
+      if (i >= 2) {
+        // Either a bet or a raise.
+        if ((pips[0] + add_amt) > pips[1]) {
+          if (pips[1] == pips[0]) {
+            ply.num_bets += 1;
+          } else {
+            ply.num_raises += 1;
+          }
+        // Must be a call.
+        } else if (add_amt > 0) {
+          ply.num_calls += 1;
+        }
+      }
+      pips[0] += add_amt;
+    } else {
+      if (i >= 2) {
+        // Either a bet or a raise.
+        if ((pips[1] + add_amt) > pips[0]) {
+          if (pips[0] == pips[1]) {
+            opp.num_bets += 1;
+          } else {
+            opp.num_raises += 1;
+          }
+        // Must be a call.
+        } else if (add_amt > 0) {
+          opp.num_calls += 1;
+        } 
+      }
+      pips[1] += add_amt;
+    }
+  }
+
+  return std::make_pair(ply, opp);
 }
 
 }

@@ -1,15 +1,21 @@
 #include <array>
 #include <unordered_map>
 #include <cassert>
-#include <iostream>
 #include <vector>
+#include <utility>
 
 namespace pb {
 
 static constexpr int kMaxActionsPerStreet = 8;
 
-class HistoryTracker {
+struct BettingInfo {
+  BettingInfo() = default;
+  int num_bets = 0;
+  int num_calls = 0;
+  int num_raises = 0;
+};
 
+class HistoryTracker {
  public:
   HistoryTracker(bool is_big_blind) : is_big_blind_(is_big_blind) {
     contributions_[0] = is_big_blind ? 2 : 1;
@@ -25,6 +31,8 @@ class HistoryTracker {
 
   // TODO: fix
   int NumBettingRounds() const { return 2; }
+
+  std::pair<BettingInfo, BettingInfo> GetBettingInfo(int street) const;
 
   void Print() const {
     const int actions_per = history_.size() / 4;
