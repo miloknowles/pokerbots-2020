@@ -8,72 +8,41 @@ import time
 from utils import *
 from constants import Constants
 from utils import sample_uniform_action
+from infoset import EvInfoSet
+
+import eval7
+from engine import RoundState, FoldAction, CallAction, CheckAction, RaiseAction, TerminalState
 
 
-class TraverseMode(object):
-  TRAVERSE_PRE_TURN = 0
-  TRAVERSE_POST_TURN = 1
-  TRAVERSE_FULL = 2
+def make_infoset(round_state, player_is_sb):
+  pass
+  # infoset = EvInfoSet(ev, bet_history_vec, player_is_sb)
 
 
-def check_terminal_node(events):
-  for e in events:
-    if e["type"] == "event_round_finish":
-      winning_player = e["winners"][0]["uuid"]
-      winning_stack = e["winners"][0]["stack"]
-      return True, winning_player, winning_stack
-  return False, None, None
+def make_actions(round_state):
+  valid_action_set = round_state.legal_actions()
+  min_raise, max_raise = round_state.get_raise_bounds()
+  pot_size = 2*Constants.INITIAL_STACK - (round_state.stacks[0] + round_state.stacks[1])
 
+  actions_mask = torch.zeros(len(Constants.ALL_ACTIONS))
+  actions_unscaled = deepcopy(Constants.ALL_ACTIONS)
 
-def check_player_node(events):
-  e = events[-1]
-  if e["type"] == "event_ask_player":
-    return True, e["uuid"], e
-  else:
-    return False, None, None
+  for i,  a in enumerate(actions_unscaled):
+    if a in valid_action_set:
+      actions_mask[i] = 1
+    if isinstance(a, RaiseAction):
+      pot_multiple = a.amount
+      a.amount = min(max_raise, max(min_raise, pot_multiple * pot_size))
 
-
-def check_turn_node(events):
-  e = events[-1]
-  if e["type"] == "event_ask_player" and e["round_state"]["street"] == "turn":
-    return True, e["uuid"], e
-  return False, None, None
-
-
-def traverse_until_turn(game_state, events, emulator, action_generator, traverse_player,
-                        recursion_ctr=[0]):
-  """
-  Randomly sample actions to traverse until a turn action node is reached. Returns the game_state
-  and new_events at the first turn node that is reached.
-  """
-  with torch.no_grad():
-    recursion_ctr[0] += 1
-    other_player = {Constants.PLAYER1_UID: Constants.PLAYER2_UID,
-                    Constants.PLAYER2_UID: Constants.PLAYER1_UID}[traverse_player]
-
-    # Base case: first action of the turn, return the state and event.
-    is_turn_node, uuid, evt = check_turn_node(events)
-    if is_turn_node:
-      return (game_state, evt)
-
-    is_player_node, uuid, evt = check_player_node(events)
-
-    if is_player_node:
-      action, amount = sample_uniform_action(evt["valid_actions"])
-      updated_state, new_events = emulator.apply_action(game_state, action, amount)
-
-      return traverse_until_turn(updated_state, new_events, emulator, action_generator,
-                      traverse_player, recursion_ctr=recursion_ctr)
-    else:
-      return None
+  assert(len(actions_unscaled) == len(actions_mask))
+  return actions_unscaled, actions_mask
 
 
 class TreeNodeInfo(object):
-  @staticmethod
-  def uuid_to_index(uuid):
-    return 0 if uuid == Constants.PLAYER1_UID else 1
-
   def __init__(self):
+    """
+    NOTE: The zero index always refers to PLAYER1 and the 1th index is PLAYER2.
+    """
     # Expected value for each player at this node if they play according to their current strategy.
     self.strategy_ev = torch.zeros(2)
 
@@ -84,46 +53,56 @@ class TreeNodeInfo(object):
     self.exploitability = torch.zeros(2)
 
 
-def traverse(game_state, events, emulator, action_generator, infoset_generator,
-             traverse_player, strategies, advt_mem, strt_mem, t, recursion_ctr=[0],
-             do_external_sampling=True):
+def create_new_round(button_player):
   """
-  Recursively traverse the game tree with external sampling.
+  Randomly generate a round_state to start a new round.
+  button_player (int) : 0 if PLAYER1 should be button (small blind), 1 if PLAYER2.
+  NOTE: Button should alternate every time.
+  """
+  deck = eval7.Deck()
+  deck.shuffle()
+  hands = [deck.deal(2), deck.deal(2)]
+  sb = Constants.SMALL_BLIND_AMOUNT
+  bb = 2*Constants.SMALL_BLIND_AMOUNT
+  pips = [sb, bb]
+  stacks = [Constants.INITIAL_STACK - sb, Constants.INITIAL_STACK - bb]
+  if button_player == 1:
+    pips.reverse()
+    stacks.reverse()
+  round_state = RoundState(button_player, 0, pips, stacks, hands, deck, None, [[1, 2]])
+  return round_state
 
-  Returns:
-    (TreeNodeInfo)
-  """
+
+def traverse(round_state, action_generator, infoset_generator, traverse_player_idx, strategies,
+             advt_mem, strt_mem, t, recursion_ctr=[0]):
   with torch.no_grad():
     node_info = TreeNodeInfo()
-    tp_index = TreeNodeInfo.uuid_to_index(traverse_player)
 
     recursion_ctr[0] += 1
-    other_player = {Constants.PLAYER1_UID: Constants.PLAYER2_UID,
-                    Constants.PLAYER2_UID: Constants.PLAYER1_UID}[traverse_player]
-
-    # CASE 0: State is a chance node - the game engine takes care of sampling this for us.
-    is_terminal_node, winning_player, winning_stack = check_terminal_node(events)
-    if is_terminal_node:
-      payoff = (winning_stack - Constants.INITIAL_STACK)
-      node_info.strategy_ev[0] = payoff if winning_player == Constants.PLAYER1_UID else -1 * payoff
-      node_info.strategy_ev[1] = -1 * node_info.strategy_ev[0] # Zero sum.
-      node_info.best_response_ev = node_info.strategy_ev
+    other_player_idx = (1 - traverse_player_idx)
+  
+    #================== TERMINAL NODE ====================
+    if isinstance(round_state, TerminalState):
+      node_info.strategy_ev = round_state.deltas.copy()
+      node_info.best_response_ev = node_info.strategy_ev.copy()
       return node_info
 
-    # CASE 1: Traversal player action node.
-    is_player_node, uuid, evt = check_player_node(events)
+    # TODO: confirm that this matches indices
+    active_player_idx = round_state.button % 2
+    is_traverse_player_action = (active_player_idx == traverse_player_idx)
 
-    if is_player_node and uuid == traverse_player:
-      infoset = infoset_generator(game_state, evt)
-      pot_size = evt["round_state"]["pot"]["main"]["amount"]
-      actions, mask = action_generator(evt["valid_actions"], pot_size)
-      del evt, pot_size
+    #============== TRAVERSE PLAYER ACTION ===============
+    if is_traverse_player_action:
+      # TODO
+      infoset = infoset_generator(round_state)
+      actions, mask = action_generator(round_state)
 
       # Do regret matching to get action probabilities.
-      if t == 0:
-        action_probs = strategies[traverse_player].get_action_probabilities_uniform()
-      else:
-        action_probs = strategies[traverse_player].get_action_probabilities(infoset, mask)
+      # if t == 0:
+      action_probs = strategies[traverse_player].get_action_probabilities_uniform()
+      # else:
+        # action_probs = strategies[traverse_player].get_action_probabilities(infoset, mask)
+   
       action_probs = apply_mask_and_normalize(action_probs, mask)
       assert torch.allclose(action_probs.sum(), torch.ones(1))
 
@@ -137,11 +116,10 @@ def traverse(game_state, events, emulator, action_generator, infoset_generator,
       for i, a in enumerate(actions):
         if mask[i] == 0:
           continue
-        updated_state, new_events = emulator.apply_action(game_state, a[0], a[1]) 
-        child_node_info = traverse(
-            updated_state, new_events, emulator, action_generator, infoset_generator,
-            traverse_player, strategies, advt_mem, strt_mem, t,
-            recursion_ctr=recursion_ctr, do_external_sampling=do_external_sampling)
+        next_round_state = round_state.proceed(a)
+        child_node_info = traverse(next_round_state, action_generator, infoset_generator,
+                                   traverse_player_idx, strategies, advt_mem, strt_mem, t,
+                                   recursion_ctr=recursion_ctr)
         
         # Expected value of the acting player taking this action and then continuing according to their strategy.
         action_values[:,i] = child_node_info.strategy_ev
@@ -171,19 +149,16 @@ def traverse(game_state, events, emulator, action_generator, infoset_generator,
 
       return node_info
 
-    # CASE 2: Other player action node.
-    elif is_player_node and uuid != traverse_player:
-      infoset = infoset_generator(game_state, evt)
+    #================== NON-TRAVERSE PLAYER ACTION =================
+    else:
+      infoset = infoset_generator(round_state)
 
       # External sampling: choose a random action for the non-traversing player.
-      pot_size = evt["round_state"]["pot"]["main"]["amount"]
-      actions, mask = action_generator(evt["valid_actions"], pot_size)
-      del evt, pot_size
-
+      actions, mask = action_generator(round_state)
       if t == 0:
-        action_probs = strategies[other_player].get_action_probabilities_uniform()
+        action_probs = strategies[other_player_idx].get_action_probabilities_uniform()
       else:
-        action_probs = strategies[other_player].get_action_probabilities(infoset, mask)
+        action_probs = strategies[other_player_idx].get_action_probabilities(infoset, mask)
       action_probs = apply_mask_and_normalize(action_probs, mask)
       assert torch.allclose(action_probs.sum(), torch.ones(1))
 
@@ -192,54 +167,15 @@ def traverse(game_state, events, emulator, action_generator, infoset_generator,
         strt_mem.add(infoset, action_probs, t)
 
       # EXTERNAL SAMPLING: choose only ONE action for the non-traversal player.
-      if do_external_sampling:
-        action, amount = actions[torch.multinomial(action_probs, 1).item()]
-        updated_state, new_events = emulator.apply_action(game_state, action, amount)
+      action = actions[torch.multinomial(action_probs, 1).item()]
+      next_round_state = round_state.proceed(action)
 
-        # NOTE(milo): Delete all events except the last one to save memory usage.
-        return traverse(updated_state, new_events, emulator, action_generator, infoset_generator, traverse_player,
-                        strategies, advt_mem, strt_mem, t, recursion_ctr=recursion_ctr,
-                        do_external_sampling=do_external_sampling)
-        
-      # NO SAMPLING: Otherwise recurse on ALL non-traversal player actions.
-      else:
-        action_values = torch.zeros(2, len(actions))
-        br_values = torch.zeros(2, len(actions))
-        instant_regrets = torch.zeros(len(actions))
+      # NOTE(milo): Delete all events except the last one to save memory usage.
+      return traverse(next_round_state, action_generator, infoset_generator, traverse_player_idx,
+                      strategies, advt_mem, strt_mem, t, recursion_ctr=recursion_ctr)
 
-        plyr_idx = TreeNodeInfo.uuid_to_index(uuid)
-        opp_idx = (1 - plyr_idx)
 
-        for i, a in enumerate(actions):
-          if mask[i] == 0:
-            continue 
-          updated_state, new_events = emulator.apply_action(game_state, a[0], a[1])
-          child_node_info = traverse(updated_state, new_events, emulator, action_generator, infoset_generator,
-                              traverse_player, strategies, advt_mem, strt_mem, t,
-                              recursion_ctr=recursion_ctr, do_external_sampling=do_external_sampling)
-          # Expected value of the acting player taking this action (for P1 and P2).
-          action_values[:,i] = child_node_info.strategy_ev
-
-          # Expected value for each player if the acting player takes this action and then they both
-          # follow a best-response strategy.
-          br_values[:,i] = child_node_info.best_response_ev
-        
-        # Sum along every action multiplied by its probability of occurring.
-        node_info.strategy_ev = (action_values * action_probs).sum(axis=1)
-
-        # Compute the instantaneous regrets for the traversing player.
-        instant_regrets_tp = (action_values[tp_index] - (node_info.strategy_ev[tp_index] * mask))
-
-        # The acting player chooses the BEST action with probability 1, while the opponent best
-        # response EV depends on the reach probability of their next acting situation.
-        node_info.best_response_ev[plyr_idx] = torch.max(br_values[plyr_idx,:])
-        node_info.best_response_ev[opp_idx] = torch.sum(action_probs * br_values[opp_idx,:])
-
-        # Exploitability is the difference in payoff between a local best response strategy and the
-        # full mixed strategy.
-        node_info.exploitability = node_info.best_response_ev - node_info.strategy_ev
-        
-        return node_info
-    
-    else:
-      raise NotImplementedError()
+if __name__ == "__main__":
+  button_player = 0
+  round_state = create_new_round(button_player)
+  print("Initial state:", round_state)

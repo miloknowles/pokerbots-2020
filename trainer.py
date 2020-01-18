@@ -71,7 +71,10 @@ def generate_actions(valid_actions, pot_amount):
   Using the valid_actions from the game engine, mask out and scale the entire set of actions.
   """
   actions_mask = torch.zeros(len(Constants.ALL_ACTIONS))
-  actions_scaled = deepcopy(Constants.ALL_ACTIONS)
+  actions_unscaled = deepcopy(Constants.ALL_ACTIONS)
+
+  for a in actions_unscaled:
+    
 
   for item in valid_actions:
     if item["action"] == "fold":
