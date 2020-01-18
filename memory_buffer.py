@@ -5,7 +5,8 @@ import torch
 import pandas as pd
 
 from constants import Constants
-from infoset import InfoSet
+# from infoset import InfoSet
+from infoset import EvInfoSet
 
 
 def get_buffer_manifest_path(folder, buffer_name):
