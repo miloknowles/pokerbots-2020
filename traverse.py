@@ -20,19 +20,28 @@ def make_infoset(round_state, player_is_sb):
 
 
 def make_actions(round_state):
+  """
+  Makes the actions that our network can take (Fold, Call, Check, PotRaise, TwoPotRaise, ThreePotRaise).
+  NOTE: A pot BET means adding chips to the pot equal to the current pot size.
+  NOTE: A pot RAISE means calling and THEN adding chips equal to the called pot size.
+  NOTE: If the current pot is x, then a pot raise puts the pip at 3x, two pot raise puts the pip at 5x, three pot at 7x.
+  """
   valid_action_set = round_state.legal_actions()
-  min_raise, max_raise = round_state.get_raise_bounds()
+  min_raise, max_raise = round_state.raise_bounds()
   pot_size = 2*Constants.INITIAL_STACK - (round_state.stacks[0] + round_state.stacks[1])
 
   actions_mask = torch.zeros(len(Constants.ALL_ACTIONS))
   actions_unscaled = deepcopy(Constants.ALL_ACTIONS)
 
   for i,  a in enumerate(actions_unscaled):
-    if a in valid_action_set:
+    if type(a) in valid_action_set:
       actions_mask[i] = 1
     if isinstance(a, RaiseAction):
-      pot_multiple = a.amount
-      a.amount = min(max_raise, max(min_raise, pot_multiple * pot_size))
+      pot_size_after_call = pot_size + abs(round_state.pips[0] - round_state.pips[1])
+      amt_to_add = a.amount * pot_size_after_call
+      amt_to_raise = max(round_state.pips[0], round_state.pips[1]) + amt_to_add
+      amt = min(max_raise, max(min_raise, amt_to_raise))
+      actions_unscaled[i] = RaiseAction(amt)
 
   assert(len(actions_unscaled) == len(actions_mask))
   return actions_unscaled, actions_mask

@@ -17,9 +17,10 @@ class Constants(object):
     FoldAction(),
     CallAction(),
     CheckAction(),
+    RaiseAction(amount=0.5),
     RaiseAction(amount=1),
     RaiseAction(amount=2),
-    RaiseAction(amount=3)
+    # RaiseAction(amount=3)
   ]
 
   NUM_ACTIONS = len(ALL_ACTIONS)
