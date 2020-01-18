@@ -2,11 +2,9 @@ import unittest, time
 import os, shutil
 from sys import getsizeof
 
-from infoset import InfoSet
 from memory_buffer import MemoryBuffer
-from memory_buffer_dataset import MemoryBufferDataset
 from utils import *
-from test_utils import make_dummy_infoset
+from test_utils import make_dummy_ev_infoset
 
 import torch
 
@@ -44,7 +42,7 @@ class MemoryBufferTest(unittest.TestCase):
     # Make sure the folder doesn't exist so the manifest has to be created.
     if os.path.exists("./memory/memory_buffer_test/"):
       shutil.rmtree("./memory/memory_buffer_test/")
-    info_set_size = 1 + 2 + 5 + 24
+    info_set_size = 1 + 1 + 24
     item_size = 64
     max_size = int(1e3)
 
@@ -53,11 +51,11 @@ class MemoryBufferTest(unittest.TestCase):
                       autosave_params=("./memory/memory_buffer_test/", "test_buffer"))
 
     for _ in range(max_size):
-      mb.add(make_dummy_infoset(), torch.zeros(item_size), 1234)
+      mb.add(make_dummy_ev_infoset(), torch.zeros(item_size), 1234)
     self.assertTrue(mb.full())
 
     # This should trigger the save and reset.
-    mb.add(make_dummy_infoset(), torch.zeros(item_size), 1234)
+    mb.add(make_dummy_ev_infoset(), torch.zeros(item_size), 1234)
 
 
 if __name__ == "__main__":
