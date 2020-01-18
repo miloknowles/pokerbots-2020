@@ -38,6 +38,52 @@ class CardEmbedding(nn.Module):
     return embs.view(B, num_cards, -1).sum(1)
 
 
+class DeepEvModel(nn.Module):
+  def __init__(self, nbets, nactions, ev_embed_dim=16, bet_embed_dim=64):
+    super(DeepEvModel, self).__init__()
+
+    self.ev1 = nn.Linear(1, ev_embed_dim)
+    self.ev2 = nn.Linear(ev_embed_dim, ev_embed_dim)
+
+    # Has size nbets * 2 because we pass in the bet amounts AND a mask of the same size.
+    self.bet1 = nn.Linear(nbets * 2, bet_embed_dim)
+    self.bet2 = nn.Linear(bet_embed_dim, bet_embed_dim)
+
+    self.comb1 = nn.Linear(ev_embed_dim + bet_embed_dim, bet_embed_dim)
+    self.comb2 = nn.Linear(bet_embed_dim, bet_embed_dim)
+    self.comb3 = nn.Linear(bet_embed_dim, bet_embed_dim)
+
+    self.normalize = nn.BatchNorm1d(bet_embed_dim)
+    self.action_head = nn.Linear(bet_embed_dim, nactions) 
+
+  def forward(self, hand_ev, bets):
+    """
+    hand_ev (torch.Tensor) : Shape (batch_size,).
+    bets (torch.Tensor) : Shape (batch_size, nbets).
+    """
+    x = F.relu(self.ev1(hand_ev))
+    x = F.relu(self.ev2(x) + x)
+
+    bet_size = bets.clamp(-1e6, 1e6)
+
+    # NOTE(milo): Changed this to a not-equal, since we encode opponent bets with negative numbers.
+    bet_occurred = bets.ne(0)
+    bet_feats = torch.cat([bet_size, bet_occurred.float()], dim=1)
+
+    y = F.relu(self.bet1(bet_feats))
+    y = F.relu(self.bet2(y) + y)
+
+    z = torch.cat([x, y], dim=1)
+    z = F.relu(self.comb1(z))
+    z = F.relu(self.comb2(z) + z)
+    z = F.relu(self.comb3(z) + z)
+
+    # Normalized to have zero mean and stdev 1.
+    z = (z - z.mean()) / torch.std(z)
+
+    return self.action_head(z)
+
+
 class DeepCFRModel(nn.Module):
   def __init__(self, ncardtypes, nbets, nactions, embed_dim=256):
     """
