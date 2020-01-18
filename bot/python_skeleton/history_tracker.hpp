@@ -8,6 +8,10 @@ namespace pb {
 
 static constexpr int kMaxActionsPerStreet = 8;
 
+inline int GetStreet0123(const int street_sz) {
+  return street_sz == 0 ? 0 : (street_sz - 2);
+}
+
 struct BettingInfo {
   BettingInfo() = default;
   int num_bets = 0;
@@ -29,8 +33,19 @@ class HistoryTracker {
   void UpdatePlayer(int my_contrib, int street);
   void UpdateOpponent(int opp_contrib, int street);
 
-  // TODO: fix
-  int NumBettingRounds() const { return 2; }
+  // Total number of actions taken by each player to increase the pot size during a street.
+  std::pair<int, int> TotalBets(int street) const {
+    const auto& info = GetBettingInfo(street);
+    const int ply_bets = info.first.num_raises + info.first.num_bets;
+    const int opp_bets = info.second.num_raises + info.second.num_bets;
+    return std::make_pair(ply_bets, opp_bets);
+  }
+
+  // Was the first action of a street a CHECK?
+  bool FirstActionWasCheck(int street) const {
+    const int offset = kMaxActionsPerStreet * GetStreet0123(street);
+    return history_.at(offset) == 0;
+  }
 
   std::pair<BettingInfo, BettingInfo> GetBettingInfo(int street) const;
 

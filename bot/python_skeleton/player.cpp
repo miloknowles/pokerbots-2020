@@ -36,7 +36,7 @@ void Player::handle_new_round(GameState* game_state, RoundState* round_state, in
   printf("*** Big blind: %d\n", big_blind);
 
   street_ev_.clear();
-
+  current_street_ = -1;
   history_ = HistoryTracker(big_blind);
 }
 
@@ -123,6 +123,18 @@ Action Player::get_action(GameState* game_state, RoundState* round_state, int ac
   const int my_contribution = STARTING_STACK - my_stack;  // the number of chips you have contributed to the pot
   const int opp_contribution = STARTING_STACK - opp_stack;  // the number of chips your opponent has contributed to the pot
 
+  if (street != current_street_) {
+    current_street_ = street;
+    if (current_street_ == 0) {
+      std::cout << "*** PREFLOP ***" << std::endl;
+    } else if (current_street_ == 3) {
+      std::cout << "*** FLOP ***" << std::endl;
+    } else if (current_street_ == 4) {
+      std::cout << "*** TURN ***" << std::endl;
+    } else {
+      std::cout << "*** RIVER ***" << std::endl;
+    }
+  }
   history_.Update(my_contribution, opp_contribution, street);
 
   // Check fold if no particles left.
@@ -149,7 +161,7 @@ Action Player::get_action(GameState* game_state, RoundState* round_state, int ac
   const float EV = street_ev_.at(street);
 
   const int pot_size = my_contribution + opp_contribution;
-  printf("[GETACTION] round=%d | street=%d | ev=%f | pot_size=%d | continue_cost=%d\n",
+  printf("[GETACTION] round=%d | street=%d | ev=%f | pot_size=%d | continue_cost=%d |\n",
       round_num, street, EV, pot_size, continue_cost);
   
   const int min_raise = round_state->raise_bounds()[0];
@@ -177,47 +189,68 @@ Action Player::HandleActionPreflop(float EV, int round_num, int street, int pot_
   const bool must_pay_to_continue = continue_cost > 0;
   const bool raise_is_allowed = RAISE_ACTION_TYPE & legal_actions;
 
-  const bool is_our_first_action = (is_big_blind && my_contribution == BIG_BLIND) || (!is_big_blind && my_contribution == SMALL_BLIND);
+  const bool is_our_first_action = (is_big_blind && my_contribution == BIG_BLIND) ||
+                                   (!is_big_blind && my_contribution == SMALL_BLIND);
+  
+  std::cout << "Getting a PREFLOP action" << std::endl;
+  const int num_betting_rounds = history_.TotalBets(0).first;
+  printf("Num bettings rounds so far: %d\n", num_betting_rounds);
 
   if (is_our_first_action) {
-    // CASE 1: First action and we are SMALL.
+    // CASE 1: First action and we are SMALLBLIND.
     if (!is_big_blind) {
-      printf("First action for SB, ev=%f\n", EV);
+      std::cout << "PREFLOP_1: first action and we are SB" << std::endl;
       assert(continue_cost > 0);
-      if (EV >= 0.60 && raise_is_allowed) {
-        return RaiseAction(2 * BIG_BLIND);
-      } else if (EV >= 0.70 && raise_is_allowed) {
-        return RaiseAction(4 * BIG_BLIND);
-      } else if (EV >= 0.80 && raise_is_allowed) {
+      if (EV >= 0.80 && raise_is_allowed) {
+        std::cout << "1A: great EV, 6BB raise" << std::endl;
         return RaiseAction(6 * BIG_BLIND);
+      } else if (EV >= 0.70 && raise_is_allowed) {
+        std::cout << "1B: pretty good EV, 4BB raise" << std::endl;
+        return RaiseAction(4 * BIG_BLIND);
+      } else if (EV >= 0.65 && raise_is_allowed) {
+        std::cout << "1C: okay EV, 2BB raise" << std::endl;
+        return RaiseAction(2 * BIG_BLIND);
       } else {
+        std::cout << "EV not good enough to call BB, folding" << std::endl;
         return FoldAction();
       }
     // CASE 2: First action and we are BIG.
     } else {
-      printf("First action for BB, ev=%f\n", EV);
+      std::cout << "PREFLOP_2: first action and we are BB" << std::endl;
       const bool other_player_did_raise = (continue_cost > 0);
 
       // If other player DID raise, consider reraising.
       if (other_player_did_raise) {
+        std::cout << "the opponent raised on their first action" << std::endl;
         const int pot_after_call = 2 * opp_contribution;
-        const int equity = EV * pot_after_call;
-        if (equity > 3 * continue_cost) {
+        const float equity = EV * static_cast<float>(pot_after_call);
+        printf("pot_after_call=%d equity=%f\n", pot_after_call, equity);
+        if (equity > 3.0f * continue_cost) {
+          std::cout << "2A: equity > 3*continue, doing 3BB raise" << std::endl;
           return RaiseAction(3 * BIG_BLIND);
-        } else if (equity > 2 * continue_cost) {
+        } else if (equity > 2.0f * continue_cost) {
+          std::cout << "2B: equity > 2*continue, calling" << std::endl;
           return CallAction();
         } else {
+          std::cout << "2C: other player raised but equity not high enough, folding" << std::endl;
           return FoldAction();
         }
       
       // Other player called but didn't raise.
       } else {
+        std::cout << "we are BB, the opponent called their first action" << std::endl;
         // Try to make the other player fold.
-        if (EV >= 0.75 && raise_is_allowed) {
-          return RaiseAction(2 * BIG_BLIND);
-        } else if (EV > 0.90 && raise_is_allowed) {
+        if (EV >= 0.90 && raise_is_allowed) {
+          std::cout << "2D: really good EV, raising 6BB" << std::endl;
+          return RaiseAction(6 * BIG_BLIND);
+        } else if (EV > 0.75 && raise_is_allowed) {
+          std::cout << "2E: good EV, raising 4BB" << std::endl;
           return RaiseAction(4 * BIG_BLIND);
+        } else if (EV > 0.65 && raise_is_allowed) {
+          std::cout << "2F: OK EV, raising 3BB" << std::endl;
+          return RaiseAction(3 * BIG_BLIND);
         } else {
+          std::cout << "2G: EV not high enough to raise, checking" << std::endl;
           return CheckAction();
         }
       }
@@ -225,42 +258,48 @@ Action Player::HandleActionPreflop(float EV, int round_num, int street, int pot_
   
   // Not our first action, limit the number of re-raises we'll do.
   } else {
-    // const int num_betting_rounds = next_action_idx_ / 2;
-    const int num_betting_rounds = history_.NumBettingRounds();
-    printf("Num bettings rounds so far: %d\n", num_betting_rounds);
-
-    // CASE 3: Not our first action, must pay to continue.
     const bool other_player_did_raise = (continue_cost > 0);
+  
+    // CASE 3: Not our first action, must pay to continue.
     if (other_player_did_raise) {
-      printf("Not first action, other player RAISED\n");
+      std::cout << "PREFLOP_3: not our first action, call required" << std::endl;
       const int pot_after_call = 2 * opp_contribution;
-      const int equity = EV * pot_after_call;
+      const float equity = EV * static_cast<float>(pot_after_call);
       
       // Raise again only if pot odds are really good.
-      if (equity > 5 * continue_cost) {
-        return RaiseAction(2 * BIG_BLIND);
+      if (equity > 8.0f * continue_cost) {
+        std::cout << "3A: great pot odds (8:1), 6BB raise" << std::endl;
+        return raise_is_allowed ? RaiseAction(6 * BIG_BLIND) : CallAction();
     
       // Otherwise, stay in it if it's barely worth it.
-      } else if (equity > continue_cost) {
+      } else if (equity > 5.0f * continue_cost) {
+        std::cout << "3B: good pot odds (5:1), raising 2BB" << std::endl;
+        return raise_is_allowed ? RaiseAction(2 * BIG_BLIND) : CallAction();
+      } else if (equity > 2.0f * continue_cost) {
         return CallAction();
       } else {
+        std::cout << "3C: equity not good enough to continue, folding" << std::endl;
         return FoldAction();
       }
     
     // CASE 4: Not our first action, don't need to pay to continue.
     } else {
-      printf("Not first action, other player CHECKED/CALLED\n");
-      // const int num_betting_rounds = next_action_idx_ / 2;
-      const int num_betting_rounds = history_.NumBettingRounds();
-      if (num_betting_rounds > 3) {
+      std::cout << "PREFLOP_4: not our first action, call not required" << std::endl;
+
+      // If we've already increased the pot 4 times, just check.
+      if (num_betting_rounds >= 4) {
+        std::cout << "already done 4 betting actions on preflop, just checking" << std::endl;
         return CheckAction();
       } else {
         // Try to make the other player fold.
-        if (EV >= 0.75 && raise_is_allowed) {
-          return RaiseAction(2 * BIG_BLIND);
-        } else if (EV > 0.90 && raise_is_allowed) {
+        if (EV >= 0.80 && raise_is_allowed) {
+          std::cout << "4A: great EV, doing 6BB bet" << std::endl;
+          return RaiseAction(6 * BIG_BLIND);
+        } else if (EV > 0.70 && raise_is_allowed) {
+          std::cout << "4B: good EV, doing 4BB bet" << std::endl;
           return RaiseAction(4 * BIG_BLIND);
         } else {
+          std::cout << "4C: EV not good enough to bet, just checking" << std::endl;
           return CheckAction();
         }
       }
@@ -275,54 +314,85 @@ Action Player::HandleActionFlop(float EV, int round_num, int street, int pot_siz
                                 int continue_cost, int legal_actions, int min_raise,
                                 int max_raise, int my_contribution, int opp_contribution,
                                 bool is_big_blind) {
+  std::cout << "Getting a FLOP action" << std::endl;
   const bool check_is_allowed = CHECK_ACTION_TYPE & legal_actions;
   const bool raise_is_allowed = RAISE_ACTION_TYPE & legal_actions;
-  // printf("check_is_allowed=%d | raise_is_allowed=%d\n", check_is_allowed, raise_is_allowed);
 
-  // Don't need to pay to continue.
-  if (check_is_allowed) {
-    // Just check if neutral odds.
-    if (EV < 0.6 || !raise_is_allowed) {
-      std::cout << "[CONVERGED] (CheckAllowed) EV < 0.6 || !raise_is_allowed ==> CheckAction" << std::endl;
-      return CheckAction();
-  
-    // If EV is pretty good (60-80%), do a pot raise.
-    } else if (EV <= 0.8) {
-      const int raise_amt = MakeRelativeBet(1.0, pot_size, min_raise, max_raise);
-      std::cout << "[CONVERGED] (CheckAllowed) EV <= 0.8 ==> PotRaise" << std::endl;
-      return RaiseAction(raise_amt);
-
-    // If EV above 0.8, do two pot raise.
-    } else {
-      const int raise_amt = MakeRelativeBet(2.0, pot_size, min_raise, max_raise);
-      std::cout << "[CONVERGED] (CheckAllowed) EV above 0.8 ==> TwoPotRaise" << std::endl;
-      return RaiseAction(raise_amt);
-    }
-
-  // Must pay to continue.
-  } else {
-    const int pot_after_call = 2 * opp_contribution;
-    const int equity = EV * pot_after_call;
-    printf("[CONVERGED] Call equity | equity=%d | pot_after_call=%d | continue_cost=%d\n", equity, pot_after_call, continue_cost);
-
-    // Not worth it to continue.
-    if (equity < (1.8 * continue_cost)) {
-      std::cout << "[CONVERGED] (CallRequired) not worth it ==> FoldAction" << std::endl;
-      return FoldAction();
-
-    // Worth it - do bet sizing.
-    } else {
-      if (EV >= 0.7) {
-        const int raise_amt = MakeRelativeBet(1.0, pot_size, min_raise, max_raise);
-        std::cout << "[CONVERGED] (CallRequired) worth it, EV >= 0.7 ==> PotRaise" << std::endl;
-        return raise_is_allowed ? RaiseAction(raise_amt) : CallAction();
-      } else if (EV >= 0.9) {
-        const int raise_amt = MakeRelativeBet(2.0, pot_size, min_raise, max_raise);
-        std::cout << "[CONVERGED] (CallRequired) worth it, EV >= 0.9 ==> TwoPotRaise" << std::endl;
-        return raise_is_allowed ? RaiseAction(raise_amt) : CallAction();
+  if (!is_big_blind) {
+    // CASE 1: If the opponent checked the flop, they probably don't have anything too good.
+    if (check_is_allowed) {
+      // EV isn't very good, consider trying to fold out the opponent.
+      if (EV < 0.5) {
+        // i.e if EV is 30%, bluff it 30% of the time.
+        const bool do_bluff_raise = real_(gen_) < EV;
+        if (do_bluff_raise) {
+          std::cout << "1A: opponent checked on the FLOP, randomly chose to BLUFF" << std::endl;
+          const int amt = MakeRelativeBet(2.0f, pot_size, min_raise, max_raise);
+          return raise_is_allowed ? RaiseAction(amt) : CheckAction();
+        } else {
+          std::cout << "1B: opponent checked on the FLOP, randomly chose to CHECK" << std::endl;
+          return CheckAction();
+        }
+      } else if (EV > 0.9) {
+        const int amt = MakeRelativeBet(3.0f, pot_size, min_raise, max_raise);
+        std::cout << "1C: really good EV, 3pot bet" << std::endl;
+        return raise_is_allowed ? RaiseAction(amt) : CheckAction();
+      } else if (EV > 0.7) {
+        std::cout << "1D: pretty good EV, pot bet" << std::endl;
+        const int amt = MakeRelativeBet(1.0f, pot_size, min_raise, max_raise);
+        return raise_is_allowed ? RaiseAction(amt) : CheckAction();
       } else {
-        std::cout << "[CONVERGED] (CallRequired) worth it, but EV not >= 0.7 ==> CallAction" << std::endl;
+        std::cout << "1E: middle EV, check" << std::endl;
+        return CheckAction();
+      }
+    
+    // CASE 2: The opponent bet on the flop, they probably have something good?
+    } else {
+      const int pot_after_call = 2 * opp_contribution;
+      const float equity = EV * static_cast<float>(pot_after_call);
+
+      if (equity > 4*continue_cost) {
+        std::cout << "2A: great pot odds, pot raise" << std::endl;
+        const int amt = MakeRelativeBet(1.0f, pot_size, min_raise, max_raise);
+        return raise_is_allowed ? RaiseAction(amt) : CallAction();
+      } else if (equity > 1.3*continue_cost) {
+        std::cout << "2B: pretty good pot odds, just call" << std::endl;
         return CallAction();
+      } else {
+        std::cout << "2C: not good pot odds, fold" << std::endl;
+        return FoldAction();
+      }
+    }
+  } else {
+    // CASE 3: We are BB and this is the FIRST action.
+    if (check_is_allowed) {
+      if (EV > 0.8) {
+        std::cout << "3A: great EV, 2pot raise" << std::endl;
+        const int amt = MakeRelativeBet(2.0f, pot_size, min_raise, max_raise);
+        return raise_is_allowed ? RaiseAction(amt) : CheckAction();
+      } else if (EV > 0.7) {
+        std::cout << "3B: good EV, pot raise" << std::endl;
+        const int amt = MakeRelativeBet(1.0f, pot_size, min_raise, max_raise);
+        return raise_is_allowed ? RaiseAction(amt) : CheckAction();
+      } else {
+        return CheckAction();
+      }
+    
+    // CASE 4: We are BB and this is not the FIRST action - opponent must have bet or raised.
+    } else {
+      const int pot_after_call = 2 * opp_contribution;
+      const float equity = EV * static_cast<float>(pot_after_call);
+
+      if (equity > 4*continue_cost) {
+        std::cout << "4A: great pot odds (4:1), pot raise" << std::endl;
+        const int amt = MakeRelativeBet(2.0f, pot_size, min_raise, max_raise);
+        return raise_is_allowed ? RaiseAction(amt) : CallAction();
+      } else if (equity > 2*continue_cost) {
+        std::cout << "4B: pretty good (2:1) pot odds, just call" << std::endl;
+        return CallAction();
+      } else {
+        std::cout << "4C: not good pot odds, fold" << std::endl;
+        return FoldAction();
       }
     }
   }
@@ -337,53 +407,46 @@ Action Player::HandleActionTurn(float EV, int round_num, int street, int pot_siz
                                 bool is_big_blind) {
   const bool check_is_allowed = CHECK_ACTION_TYPE & legal_actions;
   const bool raise_is_allowed = RAISE_ACTION_TYPE & legal_actions;
-  // printf("check_is_allowed=%d | raise_is_allowed=%d\n", check_is_allowed, raise_is_allowed);
 
   // Don't need to pay to continue.
   if (check_is_allowed) {
     // Just check if neutral odds.
-    if (EV < 0.6 || !raise_is_allowed) {
-      std::cout << "[CONVERGED] (CheckAllowed) EV < 0.6 || !raise_is_allowed ==> CheckAction" << std::endl;
+    if (EV < 0.7 || !raise_is_allowed) {
+      std::cout << "1A: (CheckAllowed) EV < 0.6 || !raise_is_allowed ==> CheckAction" << std::endl;
       return CheckAction();
   
     // If EV is pretty good (60-80%), do a pot raise.
-    } else if (EV <= 0.8) {
+    } else if (EV <= 0.85) {
       const int raise_amt = MakeRelativeBet(1.0, pot_size, min_raise, max_raise);
-      std::cout << "[CONVERGED] (CheckAllowed) EV <= 0.8 ==> PotRaise" << std::endl;
+      std::cout << "1B: (CheckAllowed) EV <= 0.8 ==> PotRaise" << std::endl;
       return RaiseAction(raise_amt);
 
     // If EV above 0.8, do two pot raise.
     } else {
       const int raise_amt = MakeRelativeBet(2.0, pot_size, min_raise, max_raise);
-      std::cout << "[CONVERGED] (CheckAllowed) EV above 0.8 ==> TwoPotRaise" << std::endl;
+      std::cout << "1C: (CheckAllowed) EV above 0.8 ==> TwoPotRaise" << std::endl;
       return RaiseAction(raise_amt);
     }
 
   // Must pay to continue.
   } else {
     const int pot_after_call = 2 * opp_contribution;
-    const int equity = EV * pot_after_call;
-    printf("[CONVERGED] Call equity | equity=%d | pot_after_call=%d | continue_cost=%d\n", equity, pot_after_call, continue_cost);
+    const float equity = EV * static_cast<float>(pot_after_call);
 
-    // Not worth it to continue.
-    if (equity < (1.8 * continue_cost)) {
-      std::cout << "[CONVERGED] (CallRequired) not worth it ==> FoldAction" << std::endl;
-      return FoldAction();
-
-    // Worth it - do bet sizing.
+    if (EV > 0.90) {
+      std::cout << "2A: really high EV, 2pot raise" << std::endl;
+      const int amt = MakeRelativeBet(2.0f, pot_size, min_raise, max_raise);
+      return raise_is_allowed ? RaiseAction(amt) : CallAction();
+    } else if (EV > 0.80) {
+      std::cout << "2B: pretty high EV, pot raise" << std::endl;
+      const int amt = MakeRelativeBet(1.0f, pot_size, min_raise, max_raise);
+      return raise_is_allowed ? RaiseAction(amt) : CallAction();
+    } else if (equity > 2*continue_cost) {
+      std::cout << "2C: good enough pot odds (2:1), calling" << std::endl;
+      return CallAction();
     } else {
-      if (EV >= 0.7) {
-        const int raise_amt = MakeRelativeBet(1.0, pot_size, min_raise, max_raise);
-        std::cout << "[CONVERGED] (CallRequired) worth it, EV >= 0.7 ==> PotRaise" << std::endl;
-        return raise_is_allowed ? RaiseAction(raise_amt) : CallAction();
-      } else if (EV >= 0.9) {
-        const int raise_amt = MakeRelativeBet(2.0, pot_size, min_raise, max_raise);
-        std::cout << "[CONVERGED] (CallRequired) worth it, EV >= 0.9 ==> TwoPotRaise" << std::endl;
-        return raise_is_allowed ? RaiseAction(raise_amt) : CallAction();
-      } else {
-        std::cout << "[CONVERGED] (CallRequired) worth it, but EV not >= 0.7 ==> CallAction" << std::endl;
-        return CallAction();
-      }
+      std::cout << "pot odds not good enough, folding" << std::endl;
+      return FoldAction();
     }
   }
 

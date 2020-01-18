@@ -43,18 +43,18 @@ if (NOT BUILD_PYTHON_WRAPPER)
             ${CMAKE_SOURCE_DIR}/pokerbots_cpp_python/preflop_equity.txt
             ${CMAKE_CURRENT_BINARY_DIR}/preflop_equity.txt)
 
-  enable_testing()  
-  set(TEST_SOURCES
-    history_tracker.cpp
-    history_tracker.hpp
-    test_history_tracker.cpp)
+  # enable_testing()  
+  # set(TEST_SOURCES
+  #   history_tracker.cpp
+  #   history_tracker.hpp
+  #   test_history_tracker.cpp)
 
-  # Make a single executable for all tests.
-  # Can use --gtest_filter option to run specific tests.
-  add_executable(run_tests ${TEST_SOURCES} ./pokerbots_cpp_python/gtest/gtest-all.cc)
-  target_link_libraries(run_tests
-    ${PROJECT_NAME}
-    pthread)
-  set_target_properties(run_tests PROPERTIES COMPILE_FLAGS "-std=c++11")
-  add_test(NAME run_tests COMMAND run_tests --gtest_color=yes)
+  # # Make a single executable for all tests.
+  # # Can use --gtest_filter option to run specific tests.
+  # add_executable(run_tests ${TEST_SOURCES} ./pokerbots_cpp_python/gtest/gtest-all.cc)
+  # target_link_libraries(run_tests
+  #   ${PROJECT_NAME}
+  #   pthread)
+  # set_target_properties(run_tests PROPERTIES COMPILE_FLAGS "-std=c++11")
+  # add_test(NAME run_tests COMMAND run_tests --gtest_color=yes)
 endif()

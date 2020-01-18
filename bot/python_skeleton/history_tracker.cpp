@@ -3,10 +3,6 @@
 
 namespace pb {
 
-static int GetStreet0123(const int street_sz) {
-  return street_sz == 0 ? 0 : (street_sz - 2);
-}
-
 void HistoryTracker::Update(int my_contrib, int opp_contrib, int street) {
   const bool did_start_new_street = (prev_street_ != street);
 
@@ -91,9 +87,11 @@ std::pair<BettingInfo, BettingInfo> HistoryTracker::GetBettingInfo(int street) c
   BettingInfo ply;
   BettingInfo opp;
   const int player_parity = (street == 0) ? is_big_blind_ : !is_big_blind_;
+  const int start_idx = kMaxActionsPerStreet * GetStreet0123(street);
+  const int end_idx = start_idx + kMaxActionsPerStreet;
 
   std::array<int, 2> pips = { 0, 0 };
-  for (int i = kMaxActionsPerStreet*street; i < kMaxActionsPerStreet*(street+1); ++i) {
+  for (int i = start_idx; i < end_idx; ++i) {
     const int add_amt = history_.at(i);
     if ((i % 2) == player_parity) {
       if (i >= 2) {
