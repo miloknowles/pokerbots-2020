@@ -4,6 +4,7 @@ from engine import FoldAction, CallAction, CheckAction, RaiseAction
 
 import torch
 
+
 class TraverseTest(unittest.TestCase):
   def test_create_new_round(self):
     for sb_index in (0, 1):
@@ -85,8 +86,6 @@ class TraverseTest(unittest.TestCase):
     terminal_state = round_state.proceed(CheckAction())
     self.assertEqual(terminal_state.previous_state.bet_history, [[1, 2, 1, 6, 12, 6], [0, 10, 10], [31, 31], [0, 0]])
 
-  def test_make_actions(self):
-    pass
 
 if __name__ == "__main__":
   unittest.main()

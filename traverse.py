@@ -15,8 +15,15 @@ from engine import RoundState, FoldAction, CallAction, CheckAction, RaiseAction,
 
 
 def make_infoset(round_state, player_is_sb):
-  pass
-  # infoset = EvInfoSet(ev, bet_history_vec, player_is_sb)
+  h =  torch.zeros(Constants.NUM_BETTING_ACTIONS)
+  for street, actions in enumerate(round_state.bet_history):
+    offset = street * Constants.NUM_BETTING_ACTIONS
+    for i, add_amt in enumerate(actions):
+      h[offset + i] = add_amt
+  
+  
+
+  return EvInfoSet(ev, h, player_is_sb)
 
 
 def make_actions(round_state):
