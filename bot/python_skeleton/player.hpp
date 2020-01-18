@@ -18,7 +18,7 @@ namespace pb {
 class Player : public Bot {
   private:
     PermutationFilter pf_{25000};
-    int compute_ev_samples_ = 3;
+    int compute_ev_samples_ = 2;
     int compute_ev_iters_ = 2000;
 
     int num_showdowns_seen_ = 0;
