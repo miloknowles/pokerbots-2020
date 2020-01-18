@@ -37,7 +37,7 @@ void Player::handle_new_round(GameState* game_state, RoundState* round_state, in
 
   street_ev_.clear();
   current_street_ = -1;
-  history_ = HistoryTracker(big_blind);
+  // history_ = HistoryTracker(big_blind);
 }
 
 /**
@@ -56,7 +56,7 @@ void Player::handle_round_over(GameState* game_state, TerminalState* terminal_st
   const int opp_stack = previous_state->stacks[1-active];  // the number of chips your opponent has remaining
   const int my_contribution = STARTING_STACK - my_stack;  // the number of chips you have contributed to the pot
   const int opp_contribution = STARTING_STACK - opp_stack;  // the number of chips your opponent has contributed to the pot
-  history_.Update(my_contribution, opp_contribution, street);
+  // history_.Update(my_contribution, opp_contribution, street);
 
   const std::array<std::string, 2> my_cards = previous_state->hands[active];  // your cards
   const std::array<std::string, 2> opp_cards = previous_state->hands[1-active];  // opponent's cards or "" if not revealed
@@ -96,7 +96,7 @@ void Player::handle_round_over(GameState* game_state, TerminalState* terminal_st
   }
 
   std::cout << "\n[ROUNDOVER] Final history:" << std::endl;
-  history_.Print();
+  // history_.Print();
   std::cout << std::endl;
 }
 
@@ -135,7 +135,7 @@ Action Player::get_action(GameState* game_state, RoundState* round_state, int ac
       std::cout << "*** RIVER ***" << std::endl;
     }
   }
-  history_.Update(my_contribution, opp_contribution, street);
+  // history_.Update(my_contribution, opp_contribution, street);
 
   // Check fold if no particles left.
   if (pf_.Nonzero() <= 0) {
@@ -192,8 +192,8 @@ Action Player::HandleActionPreflop(float EV, int round_num, int street, int pot_
   const bool is_our_first_action = (is_big_blind && my_contribution == BIG_BLIND) ||
                                    (!is_big_blind && my_contribution == SMALL_BLIND);
   
-  const int num_betting_rounds = history_.TotalBets(0).first;
-  printf("Num bettings rounds so far: %d\n", num_betting_rounds);
+  // const int num_betting_rounds = history_.TotalBets(0).first;
+  // printf("Num bettings rounds so far: %d\n", num_betting_rounds);
 
   if (is_our_first_action) {
     // CASE 1: First action and we are SMALLBLIND.
@@ -284,22 +284,22 @@ Action Player::HandleActionPreflop(float EV, int round_num, int street, int pot_
       std::cout << "PREFLOP_4: not our first action, call NOT required." << std::endl;
 
       // If we've already increased the pot 4 times, just check.
-      if (num_betting_rounds >= 4) {
-        std::cout << "already done 4 betting actions on preflop, just checking" << std::endl;
-        return CheckAction();
+      // if (num_betting_rounds >= 4) {
+      //   std::cout << "already done 4 betting actions on preflop, just checking" << std::endl;
+      //   return CheckAction();
+      // } else {
+      // Try to make the other player fold.
+      if (EV >= 0.80 && raise_is_allowed) {
+        std::cout << "4A: great EV, doing 8BB bet" << std::endl;
+        return RaiseAction(8 * BIG_BLIND);
+      } else if (EV > 0.70 && raise_is_allowed) {
+        std::cout << "4B: good EV, doing 4BB bet" << std::endl;
+        return RaiseAction(4 * BIG_BLIND);
       } else {
-        // Try to make the other player fold.
-        if (EV >= 0.80 && raise_is_allowed) {
-          std::cout << "4A: great EV, doing 8BB bet" << std::endl;
-          return RaiseAction(8 * BIG_BLIND);
-        } else if (EV > 0.70 && raise_is_allowed) {
-          std::cout << "4B: good EV, doing 4BB bet" << std::endl;
-          return RaiseAction(4 * BIG_BLIND);
-        } else {
-          std::cout << "4C: EV not good enough to bet, just checking" << std::endl;
-          return CheckAction();
-        }
+        std::cout << "4C: EV not good enough to bet, just checking" << std::endl;
+        return CheckAction();
       }
+      // }
     }
   }
 

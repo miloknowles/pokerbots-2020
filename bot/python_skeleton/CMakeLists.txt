@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.5.0 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.0.0 FATAL_ERROR)
 
 project(pokerbots_cpp VERSION 0.1.0 LANGUAGES CXX)
 add_compile_options(-std=c++11)
@@ -15,6 +15,10 @@ set(CMAKE_CXX_FLAGS_RELEASE "-Ofast")
 # Build our library first.
 add_subdirectory(./pokerbots_cpp_python)
 
+message(STATUS "CMAKE_HOME_DIRECTORY:")
+message(STATUS ${CMAKE_HOME_DIRECTORY})
+message(STATUS ${CMAKE_CACHEFILE_DIR})
+
 # Build the pure C++ bot.
 if (NOT BUILD_PYTHON_WRAPPER)
   message(STATUS "BUILD_PYTHON_WRAPPER is OFF, building pure C++ bot")
@@ -22,18 +26,26 @@ if (NOT BUILD_PYTHON_WRAPPER)
   include_directories(${CMAKE_CURRENT_SOURCE_DIR})
   include_directories(${CMAKE_CURRENT_SOURCE_DIR}/pokerbots_cpp_python/)
   include_directories(${CMAKE_CURRENT_SOURCE_DIR}/pokerbots_cpp_python/OMPEval)
-  add_executable(cpp_player
+  add_library(cpp_skeleton
     cpp_skeleton/actions.cpp
     cpp_skeleton/bot.hpp
     cpp_skeleton/runner.cpp
-    cpp_skeleton/states.cpp
+    cpp_skeleton/states.cpp)
+  target_link_libraries(cpp_skeleton
+    ${Boost_LIBRARIES})
+  add_executable(cpp_player
+    # cpp_skeleton/actions.cpp
+    # cpp_skeleton/bot.hpp
+    # cpp_skeleton/runner.cpp
+    # cpp_skeleton/states.cpp
     history_tracker.cpp
     history_tracker.hpp
     player.hpp
     player.cpp
     main.cpp)
   target_link_libraries(cpp_player
-    ${Boost_LIBRARIES}
+    # ${Boost_LIBRARIES}
+    cpp_skeleton
     pokerbots_cpp)
 
   # Copy necessary files to final executable directory.

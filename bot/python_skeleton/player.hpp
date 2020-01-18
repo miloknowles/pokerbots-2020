@@ -12,20 +12,18 @@
 
 namespace pb {
 
-// 4 betting actions per player.
-// static constexpr int kMaxActionsPerStreet = 8;
 
 class Player : public Bot {
   private:
     PermutationFilter pf_{25000};
-    int compute_ev_samples_ = 2;
+    int compute_ev_samples_ = 3;
     int compute_ev_iters_ = 2000;
 
     int num_showdowns_seen_ = 0;
     int num_showdowns_converge_ = 50;
 
     int current_street_ = -1;
-    HistoryTracker history_{false};
+    // HistoryTracker history_{false};
 
     // Keep track of some info for betting.
     std::unordered_map<int, float> street_ev_{};

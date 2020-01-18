@@ -17,7 +17,7 @@ add_library(${PROJECT_NAME} SHARED
   # OMPEval/omp/EquityCalculator.h
   OMPEval/omp/Hand.h
   OMPEval/omp/HandEvaluator.cpp
-  OMPEval/omp/HandEvaluator.h
+  # OMPEval/omp/HandEvaluator.h
   # OMPEval/omp/Random.h
   # OMPEval/omp/Util.h
   OMPEval/libdivide/libdivide.h
