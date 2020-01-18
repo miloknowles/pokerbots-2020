@@ -2,7 +2,7 @@ import torch
 from torch.utils.data import Dataset
 
 from memory_buffer import *
-from infoset import unpack_infoset
+from infoset import unpack_ev_infoset
 
 
 class MemoryBufferDataset(Dataset):
@@ -65,18 +65,26 @@ class MemoryBufferDataset(Dataset):
     return min(self._n, self._N)
 
   def __getitem__(self, idx):
-    infoset = unpack_infoset(self._infosets[idx])
+    infoset = unpack_ev_infoset(self._infosets[idx])
 
-    hole_cards, board_cards = infoset.get_card_input_tensors()
+    # hole_cards, board_cards = infoset.get_card_input_tensors()
+    ev_input = infoset.get_ev_input_tensors()
 
     # NOTE(milo): This function unsqueezes the first dim for traversal, but the DataLoader will
     # add another batch dimension anyways.
     bets_input, position_mask = infoset.get_bet_input_tensors()
     bets_input = bets_input * position_mask
 
+    # return {
+    #   "hole_cards": hole_cards.squeeze(0),
+    #   "board_cards": board_cards.squeeze(0),
+    #   "bets_input": bets_input.squeeze(0),
+    #   "weights": self._weights[idx].unsqueeze(0),
+    #   "target": self._items[idx]
+    # }
+
     return {
-      "hole_cards": hole_cards.squeeze(0),
-      "board_cards": board_cards.squeeze(0),
+      "ev_input": ev_input.squeeze(0),
       "bets_input": bets_input.squeeze(0),
       "weights": self._weights[idx].unsqueeze(0),
       "target": self._items[idx]
