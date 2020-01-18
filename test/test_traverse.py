@@ -86,6 +86,35 @@ class TraverseTest(unittest.TestCase):
     terminal_state = round_state.proceed(CheckAction())
     self.assertEqual(terminal_state.previous_state.bet_history, [[1, 2, 1, 6, 12, 6], [0, 10, 10], [31, 31], [0, 0]])
 
+    infoset = make_infoset(round_state, 0, True)
+    self.assertEqual(infoset.player_position, 0)
+    expected_history = torch.Tensor([1, 2, 1, 6, 12, 6, 0, 10, 10, 0, 0, 0, 31, 31, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+    self.assertTrue((expected_history == infoset.bet_history_vec).all())
+    print(infoset.bet_history_vec)
+
+  def test_bet_history_wraps(self):
+    # P2 is the small blind.
+    sb_index = 1
+    round_state = create_new_round(sb_index)
+
+    # SB calls, BB checks.
+    round_state = round_state.proceed(CallAction())
+
+    # Do 8 bets/raises to exceed the max 6 actions.
+    round_state = round_state.proceed(RaiseAction(2))
+    round_state = round_state.proceed(RaiseAction(4))
+    round_state = round_state.proceed(RaiseAction(6))
+    round_state = round_state.proceed(RaiseAction(8))
+    round_state = round_state.proceed(RaiseAction(10))
+    round_state = round_state.proceed(RaiseAction(12))
+    round_state = round_state.proceed(RaiseAction(14))
+    round_state = round_state.proceed(RaiseAction(16))
+    round_state = round_state.proceed(CallAction())
+    
+    infoset = make_infoset(round_state, 0, False)
+    expected = torch.Tensor([1, 2, 1, 0, 0, 0, 2, 4, 4, 4, 10, 8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+    self.assertTrue((infoset.bet_history_vec == expected).all())
+    print(infoset.bet_history_vec)
 
 if __name__ == "__main__":
   unittest.main()

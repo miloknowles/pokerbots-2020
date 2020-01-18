@@ -11,19 +11,28 @@ from utils import sample_uniform_action
 from infoset import EvInfoSet
 
 import eval7
+from pbots_calc import calc
 from engine import RoundState, FoldAction, CallAction, CheckAction, RaiseAction, TerminalState
 
 
-def make_infoset(round_state, player_is_sb):
-  h =  torch.zeros(Constants.NUM_BETTING_ACTIONS)
-  for street, actions in enumerate(round_state.bet_history):
-    offset = street * Constants.NUM_BETTING_ACTIONS
-    for i, add_amt in enumerate(actions):
-      h[offset + i] = add_amt
-  
-  
+def get_street_0123(s):
+  return 0 if s == 0 else s - 2
 
-  return EvInfoSet(ev, h, player_is_sb)
+
+def make_infoset(round_state, player_idx, player_is_sb):
+  h =  torch.zeros(Constants.NUM_BETTING_ACTIONS)
+  print(round_state.bet_history)
+  for street, actions in enumerate(round_state.bet_history):
+    offset = street * Constants.STREET_OFFSET
+    for i, add_amt in enumerate(actions):
+      i = min(i, Constants.STREET_OFFSET - 2 + i % 2)
+      h[offset + i] += add_amt
+  
+  hand = "{}:xx".format(str(round_state.hands[player_idx][0]) + str(round_state.hands[player_idx][1]))
+  board = "".join([str(c) for c in round_state.deck.peek(round_state.street)])
+  ev = calc(str.encode(hand), str.encode(board), b"", 10000).ev[0]
+
+  return EvInfoSet(ev, h, 0 if player_is_sb else 1)
 
 
 def make_actions(round_state):
