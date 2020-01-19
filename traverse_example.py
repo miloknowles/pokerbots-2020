@@ -64,9 +64,9 @@ def traverse_multiple(worker_id, traverse_player, strategies, t, save_lock):
 if __name__ == '__main__':
   opt = Options().parse_default()
 
-  p1_strategy = NetworkWrapper(4, Constants.NUM_BETTING_ACTIONS, Constants.NUM_ACTIONS, opt.EMBED_DIM,
+  p1_strategy = NetworkWrapper(4, Constants.BET_HISTORY_SIZE, Constants.NUM_ACTIONS, opt.EMBED_DIM,
                                 torch.device("cuda:0" if torch.cuda.device_count() >= 2 else "cuda"))
-  p2_strategy = NetworkWrapper(4, Constants.NUM_BETTING_ACTIONS, Constants.NUM_ACTIONS, opt.EMBED_DIM,
+  p2_strategy = NetworkWrapper(4, Constants.BET_HISTORY_SIZE, Constants.NUM_ACTIONS, opt.EMBED_DIM,
                                 torch.device("cuda:1" if torch.cuda.device_count() >= 2 else "cuda"))
 
   p1_strategy._network.share_memory()

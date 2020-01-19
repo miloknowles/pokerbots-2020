@@ -9,7 +9,7 @@ from trainer import make_infoset, make_infoset_helper, generate_actions
 
 class DeepCFRPlayer(BasePokerPlayer):
   def __init__(self, load_weights_path):
-    self.wrap = NetworkWrapper(Constants.NUM_STREETS, Constants.NUM_BETTING_ACTIONS,
+    self.wrap = NetworkWrapper(Constants.NUM_STREETS, Constants.BET_HISTORY_SIZE,
                                Constants.NUM_ACTIONS, 64, device=torch.device("cuda:0"))
 
     if load_weights_path is not None:

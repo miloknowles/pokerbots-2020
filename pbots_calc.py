@@ -26,6 +26,7 @@ function provided by pbots_calc. Returns a Results object.
 import ctypes
 import ctypes.util
 import sys, os
+import pickle
 
 # if 'LD_LIBRARY_PATH' not in os.environ:
 #     os.environ['LD_LIBRARY_PATH'] = os.path.dirname(os.path.abspath(__file__))
@@ -82,6 +83,31 @@ def calc(hands, board, dead, iters):
         results = None
     pcalc.free_results(res)
     return results
+
+
+class CalcWithLookup(object):
+    def __init__(self):
+        with open("./preflop_odds.pkl", "rb") as f:
+            self.preflop_odds = pickle.load(f)
+        # self.preflop_odds = pickle.load(open('./preflop_odds.pkl','rb'))
+    
+    def calc(self, hand, board, dead, iters):
+        """
+        hand: list of cards strings, i.e ['Kd', 'As']
+        """
+        if len(board) == 0:
+            return self.preflop_odds[frozenset(hand)]
+        else:
+            hands = str.encode("{}:xx".format("".join(hand)))
+            res = pcalc.alloc_results()
+            err = pcalc.calc(hands, board, dead, iters, res)
+            if err > 0:
+                results = Results(res[0])
+            else:
+                print("error: could not parse input or something...")
+                results = None
+            pcalc.free_results(res)
+            return results.ev[0]
 
 
 if __name__ == "__main__":

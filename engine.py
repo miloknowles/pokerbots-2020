@@ -1,11 +1,8 @@
-'''
-6.176 MIT POKERBOTS GAME ENGINE
-DO NOT REMOVE, RENAME, OR EDIT THIS FILE
-'''
 from numpy.random import geometric
 from collections import namedtuple
 from threading import Thread
 from queue import Queue
+from copy import deepcopy
 import time
 import json
 import subprocess
@@ -14,22 +11,15 @@ import eval7
 import sys
 import os
 
+
 SMALL_BLIND = 1
 BIG_BLIND = 2
 STARTING_STACK = 200
 
-# NOTE: no perm, this is the identity.
-# PERM = {eval7.Card(values[i % 13] + suits[i // 13]) :
-#                 eval7.Card(perm[i % 13] + suits[i // 13])
-#                 for i in range(52)}
-
-# sys.path.append(os.getcwd())
-# from config import *
 
 FoldAction = namedtuple('FoldAction', [])
 CallAction = namedtuple('CallAction', [])
 CheckAction = namedtuple('CheckAction', [])
-# we coalesce BetAction and RaiseAction for convenience
 RaiseAction = namedtuple('RaiseAction', ['amount'])
 TerminalState = namedtuple('TerminalState', ['deltas', 'previous_state'])
 
@@ -39,26 +29,6 @@ CCARDS = lambda cards: ','.join(map(str, cards))
 PCARDS = lambda cards: '{} [{}]'.format(' '.join(map(str, cards)), ' '.join(map(str, map(PERM.get, cards))))
 PVALUE = lambda name, value: ', {} ({})'.format(name, value)
 STATUS = lambda players: ''.join([PVALUE(p.name, p.bankroll) for p in players])
-
-# Socket encoding scheme:
-#
-# T#.### the player's game clock
-# P# the player's index
-# H**,** the player's hand in common format
-# F a fold action in the round history
-# C a call action in the round history
-# K a check action in the round history
-# R### a raise action in the round history
-# B**,**,**,**,** the board cards in common format
-# O**,** the opponent's hand in common format
-# D### the player's bankroll delta from the round
-# Q game over
-#
-# Clauses are separated by spaces
-# Messages end with '\n'
-# The engine expects a response of K at the end of the round as an ack,
-# otherwise a response which encodes the player's action
-# Action history is sent once, including the player's actions
 
 
 class RoundState(namedtuple('_RoundState', ['button', 'street', 'pips', 'stacks', 'hands', 'deck', 'previous_state', 'bet_history'])):
@@ -164,6 +134,9 @@ class RoundState(namedtuple('_RoundState', ['button', 'street', 'pips', 'stacks'
         new_pips[active] += contribution
         return RoundState(self.button + 1, self.street, new_pips, new_stacks, self.hands, self.deck, self, self.bet_history)
 
+    def copy(self):
+        return RoundState(self.button, self.street, deepcopy(self.pips), deepcopy(self.stacks),
+                          self.hands, self.deck, self.previous_state, deepcopy(self.bet_history))
 
 # class Game():
 #     '''

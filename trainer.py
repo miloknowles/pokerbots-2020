@@ -32,7 +32,7 @@ def make_infoset_helper(hole_suit_rank, round_state):
   # NOTE(milo): PyPokerEngine encodes cards with rank-suit i.e CJ.
   board_suit_rank = round_state["community_card"]
 
-  bet_history_vec = torch.zeros(Constants.NUM_BETTING_ACTIONS)
+  bet_history_vec = torch.zeros(Constants.BET_HISTORY_SIZE)
   h = round_state["action_histories"]
   
   # Always start out with SB + BB in the pot.
@@ -41,10 +41,10 @@ def make_infoset_helper(hole_suit_rank, round_state):
     if street in h:
       for i, action in enumerate(h[street]):
         # Skip actions if they exceed the number of betting actions we consider.
-        if (street_num * Constants.STREET_OFFSET + i) >= len(bet_history_vec):
+        if (street_num * Constants.BET_ACTIONS_PER_STREET + i) >= len(bet_history_vec):
           continue
         # Percentage of CURRENT pot.
-        bet_history_vec[street_num * Constants.STREET_OFFSET + i] = action["amount"] / pot_total
+        bet_history_vec[street_num * Constants.BET_ACTIONS_PER_STREET + i] = action["amount"] / pot_total
         pot_total += action["amount"]
 
   infoset = InfoSet(
@@ -171,9 +171,9 @@ class Trainer(object):
     self.opt = opt
 
     self.value_networks = {
-      Constants.PLAYER1_UID: NetworkWrapper(Constants.NUM_STREETS, Constants.NUM_BETTING_ACTIONS,
+      Constants.PLAYER1_UID: NetworkWrapper(Constants.NUM_STREETS, Constants.BET_HISTORY_SIZE,
                                             Constants.NUM_ACTIONS, opt.EMBED_DIM, device=opt.DEVICE),
-      Constants.PLAYER2_UID: NetworkWrapper(Constants.NUM_STREETS, Constants.NUM_BETTING_ACTIONS,
+      Constants.PLAYER2_UID: NetworkWrapper(Constants.NUM_STREETS, Constants.BET_HISTORY_SIZE,
                                             Constants.NUM_ACTIONS, opt.EMBED_DIM, device=opt.DEVICE)
     }
     self.value_networks[Constants.PLAYER1_UID]._network.share_memory()
@@ -181,7 +181,7 @@ class Trainer(object):
     print("[DONE] Made value networks")
 
     # TODO(milo): Does this need to be different than the value networks?
-    self.strategy_network = NetworkWrapper(Constants.NUM_STREETS, Constants.NUM_BETTING_ACTIONS,
+    self.strategy_network = NetworkWrapper(Constants.NUM_STREETS, Constants.BET_HISTORY_SIZE,
                                            Constants.NUM_ACTIONS, opt.EMBED_DIM)
     print("[DONE] Made strategy network")
 
@@ -241,7 +241,7 @@ class Trainer(object):
 
     # This causes the network to be reset.
     model_wrap = self.value_networks[traverse_player]
-    model_wrap = NetworkWrapper(Constants.NUM_STREETS, Constants.NUM_BETTING_ACTIONS,
+    model_wrap = NetworkWrapper(Constants.NUM_STREETS, Constants.BET_HISTORY_SIZE,
                                 Constants.NUM_ACTIONS, self.opt.EMBED_DIM, device=self.opt.DEVICE)
 
     net = model_wrap.network()

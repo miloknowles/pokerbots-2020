@@ -51,11 +51,11 @@ def traverse_multiple(worker_id, traverse_player, strategies, advantage_mem, str
 if __name__ == '__main__':
   ray.init()
 
-  p1_strategy = RayNetworkWrapper.remote(4, Constants.NUM_BETTING_ACTIONS, Constants.NUM_ACTIONS, 128, torch.device("cuda"))
-  p2_strategy = RayNetworkWrapper.remote(4, Constants.NUM_BETTING_ACTIONS, Constants.NUM_ACTIONS, 128, torch.device("cuda"))
+  p1_strategy = RayNetworkWrapper.remote(4, Constants.BET_HISTORY_SIZE, Constants.NUM_ACTIONS, 128, torch.device("cuda"))
+  p2_strategy = RayNetworkWrapper.remote(4, Constants.BET_HISTORY_SIZE, Constants.NUM_ACTIONS, 128, torch.device("cuda"))
   # p1_strategy._network.share_memory()
   # p2_strategy._network.share_memory()
-  # net_manager = RayNetworkManager.remote(4, Constants.NUM_BETTING_ACTIONS, Constants.NUM_ACTIONS, 128, torch.device("cuda"))
+  # net_manager = RayNetworkManager.remote(4, Constants.BET_HISTORY_SIZE, Constants.NUM_ACTIONS, 128, torch.device("cuda"))
 
   # advantage_mem = MemoryBuffer(Constants.INFO_SET_SIZE, Constants.NUM_ACTIONS, max_size=1e6, store_weights=True)
   # strategy_mem = MemoryBuffer(Constants.INFO_SET_SIZE, Constants.NUM_ACTIONS, max_size=1e6, store_weights=True)

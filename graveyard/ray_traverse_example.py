@@ -52,9 +52,9 @@ def traverse_multiple(worker_id, traverse_player, strategies, advantage_mem, str
 if __name__ == '__main__':
   ray.init()
 
-  p1_strategy = RayNetworkWrapper.remote(4, Constants.NUM_BETTING_ACTIONS, Constants.NUM_ACTIONS, 128,
+  p1_strategy = RayNetworkWrapper.remote(4, Constants.BET_HISTORY_SIZE, Constants.NUM_ACTIONS, 128,
                                 torch.device("cuda:0" if torch.cuda.device_count() >= 2 else "cuda"))
-  p2_strategy = RayNetworkWrapper.remote(4, Constants.NUM_BETTING_ACTIONS, Constants.NUM_ACTIONS, 128,
+  p2_strategy = RayNetworkWrapper.remote(4, Constants.BET_HISTORY_SIZE, Constants.NUM_ACTIONS, 128,
                                 torch.device("cuda:1" if torch.cuda.device_count() >= 2 else "cuda"))
   # p1_strategy._network.share_memory()
   # p2_strategy._network.share_memory()

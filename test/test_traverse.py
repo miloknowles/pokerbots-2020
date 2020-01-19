@@ -1,6 +1,8 @@
 import unittest, time
 from traverse import *
+from network_wrapper import NetworkWrapper
 from engine import FoldAction, CallAction, CheckAction, RaiseAction
+from pbots_calc import CalcWithLookup
 
 import torch
 
@@ -115,6 +117,45 @@ class TraverseTest(unittest.TestCase):
     expected = torch.Tensor([1, 2, 1, 0, 0, 0, 2, 4, 4, 4, 10, 8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
     self.assertTrue((infoset.bet_history_vec == expected).all())
     print(infoset.bet_history_vec)
+
+  def test_traverse(self):
+    t = 0
+    sb_index = 0
+    traverse_player_idx = 0
+
+    round_state = create_new_round(sb_index)
+
+    strategies = [
+      NetworkWrapper(Constants.BET_HISTORY_SIZE, Constants.NUM_ACTIONS, 16, 256, torch.device("cpu")),
+      NetworkWrapper(Constants.BET_HISTORY_SIZE, Constants.NUM_ACTIONS, 16, 256, torch.device("cpu"))
+    ]
+
+    t0 = time.time()
+    N = 100
+    for _ in range(N):
+      ctr = [0]
+      info = traverse(round_state, make_actions, make_infoset, traverse_player_idx, sb_index, strategies, None, None, t, recursion_ctr=ctr)
+      print(ctr)
+    elapsed = time.time() - t0
+
+    print("Took {} sec for {} traversals".format(elapsed, N))
+
+  def test_ev_variance(self):
+    calculator = CalcWithLookup()
+
+    results = []
+    # Flop results:
+    # stdev is ~0.05 w/ 100 MC iters
+    # stdev is ~0.035 w/ 200 MC iters.
+    # stdev is ~0.02 w/ 500 MC iters.
+    # stdev is ~0.015 w/ 1000 MC iters.
+    for _ in range(10000):
+      results.append(calculator.calc(["3h", "Th"], b"3c7h7d8h9s", b"", 100))
+
+    variance = np.var(results)
+    stdev = np.sqrt(variance)
+    print("stdev={}".format(stdev))
+
 
 if __name__ == "__main__":
   unittest.main()

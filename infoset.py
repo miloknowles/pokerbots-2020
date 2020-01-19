@@ -30,7 +30,7 @@ class EvInfoSet(object):
   
   def get_bet_input_tensors(self):
     """
-    Returns: (torch.Tensor) with shape (batch_size x num_betting_actions).
+    Returns: (torch.Tensor) with shape (batch_size x BET_HISTORY_SIZE).
     """
     nbets = self.bet_history_vec.shape[0]
     position_mask = torch.zeros(nbets)
@@ -41,7 +41,7 @@ class EvInfoSet(object):
   def pack(self):
     """
     Packs the infoset into a compact torch.Tensor of size:
-      (1 player position, 1 ev, num_betting_actions)
+      (1 player position, 1 ev, BET_HISTORY_SIZE)
     """
     return torch.cat([
       torch.Tensor([self.player_position]),
@@ -57,7 +57,7 @@ def unpack_ev_infoset(tensor):
   player_ev = tensor[1]
   bet_history_vec = tensor[2:]
 
-  if len(bet_history_vec) != Constants.NUM_BETTING_ACTIONS:
+  if len(bet_history_vec) != Constants.BET_HISTORY_SIZE:
     raise IncompatibleInfosetException()
 
   return EvInfoSet(player_ev, bet_history_vec, player_position)

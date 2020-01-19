@@ -11,8 +11,11 @@ from utils import sample_uniform_action
 from infoset import EvInfoSet
 
 import eval7
-from pbots_calc import calc
+from pbots_calc import calc, CalcWithLookup
 from engine import RoundState, FoldAction, CallAction, CheckAction, RaiseAction, TerminalState
+
+
+EV_CALCULATOR = CalcWithLookup()
 
 
 def get_street_0123(s):
@@ -20,17 +23,36 @@ def get_street_0123(s):
 
 
 def make_infoset(round_state, player_idx, player_is_sb):
-  h =  torch.zeros(Constants.NUM_BETTING_ACTIONS)
-  print(round_state.bet_history)
+  """
+  Make an information set representation of the game state.
+
+  round_state (RoundState) : From MIT game engine.
+  player_idx (int) : 0 if P1 is acting, 1 if P2 is acting.
+  player_is_sb (bool) : Is the acting player the SB?
+  """
+  h =  torch.zeros(Constants.BET_HISTORY_SIZE)
   for street, actions in enumerate(round_state.bet_history):
-    offset = street * Constants.STREET_OFFSET
+    offset = street * Constants.BET_ACTIONS_PER_STREET
     for i, add_amt in enumerate(actions):
-      i = min(i, Constants.STREET_OFFSET - 2 + i % 2)
+      i = min(i, Constants.BET_ACTIONS_PER_STREET - 2 + i % 2)
       h[offset + i] += add_amt
   
-  hand = "{}:xx".format(str(round_state.hands[player_idx][0]) + str(round_state.hands[player_idx][1]))
+  # hand = "{}:xx".format(str(round_state.hands[player_idx][0]) + str(round_state.hands[player_idx][1]))
+  hand = [str(round_state.hands[player_idx][0]), str(round_state.hands[player_idx][1])]
   board = "".join([str(c) for c in round_state.deck.peek(round_state.street)])
-  ev = calc(str.encode(hand), str.encode(board), b"", 10000).ev[0]
+
+  # Use fewer iters on later streets.
+  if len(board) == 3:
+    iters = 500
+  elif len(board) == 4:
+    iters = 200
+  elif len(board) == 5:
+    iters = 100
+  else:
+    iters = 1
+
+  ev = EV_CALCULATOR.calc(hand, str.encode(board), b"", iters)
+  # ev = calc(str.encode(hand), str.encode(board), b"", 1000).ev[0]
 
   return EvInfoSet(ev, h, 0 if player_is_sb else 1)
 
@@ -46,11 +68,16 @@ def make_actions(round_state):
   min_raise, max_raise = round_state.raise_bounds()
   pot_size = 2*Constants.INITIAL_STACK - (round_state.stacks[0] + round_state.stacks[1])
 
+  # If we've exceeded the number of betting actions, or if doing this action would hit the limit,
+  # disable raising, forcing the bot to either fold or call.
+  bet_actions_this_street = len(round_state.bet_history[get_street_0123(round_state.street)])
+  force_fold_call = bet_actions_this_street >= (Constants.BET_ACTIONS_PER_STREET - 1)
+
   actions_mask = torch.zeros(len(Constants.ALL_ACTIONS))
   actions_unscaled = deepcopy(Constants.ALL_ACTIONS)
 
   for i,  a in enumerate(actions_unscaled):
-    if type(a) in valid_action_set:
+    if type(a) in valid_action_set and not (isinstance(a, RaiseAction) and force_fold_call):
       actions_mask[i] = 1
     if isinstance(a, RaiseAction):
       pot_size_after_call = pot_size + abs(round_state.pips[0] - round_state.pips[1])
@@ -98,8 +125,8 @@ def create_new_round(button_player):
   return round_state
 
 
-def traverse(round_state, action_generator, infoset_generator, traverse_player_idx, strategies,
-             advt_mem, strt_mem, t, recursion_ctr=[0]):
+def traverse(round_state, action_generator, infoset_generator, traverse_player_idx, sb_player_idx,
+             strategies, advt_mem, strt_mem, t, recursion_ctr=[0]):
   with torch.no_grad():
     node_info = TreeNodeInfo()
 
@@ -108,26 +135,24 @@ def traverse(round_state, action_generator, infoset_generator, traverse_player_i
   
     #================== TERMINAL NODE ====================
     if isinstance(round_state, TerminalState):
-      node_info.strategy_ev = round_state.deltas.copy()
-      node_info.best_response_ev = node_info.strategy_ev.copy()
+      node_info.strategy_ev = torch.Tensor(round_state.deltas)
+      node_info.best_response_ev = node_info.strategy_ev
       return node_info
 
-    # TODO: confirm that this matches indices
     active_player_idx = round_state.button % 2
     is_traverse_player_action = (active_player_idx == traverse_player_idx)
 
     #============== TRAVERSE PLAYER ACTION ===============
     if is_traverse_player_action:
-      # TODO
-      infoset = infoset_generator(round_state)
+      infoset = infoset_generator(round_state, traverse_player_idx, traverse_player_idx == sb_player_idx)
       actions, mask = action_generator(round_state)
 
       # Do regret matching to get action probabilities.
-      # if t == 0:
-      action_probs = strategies[traverse_player].get_action_probabilities_uniform()
-      # else:
-        # action_probs = strategies[traverse_player].get_action_probabilities(infoset, mask)
-   
+      if t == 0:
+        action_probs = strategies[traverse_player_idx].get_action_probabilities_uniform()
+      else:
+        action_probs = strategies[traverse_player_idx].get_action_probabilities(infoset, mask)
+
       action_probs = apply_mask_and_normalize(action_probs, mask)
       assert torch.allclose(action_probs.sum(), torch.ones(1))
 
@@ -135,15 +160,16 @@ def traverse(round_state, action_generator, infoset_generator, traverse_player_i
       br_values = torch.zeros(2, len(actions))
       instant_regrets = torch.zeros(len(actions))
 
-      plyr_idx = TreeNodeInfo.uuid_to_index(uuid)
+      plyr_idx = traverse_player_idx
       opp_idx = (1 - plyr_idx)
 
       for i, a in enumerate(actions):
-        if mask[i] == 0:
+        if mask[i] <= 0:
           continue
-        next_round_state = round_state.proceed(a)
-        child_node_info = traverse(next_round_state, action_generator, infoset_generator,
-                                   traverse_player_idx, strategies, advt_mem, strt_mem, t,
+        next_round_state = round_state.copy().proceed(a)
+        child_node_info = traverse(next_round_state,
+                                   action_generator, infoset_generator,
+                                   traverse_player_idx, sb_player_idx, strategies, advt_mem, strt_mem, t,
                                    recursion_ctr=recursion_ctr)
         
         # Expected value of the acting player taking this action and then continuing according to their strategy.
@@ -157,7 +183,7 @@ def traverse(round_state, action_generator, infoset_generator, traverse_player_i
       node_info.strategy_ev = (action_values * action_probs).sum(axis=1)
 
       # Compute the instantaneous regrets for the traversing player.
-      instant_regrets_tp = (action_values[tp_index] - (node_info.strategy_ev[tp_index] * mask))
+      instant_regrets_tp = (action_values[traverse_player_idx] - (node_info.strategy_ev[traverse_player_idx] * mask))
 
       # The acting player chooses the BEST action with probability 1, while the opponent best
       # response EV depends on the reach probability of their next acting situation.
@@ -176,7 +202,7 @@ def traverse(round_state, action_generator, infoset_generator, traverse_player_i
 
     #================== NON-TRAVERSE PLAYER ACTION =================
     else:
-      infoset = infoset_generator(round_state)
+      infoset = infoset_generator(round_state, other_player_idx, other_player_idx == sb_player_idx)
 
       # External sampling: choose a random action for the non-traversing player.
       actions, mask = action_generator(round_state)
@@ -193,14 +219,8 @@ def traverse(round_state, action_generator, infoset_generator, traverse_player_i
 
       # EXTERNAL SAMPLING: choose only ONE action for the non-traversal player.
       action = actions[torch.multinomial(action_probs, 1).item()]
-      next_round_state = round_state.proceed(action)
+      next_round_state = round_state.copy().proceed(action)
 
-      # NOTE(milo): Delete all events except the last one to save memory usage.
-      return traverse(next_round_state, action_generator, infoset_generator, traverse_player_idx,
+      return traverse(next_round_state,
+                      action_generator, infoset_generator, traverse_player_idx, sb_player_idx,
                       strategies, advt_mem, strt_mem, t, recursion_ctr=recursion_ctr)
-
-
-if __name__ == "__main__":
-  button_player = 0
-  round_state = create_new_round(button_player)
-  print("Initial state:", round_state)
