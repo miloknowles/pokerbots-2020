@@ -126,8 +126,8 @@ class TraverseTest(unittest.TestCase):
     round_state = create_new_round(sb_index)
 
     strategies = [
-      NetworkWrapper(Constants.BET_HISTORY_SIZE, Constants.NUM_ACTIONS, 16, 256, torch.device("cuda:0")),
-      NetworkWrapper(Constants.BET_HISTORY_SIZE, Constants.NUM_ACTIONS, 16, 256, torch.device("cuda:0"))
+      NetworkWrapper(Constants.BET_HISTORY_SIZE, Constants.NUM_ACTIONS, 8, 64, torch.device("cuda:0")),
+      NetworkWrapper(Constants.BET_HISTORY_SIZE, Constants.NUM_ACTIONS, 8, 64, torch.device("cuda:0"))
     ]
 
     t0 = time.time()

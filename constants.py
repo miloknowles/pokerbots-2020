@@ -21,16 +21,7 @@ class Constants(object):
     RaiseAction(amount=0.5),
     RaiseAction(amount=1),
     RaiseAction(amount=2),
-    # RaiseAction(amount=3)
   ]
 
   NUM_ACTIONS = len(ALL_ACTIONS)
-
-  # # Index of these actions in ALL_ACTIONS.
-  # ACTION_FOLD = 0
-  # ACTION_CALL = 1
-  # ACTION_POTRAISE = 2
-  # ACTION_TWOPOTRAISE = 3
-  # ACTION_THREEPOTRAISE = 4
-
   NUM_STREETS = 4
