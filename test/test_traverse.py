@@ -118,23 +118,26 @@ class TraverseTest(unittest.TestCase):
     self.assertTrue((infoset.bet_history_vec == expected).all())
     print(infoset.bet_history_vec)
 
-  def test_traverse(self):
-    t = 0
+  def test_traverse_timing(self):
+    t = 1
     sb_index = 0
     traverse_player_idx = 0
 
     round_state = create_new_round(sb_index)
 
     strategies = [
-      NetworkWrapper(Constants.BET_HISTORY_SIZE, Constants.NUM_ACTIONS, 16, 256, torch.device("cpu")),
-      NetworkWrapper(Constants.BET_HISTORY_SIZE, Constants.NUM_ACTIONS, 16, 256, torch.device("cpu"))
+      NetworkWrapper(Constants.BET_HISTORY_SIZE, Constants.NUM_ACTIONS, 16, 256, torch.device("cuda:0")),
+      NetworkWrapper(Constants.BET_HISTORY_SIZE, Constants.NUM_ACTIONS, 16, 256, torch.device("cuda:0"))
     ]
 
     t0 = time.time()
     N = 100
     for _ in range(N):
       ctr = [0]
-      info = traverse(round_state, make_actions, make_infoset, traverse_player_idx, sb_index, strategies, None, None, t, recursion_ctr=ctr)
+      round_state = create_new_round(sb_index)
+      precomputed_ev = make_precomputed_ev(round_state)
+      info = traverse(round_state, make_actions, make_infoset, traverse_player_idx, sb_index,
+                      strategies, None, None, t, precomputed_ev, recursion_ctr=ctr)
       print(ctr)
     elapsed = time.time() - t0
 
@@ -149,8 +152,8 @@ class TraverseTest(unittest.TestCase):
     # stdev is ~0.035 w/ 200 MC iters.
     # stdev is ~0.02 w/ 500 MC iters.
     # stdev is ~0.015 w/ 1000 MC iters.
-    for _ in range(10000):
-      results.append(calculator.calc(["3h", "Th"], b"3c7h7d8h9s", b"", 100))
+    for _ in range(1000):
+      results.append(calculator.calc(["3h", "Th"], b"3c7h7d6c8d", b"", 1326))
 
     variance = np.var(results)
     stdev = np.sqrt(variance)

@@ -8,8 +8,8 @@ class Constants(object):
   SMALL_BLIND_AMOUNT = 1
   ANTE_AMOUNT = 0
 
-  BET_ACTIONS_PER_STREET = 6
-  BET_HISTORY_SIZE = 24 # 4 streets, 6 betting actions per street.
+  BET_ACTIONS_PER_STREET = 4
+  BET_HISTORY_SIZE = 16 # 4 streets, 6 betting actions per street.
 
   # INFO_SET_SIZE = 1 + 2 + 5 + BET_HISTORY_SIZE
   INFO_SET_SIZE = 1 + BET_HISTORY_SIZE # EV and betting actions.

@@ -22,7 +22,30 @@ def get_street_0123(s):
   return 0 if s == 0 else s - 2
 
 
-def make_infoset(round_state, player_idx, player_is_sb):
+def make_precomputed_ev(round_state):
+  out = {}
+  for s in (0, 3, 4, 5):
+    if s == 3:
+      iters = 5000
+    elif s == 4:
+      iters = 5000
+    elif s == 5:
+      iters = 1326
+    else:
+      iters = 1
+
+    h1 = [str(round_state.hands[0][0]), str(round_state.hands[0][1])]
+    h2 = [str(round_state.hands[1][0]), str(round_state.hands[1][1])]
+    board = str.encode("".join([str(c) for c in round_state.deck.peek(s)]))
+
+    ev1 = EV_CALCULATOR.calc(h1, board, b"", iters)
+    ev2 = EV_CALCULATOR.calc(h2, board, b"", iters)
+    out[s] = [ev1, ev2]
+
+  return out
+
+
+def make_infoset(round_state, player_idx, player_is_sb, precomputed_ev=None):
   """
   Make an information set representation of the game state.
 
@@ -36,25 +59,31 @@ def make_infoset(round_state, player_idx, player_is_sb):
     for i, add_amt in enumerate(actions):
       i = min(i, Constants.BET_ACTIONS_PER_STREET - 2 + i % 2)
       h[offset + i] += add_amt
+
+  if precomputed_ev is not None:
+    ev = precomputed_ev[round_state.street][player_idx]
+    return EvInfoSet(ev, h, 0 if player_is_sb else 1)
   
-  # hand = "{}:xx".format(str(round_state.hands[player_idx][0]) + str(round_state.hands[player_idx][1]))
-  hand = [str(round_state.hands[player_idx][0]), str(round_state.hands[player_idx][1])]
-  board = "".join([str(c) for c in round_state.deck.peek(round_state.street)])
-
-  # Use fewer iters on later streets.
-  if len(board) == 3:
-    iters = 500
-  elif len(board) == 4:
-    iters = 200
-  elif len(board) == 5:
-    iters = 100
   else:
-    iters = 1
+    assert(False)
+    # hand = "{}:xx".format(str(round_state.hands[player_idx][0]) + str(round_state.hands[player_idx][1]))
+    hand = [str(round_state.hands[player_idx][0]), str(round_state.hands[player_idx][1])]
+    board = "".join([str(c) for c in round_state.deck.peek(round_state.street)])
 
-  ev = EV_CALCULATOR.calc(hand, str.encode(board), b"", iters)
-  # ev = calc(str.encode(hand), str.encode(board), b"", 1000).ev[0]
+    # Use fewer iters on later streets.
+    if len(board) == 3:
+      iters = 400
+    elif len(board) == 4:
+      iters = 200
+    elif len(board) == 5:
+      iters = 100
+    else:
+      iters = 1
 
-  return EvInfoSet(ev, h, 0 if player_is_sb else 1)
+    ev = EV_CALCULATOR.calc(hand, str.encode(board), b"", iters)
+    # ev = calc(str.encode(hand), str.encode(board), b"", 1000).ev[0]
+
+    return EvInfoSet(ev, h, 0 if player_is_sb else 1)
 
 
 def make_actions(round_state):
@@ -126,7 +155,7 @@ def create_new_round(button_player):
 
 
 def traverse(round_state, action_generator, infoset_generator, traverse_player_idx, sb_player_idx,
-             strategies, advt_mem, strt_mem, t, recursion_ctr=[0]):
+             strategies, advt_mem, strt_mem, t, precomputed_ev, recursion_ctr=[0]):
   with torch.no_grad():
     node_info = TreeNodeInfo()
 
@@ -144,7 +173,7 @@ def traverse(round_state, action_generator, infoset_generator, traverse_player_i
 
     #============== TRAVERSE PLAYER ACTION ===============
     if is_traverse_player_action:
-      infoset = infoset_generator(round_state, traverse_player_idx, traverse_player_idx == sb_player_idx)
+      infoset = infoset_generator(round_state, traverse_player_idx, traverse_player_idx == sb_player_idx, precomputed_ev)
       actions, mask = action_generator(round_state)
 
       # Do regret matching to get action probabilities.
@@ -170,7 +199,7 @@ def traverse(round_state, action_generator, infoset_generator, traverse_player_i
         child_node_info = traverse(next_round_state,
                                    action_generator, infoset_generator,
                                    traverse_player_idx, sb_player_idx, strategies, advt_mem, strt_mem, t,
-                                   recursion_ctr=recursion_ctr)
+                                   precomputed_ev, recursion_ctr=recursion_ctr)
         
         # Expected value of the acting player taking this action and then continuing according to their strategy.
         action_values[:,i] = child_node_info.strategy_ev
@@ -202,7 +231,7 @@ def traverse(round_state, action_generator, infoset_generator, traverse_player_i
 
     #================== NON-TRAVERSE PLAYER ACTION =================
     else:
-      infoset = infoset_generator(round_state, other_player_idx, other_player_idx == sb_player_idx)
+      infoset = infoset_generator(round_state, other_player_idx, other_player_idx == sb_player_idx, precomputed_ev)
 
       # External sampling: choose a random action for the non-traversing player.
       actions, mask = action_generator(round_state)
@@ -223,4 +252,4 @@ def traverse(round_state, action_generator, infoset_generator, traverse_player_i
 
       return traverse(next_round_state,
                       action_generator, infoset_generator, traverse_player_idx, sb_player_idx,
-                      strategies, advt_mem, strt_mem, t, recursion_ctr=recursion_ctr)
+                      strategies, advt_mem, strt_mem, t, precomputed_ev, recursion_ctr=recursion_ctr)
