@@ -252,7 +252,7 @@ class Trainer(object):
     mp.spawn(
       traverse_worker,
       args=(0, self.value_networks, save_lock, self.opt, t, True, info_queue),
-      nprocs=self.opt.NUM_TRAVERSE_WORKERS, join=True, daemon=False)
+      nprocs=min(8, self.opt.NUM_TRAVERSE_WORKERS), join=True, daemon=False)
 
     elapsed = time.time() - t0
     print("Time for {} traversals across {} workers: {} sec".format(
