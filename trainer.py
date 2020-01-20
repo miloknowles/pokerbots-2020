@@ -56,8 +56,8 @@ def traverse_worker(worker_id, traverse_player_idx, strategies, save_lock, opt, 
     info = traverse(round_state, make_actions, make_infoset, traverse_player_idx, sb_player_idx,
                     strategies, advt_mem, strt_mem, t, precomputed_ev, recursion_ctr=ctr)
 
-    if info_queue is not None:
-      info_queue.put(info, True, 0.1)
+    # if info_queue is not None:
+    #   info_queue.put(info, True, 0.1)
 
     if (k % opt.TRAVERSE_DEBUG_PRINT_HZ) == 0 and eval_mode == False:
       elapsed = time.time() - t0
@@ -102,7 +102,7 @@ class Trainer(object):
       for traverse_player_idx in (0, 1):
         self.do_cfr_iter_for_player(traverse_player_idx, t)
         self.train_value_network(traverse_player_idx, t)
-        self.eval_value_network("cfr", eval_t, None)
+        self.eval_value_network("cfr", eval_t, None, traverse_player_idx)
         eval_t += 1
     # TODO(milo): Train strategy network.
   
@@ -199,13 +199,16 @@ class Trainer(object):
           self.log("train", traverse_player_idx, t, losses, step)
 
         # Only need to save the value network for the traversing player.
-        if (batch_idx % self.opt.TRAINING_VALUE_NET_SAVE_HZ) == 0:
+        if (batch_idx % self.opt.TRAINING_VALUE_NET_SAVE_HZ) == 0 and batch_idx > 0:
           self.save_models(t, save_value_networks=[traverse_player_idx], save_strategy_network=False)
 
-        if (batch_idx % self.opt.TRAINING_VALUE_NET_EVAL_HZ) == 0 and batch_idx > 0:
-          self.eval_value_network("train", t, step)
+        # if (batch_idx % self.opt.TRAINING_VALUE_NET_EVAL_HZ) == 0 and batch_idx > 0:
+        #   self.eval_value_network("train", t, step)
         
         step += 1
+    
+    print("Saving final model for traverse player {}".format(traverse_player_idx))
+    self.save_models(t, save_value_networks=[traverse_player_idx], save_strategy_network=False)
 
   def save_models(self, t, save_value_networks=[], save_strategy_network=False):
     """
@@ -233,7 +236,7 @@ class Trainer(object):
     
     print("Saved models to {}".format(save_folder))
 
-  def eval_value_network(self, mode, t, steps):
+  def eval_value_network(self, mode, t, steps, traverse_player_idx):
     """
     Evaluate the (total) exploitability of the value networks, as in Brown et. al.
     """
@@ -249,22 +252,30 @@ class Trainer(object):
     t0 = time.time()
 
     # Use worker with eval_mode = True.
-    mp.spawn(
-      traverse_worker,
-      args=(0, self.value_networks, save_lock, self.opt, t, True, info_queue),
-      nprocs=min(8, self.opt.NUM_TRAVERSE_WORKERS), join=True, daemon=False)
+    # mp.spawn(
+    #   traverse_worker,
+    #   args=(0, self.value_networks, save_lock, self.opt, t, True, info_queue),
+    #   nprocs=min(8, self.opt.NUM_TRAVERSE_WORKERS), join=True, daemon=False)
+    exploits = []
+
+    for k in range(self.opt.NUM_TRAVERSALS_EVAL):
+      sb_player_idx = k % 2
+      round_state = create_new_round(sb_player_idx)
+      precomputed_ev = make_precomputed_ev(round_state)
+      info = traverse(round_state, make_actions, make_infoset, traverse_player_idx, sb_player_idx,
+                      self.value_networks, None, None, t, precomputed_ev)
+      exploits.append(info.exploitability.sum())
 
     elapsed = time.time() - t0
-    print("Time for {} traversals across {} workers: {} sec".format(
-      self.opt.NUM_TRAVERSALS_EVAL, self.opt.NUM_TRAVERSE_WORKERS, elapsed))
+    print("Time for {} eval traversals {} sec".format(self.opt.NUM_TRAVERSALS_EVAL, elapsed))
 
-    total_exploits = []
+    # total_exploits = []
 
-    while not info_queue.empty():
-      info = info_queue.get_nowait()
-      total_exploits.append(info.exploitability.sum())
+    # while not info_queue.empty():
+    #   info = info_queue.get_nowait()
+    #   total_exploits.append(info.exploitability.sum())
 
-    mbb_per_game = 1e3 * torch.Tensor(total_exploits) / (2.0 * Constants.SMALL_BLIND_AMOUNT)
+    mbb_per_game = 1e3 * torch.Tensor(exploits) / (2.0 * Constants.SMALL_BLIND_AMOUNT)
     mean_mbb_per_game = mbb_per_game.mean()
     stdev_mbb_per_game = mbb_per_game.std()
 
