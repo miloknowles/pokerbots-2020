@@ -69,11 +69,11 @@ class Options(object):
                 type=int,
                 help="Log info after this many minibatches",
                 default=10)
-    self.parser.add_argument("--TRAINING_VALUE_NET_SAVE_HZ",
+    self.parser.add_argument("--TRAINING_SAVE_HZ",
                 type=int,
                 help="Save the value network after this many minibatches",
                 default=8000)
-    self.parser.add_argument("--TRAINING_VALUE_NET_EVAL_HZ",
+    self.parser.add_argument("--TRAINING_EVAL_HZ",
                 type=int,
                 help="Save the value network after this many minibatches",
                 default=4000)

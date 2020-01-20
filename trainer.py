@@ -56,9 +56,6 @@ def traverse_worker(worker_id, traverse_player_idx, strategies, save_lock, opt, 
     info = traverse(round_state, make_actions, make_infoset, traverse_player_idx, sb_player_idx,
                     strategies, advt_mem, strt_mem, t, precomputed_ev, recursion_ctr=ctr)
 
-    # if info_queue is not None:
-    #   info_queue.put(info, True, 0.1)
-
     if (k % opt.TRAVERSE_DEBUG_PRINT_HZ) == 0 and eval_mode == False:
       elapsed = time.time() - t0
       print("[WORKER #{}] done with {}/{} traversals | recursion depth={} | advt={} strt={} | elapsed={} sec".format(
@@ -86,11 +83,10 @@ class Trainer(object):
     # self.value_networks[1]._network.share_memory()
     print("[DONE] Made value networks")
 
-    # TODO(milo): Does this need to be different than the value networks?
-    # self.strategy_network = NetworkWrapper(Constants.BET_HISTORY_SIZE,
-    #                     Constants.NUM_ACTIONS, ev_embed_dim=opt.EV_EMBED_DIM,
-    #                     bet_embed_dim=opt.BET_EMBED_DIM, device=opt.TRAVERSE_DEVICE)
-    # print("[DONE] Made strategy network")
+    self.strategy_network = NetworkWrapper(Constants.BET_HISTORY_SIZE,
+                        Constants.NUM_ACTIONS, ev_embed_dim=opt.EV_EMBED_DIM,
+                        bet_embed_dim=opt.BET_EMBED_DIM, device=opt.TRAIN_DEVICE)
+    print("[DONE] Made strategy network")
 
     self.writers = {}
     for mode in ["train", "cfr"]:
@@ -127,7 +123,7 @@ class Trainer(object):
     print("Time for {} traversals across {} workers: {} sec".format(
       self.opt.NUM_TRAVERSALS_PER_ITER, self.opt.NUM_TRAVERSE_WORKERS, elapsed))
 
-  def linear_cfr_loss(self, output, target, weights, T):
+  def linear_cfr_loss(self, output, target, weights):
     """
     Mean-squared error loss, where each example is weighted by its CFR iteration t. We divide the
     loss by the mean weight so that the batch has an average weight of 1.
@@ -141,6 +137,83 @@ class Trainer(object):
     weights_safe = (weights + 1.0)
     weighted_se = weights_safe * (target - output).pow(2) / weights_safe.mean()
     return weighted_se.mean()
+
+  def train_strategy_network(self):
+    """
+    Train the strategy network from scratch using all strategy buffer entries.
+    """
+    print("\nTraining strategy network!")
+
+    losses = {}
+
+    self.strategy_network._network = self.strategy_network._network.cuda()
+    self.strategy_network._device = torch.device("cuda")
+
+    net = self.strategy_network.network()
+    net.train()
+
+    optimizer = torch.optim.Adam(net.parameters(), lr=self.opt.SGD_LR)
+
+    buffer_name = self.opt.STRT_BUFFER_FMT
+    train_dataset = MemoryBufferDataset(self.opt.MEMORY_FOLDER, buffer_name,
+                                        self.opt.TRAIN_DATASET_SIZE)
+
+    # Due to memory limitations, we can only store a subset of the dataset in memory at a time.
+    # Calculate the number of times we'll have to resample and iterate over the dataset.
+    # num_resample_iters = int(float(self.opt.SGD_ITERS * self.opt.SGD_BATCH_SIZE) / len(train_dataset)) + 1
+    total_items = self.opt.SGD_ITERS * self.opt.SGD_BATCH_SIZE
+    num_resample_iters = int(max(1.0, float(total_items) / self.opt.TRAIN_DATASET_SIZE))
+    print("Will do {} resample iters (need {} total items, dataset size is {})".format(
+        num_resample_iters, total_items, len(train_dataset)))
+
+    step = 0
+    for resample_iter in range(num_resample_iters):
+      print("> Doing resample iteration {}/{} ...".format(resample_iter, num_resample_iters))
+      train_dataset.resample()
+      train_loader = DataLoader(train_dataset,
+                                batch_size=self.opt.SGD_BATCH_SIZE,
+                                num_workers=self.opt.NUM_DATA_WORKERS,
+                                shuffle=True)
+      print("> Done. DataLoader has {} batches of size {}.".format(len(train_loader), self.opt.SGD_BATCH_SIZE))
+
+      for batch_idx, input_dict in enumerate(train_loader):
+        if (batch_idx > self.opt.SGD_ITERS):
+          print("Finished batch {}, didn't need to use all batches in DataLoader".format(batch_idx))
+          break
+        ev_input = input_dict["ev_input"].to(self.opt.TRAIN_DEVICE)
+        bets_input = input_dict["bets_input"].to(self.opt.TRAIN_DEVICE)
+        sigma_target = input_dict["target"].to(self.opt.TRAIN_DEVICE)
+        weights = input_dict["weights"].to(self.opt.TRAIN_DEVICE)
+
+        optimizer.zero_grad()
+
+        # Minimize MSE between predicted advantage and instantaneous regret samples.
+        sigma_pred = net(ev_input, bets_input)
+        loss = self.linear_cfr_loss(sigma_pred, sigma_target, weights)
+        loss.backward()
+        losses["strt_mse_loss"] = loss.cpu().item()
+
+        torch.nn.utils.clip_grad_norm_(net.parameters(), 1.0)
+        optimizer.step()
+
+        if (step % self.opt.TRAINING_LOG_HZ) == 0:
+          self.log("train", 0, 1234, losses, step)
+
+        if (step % self.opt.TRAINING_SAVE_HZ) == 0 and step > 0:
+          self.save_models(1234, save_value_networks=[], save_strategy_network=True)
+
+        if (step % self.opt.TRAINING_EVAL_HZ) == 0:
+          self.eval_strategy_network(step)
+          self.strategy_network._network = self.strategy_network._network.cuda()
+          self.strategy_network._device = torch.device("cuda")
+
+        step += 1
+    
+    print("Saving final strategy model")
+    self.save_models(1234, save_value_networks=[], save_strategy_network=True)
+
+    print("Evaluating final strategy model")
+    self.eval_strategy_network(step)
 
   def train_value_network(self, traverse_player_idx, t):
     """
@@ -156,16 +229,12 @@ class Trainer(object):
                                 bet_embed_dim=self.opt.BET_EMBED_DIM, device=self.opt.TRAIN_DEVICE)
     net = model_wrap.network()
     net.train()
-    # assert(net.device == torch.device("cuda"))
 
     optimizer = torch.optim.Adam(net.parameters(), lr=self.opt.SGD_LR)
 
     buffer_name = self.opt.ADVT_BUFFER_FMT.format(traverse_player_idx)
     train_dataset = MemoryBufferDataset(self.opt.MEMORY_FOLDER, buffer_name,
                                         self.opt.TRAIN_DATASET_SIZE)
-    # train_loader = DataLoader(train_dataset,
-    #                           batch_size=self.opt.SGD_BATCH_SIZE,
-    #                           num_workers=self.opt.NUM_DATA_WORKERS)
 
     # Due to memory limitations, we can only store a subset of the dataset in memory at a time.
     # Calculate the number of times we'll have to resample and iterate over the dataset.
@@ -184,28 +253,20 @@ class Trainer(object):
                                 shuffle=True)
       print("> Done. DataLoader has {} batches of size {}.".format(len(train_loader), self.opt.SGD_BATCH_SIZE))
 
-      print(train_dataset._weights)
-
       for batch_idx, input_dict in enumerate(train_loader):
         if (batch_idx > self.opt.SGD_ITERS):
-          print("Finished batch {}, didn't need to use whole dataloader".format(batch_idx))
+          print("Finished batch {}, didn't need to all batches in DataLoader".format(batch_idx))
           break
         ev_input = input_dict["ev_input"].to(self.opt.TRAIN_DEVICE)
         bets_input = input_dict["bets_input"].to(self.opt.TRAIN_DEVICE)
         advt_target = input_dict["target"].to(self.opt.TRAIN_DEVICE)
-
-        # print(ev_input[:5])
-        # print(bets_input[:5])
-        # print(advt_target[:5])
 
         weights = input_dict["weights"].to(self.opt.TRAIN_DEVICE)
         optimizer.zero_grad()
 
         # Minimize MSE between predicted advantage and instantaneous regret samples.
         output = net(ev_input, bets_input)
-        # print(output[:5])
-        # print(output[:5])
-        loss = self.linear_cfr_loss(output, advt_target, weights, t)
+        loss = self.linear_cfr_loss(output, advt_target, weights)
         # loss = torch.nn.functional.mse_loss(output, advt_target)
         loss.backward()
         losses["mse_loss/{}/{}".format(t, traverse_player_idx)] = loss.cpu().item()
@@ -215,14 +276,14 @@ class Trainer(object):
 
         optimizer.step()
 
-        if (batch_idx % self.opt.TRAINING_LOG_HZ) == 0:
+        if (step % self.opt.TRAINING_LOG_HZ) == 0:
           self.log("train", traverse_player_idx, t, losses, step)
 
         # Only need to save the value network for the traversing player.
-        if (batch_idx % self.opt.TRAINING_VALUE_NET_SAVE_HZ) == 0 and batch_idx > 0:
+        if (step % self.opt.TRAINING_SAVE_HZ) == 0 and step > 0:
           self.save_models(t, save_value_networks=[traverse_player_idx], save_strategy_network=False)
 
-        # if (batch_idx % self.opt.TRAINING_VALUE_NET_EVAL_HZ) == 0 and batch_idx > 0:
+        # if (batch_idx % self.opt.TRAINING_EVAL_HZ) == 0 and batch_idx > 0:
         #   self.eval_value_network("train", t, step)
         
         step += 1
@@ -249,12 +310,53 @@ class Trainer(object):
       torch.save(to_save, save_path)
 
     # Save the strategy network also.
-    # if save_strategy_network:
-    #   save_path = os.path.join(save_folder, "strategy_network_{}.pth".format(t))
-    #   to_save = self.strategy_network.network().state_dict()
-    #   torch.save(to_save, save_path)
+    if save_strategy_network:
+      save_path = os.path.join(save_folder, "strategy_network_{}.pth".format(t))
+      to_save = self.strategy_network.network().state_dict()
+      torch.save(to_save, save_path)
     
     print("Saved models to {}".format(save_folder))
+
+  def eval_strategy_network(self, steps):
+    print("\nEvaluating strategy network after {} steps".format(steps))
+    self.strategy_network._network = self.strategy_network._network.cpu()
+    self.strategy_network._device = torch.device("cpu")
+
+    for p in self.strategy_network._network.parameters():
+      assert(p.device == torch.device("cpu"))
+
+    manager = mp.Manager()
+    save_lock = manager.Lock()
+
+    t0 = time.time()
+    exploits = []
+
+    strategies = {
+      0: self.strategy_network,
+      1: self.strategy_network
+    }
+
+    for k in range(self.opt.NUM_TRAVERSALS_EVAL):
+      sb_player_idx = k % 2
+      round_state = create_new_round(sb_player_idx)
+      precomputed_ev = make_precomputed_ev(round_state)
+      info = traverse(round_state, make_actions, make_infoset, 0, sb_player_idx,
+                      strategies, None, None, 0, precomputed_ev)
+      exploits.append(info.exploitability.sum())
+
+    elapsed = time.time() - t0
+    print("Time for {} eval traversals {} sec".format(self.opt.NUM_TRAVERSALS_EVAL, elapsed))
+
+    mbb_per_game = 1e3 * torch.Tensor(exploits) / (2.0 * Constants.SMALL_BLIND_AMOUNT)
+    mean_mbb_per_game = mbb_per_game.mean()
+    stdev_mbb_per_game = mbb_per_game.std()
+
+    writer = self.writers["train"]
+    writer.add_scalar("strt_exploit_mbbg_mean", mean_mbb_per_game, steps)
+    writer.add_scalar("strt_exploit_mbbg_stdev", stdev_mbb_per_game, steps)
+    writer.close()
+    print("===> [EVAL] [STRATEGY] Exploitability | mean={} mbb/g | stdev={} | (steps={})".format(
+        mean_mbb_per_game, stdev_mbb_per_game, steps))
 
   def eval_value_network(self, mode, t, steps, traverse_player_idx):
     """
@@ -268,7 +370,6 @@ class Trainer(object):
 
     manager = mp.Manager()
     save_lock = manager.Lock()
-    info_queue = manager.Queue()
 
     t0 = time.time()
     exploits = []
@@ -307,8 +408,14 @@ class Trainer(object):
     """
     Write an event to the tensorboard events file.
     """
-    loss = losses["mse_loss/{}/{}".format(t, traverse_player_idx)]
-    print("==> TRAINING | steps={} | loss={} | cfr_iter={}".format(steps, loss, t))
+    loss_name_advt = "mse_loss/{}/{}".format(t, traverse_player_idx)
+    loss_name_strt = "strt_mse_loss"
+    if loss_name_advt in losses:
+      loss = losses[loss_name_advt]
+      print("==> TRAINING [ADVT] | steps={} | loss={} | cfr_iter={}".format(steps, loss, t))
+    elif loss_name_strt in losses:
+      loss = losses[loss_name_strt]
+      print("==> TRAINING [STRT] | steps={} | loss={} | cfr_iter={}".format(steps, loss, t))
 
     writer = self.writers[mode]
     for l, v in losses.items():
