@@ -140,6 +140,7 @@ class Trainer(object):
     # NOTE(milo): Need to add 1 to the weights to deal with zeroth CFR iteration.
     weights_safe = (weights + 1.0)
     weighted_se = weights_safe * (target - output).pow(2) / weights_safe.mean()
+    # print(weighted_se)
     return weighted_se.mean()
 
   def train_value_network(self, traverse_player_idx, t):
@@ -182,16 +183,26 @@ class Trainer(object):
         bets_input = input_dict["bets_input"].to(self.opt.TRAIN_DEVICE)
         advt_target = input_dict["target"].to(self.opt.TRAIN_DEVICE)
 
+        # print(ev_input[:5])
+        # print(bets_input[:5])
+        # print(advt_target[:5])
+
         weights = input_dict["weights"].to(self.opt.TRAIN_DEVICE)
+        # print(weights[:5])
 
         optimizer.zero_grad()
 
         # Minimize MSE between predicted advantage and instantaneous regret samples.
         output = net(ev_input, bets_input)
+        # print(output[:5])
+        # print(output[:5])
         loss = self.linear_cfr_loss(output, advt_target, weights, t)
         # loss = torch.nn.functional.mse_loss(output, advt_target)
         loss.backward()
         losses["mse_loss/{}/{}".format(t, traverse_player_idx)] = loss.cpu().item()
+
+        # NOTE: Clip gradient norm.
+        torch.nn.utils.clip_grad_norm_(net.parameters(), 1.0)
 
         optimizer.step()
 
@@ -250,12 +261,6 @@ class Trainer(object):
     info_queue = manager.Queue()
 
     t0 = time.time()
-
-    # Use worker with eval_mode = True.
-    # mp.spawn(
-    #   traverse_worker,
-    #   args=(0, self.value_networks, save_lock, self.opt, t, True, info_queue),
-    #   nprocs=min(8, self.opt.NUM_TRAVERSE_WORKERS), join=True, daemon=False)
     exploits = []
 
     for k in range(self.opt.NUM_TRAVERSALS_EVAL):
@@ -268,12 +273,6 @@ class Trainer(object):
 
     elapsed = time.time() - t0
     print("Time for {} eval traversals {} sec".format(self.opt.NUM_TRAVERSALS_EVAL, elapsed))
-
-    # total_exploits = []
-
-    # while not info_queue.empty():
-    #   info = info_queue.get_nowait()
-    #   total_exploits.append(info.exploitability.sum())
 
     mbb_per_game = 1e3 * torch.Tensor(exploits) / (2.0 * Constants.SMALL_BLIND_AMOUNT)
     mean_mbb_per_game = mbb_per_game.mean()
