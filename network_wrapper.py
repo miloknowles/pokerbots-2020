@@ -29,7 +29,12 @@ class NetworkWrapper(object):
 
       # Make the opponent bet actions negative, and ours positive.
       bets_input, position_mask = infoset.get_bet_input_tensors()
-      bets_input = (bets_input * position_mask).to(self._device)
+      
+      # Normalize bets_input by the pot size.
+      cumul_pot = torch.cumsum(bets_input, dim=1)
+      cumul_pot[cumul_pot == 0] = 1
+      bets_input = (bets_input * position_mask / cumul_pot).to(self._device)
+      # bets_input = (bets_input * position_mask).to(self._device)
 
       pred_regret = self._network(ev_input, bets_input)[0]
 
