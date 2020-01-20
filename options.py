@@ -108,7 +108,9 @@ class Options(object):
   def setup_after_parse(self, options):
     options.MEMORY_FOLDER = os.path.join("/home/milo/pokerbots-2020/memory/", options.EXPERIMENT_NAME)
     options.TRAIN_LOG_FOLDER = os.path.join("/home/milo/pokerbots-2020/training_logs/", options.EXPERIMENT_NAME)
-    options.DEVICE = torch.device("cuda:0")
+    # options.DEVICE = torch.device("cuda:0")
+    options.TRAVERSE_DEVICE = torch.device("cpu")
+    options.TRAIN_DEVICE = torch.device("cuda:0")
 
     # Call THIS_FMT.format(PLAYER_UID) to get the right name.
     options.ADVT_BUFFER_FMT = "advt_mem_{}"

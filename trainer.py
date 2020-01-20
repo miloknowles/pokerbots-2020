@@ -26,6 +26,9 @@ def traverse_worker(worker_id, traverse_player_idx, strategies, save_lock, opt, 
 
   If eval_mode is set to True, no memory buffers are created.
   """
+  # assert(strategies[0]._network.device == torch.device("cpu"))
+  # assert(strategies[1]._network.device == torch.device("cpu"))
+
   advt_mem = MemoryBuffer(Constants.INFO_SET_SIZE, Constants.NUM_ACTIONS,
                           max_size=opt.SINGLE_PROC_MEM_BUFFER_MAX_SIZE,
                           autosave_params=(opt.MEMORY_FOLDER, opt.ADVT_BUFFER_FMT.format(traverse_player_idx)),
@@ -74,20 +77,20 @@ class Trainer(object):
     self.value_networks = {
       0: NetworkWrapper(Constants.BET_HISTORY_SIZE,
                         Constants.NUM_ACTIONS, ev_embed_dim=opt.EV_EMBED_DIM,
-                        bet_embed_dim=opt.BET_EMBED_DIM, device=opt.DEVICE),
+                        bet_embed_dim=opt.BET_EMBED_DIM, device=opt.TRAVERSE_DEVICE),
       1: NetworkWrapper(Constants.BET_HISTORY_SIZE,
                         Constants.NUM_ACTIONS, ev_embed_dim=opt.EV_EMBED_DIM,
-                        bet_embed_dim=opt.BET_EMBED_DIM, device=opt.DEVICE)
+                        bet_embed_dim=opt.BET_EMBED_DIM, device=opt.TRAVERSE_DEVICE)
     }
-    self.value_networks[0]._network.share_memory()
-    self.value_networks[1]._network.share_memory()
+    # self.value_networks[0]._network.share_memory()
+    # self.value_networks[1]._network.share_memory()
     print("[DONE] Made value networks")
 
     # TODO(milo): Does this need to be different than the value networks?
-    self.strategy_network = NetworkWrapper(Constants.BET_HISTORY_SIZE,
-                        Constants.NUM_ACTIONS, ev_embed_dim=opt.EV_EMBED_DIM,
-                        bet_embed_dim=opt.BET_EMBED_DIM, device=opt.DEVICE)
-    print("[DONE] Made strategy network")
+    # self.strategy_network = NetworkWrapper(Constants.BET_HISTORY_SIZE,
+    #                     Constants.NUM_ACTIONS, ev_embed_dim=opt.EV_EMBED_DIM,
+    #                     bet_embed_dim=opt.BET_EMBED_DIM, device=opt.TRAVERSE_DEVICE)
+    # print("[DONE] Made strategy network")
 
     self.writers = {}
     for mode in ["train", "cfr"]:
@@ -104,8 +107,10 @@ class Trainer(object):
     # TODO(milo): Train strategy network.
   
   def do_cfr_iter_for_player(self, traverse_player_idx, t):
-    self.value_networks[0]._network.share_memory()
-    self.value_networks[1]._network.share_memory()
+    self.value_networks[0]._network = self.value_networks[0]._network.to(self.opt.TRAVERSE_DEVICE)
+    self.value_networks[1]._network = self.value_networks[1]._network.to(self.opt.TRAVERSE_DEVICE)
+    self.value_networks[0]._device = self.opt.TRAVERSE_DEVICE
+    self.value_networks[1]._device = self.opt.TRAVERSE_DEVICE
 
     manager = mp.Manager()
     save_lock = manager.Lock()
@@ -147,10 +152,10 @@ class Trainer(object):
     model_wrap = self.value_networks[traverse_player_idx]
     model_wrap = NetworkWrapper(Constants.BET_HISTORY_SIZE,
                                 Constants.NUM_ACTIONS, ev_embed_dim=self.opt.EV_EMBED_DIM,
-                                bet_embed_dim=self.opt.BET_EMBED_DIM, device=self.opt.DEVICE)
-
+                                bet_embed_dim=self.opt.BET_EMBED_DIM, device=self.opt.TRAIN_DEVICE)
     net = model_wrap.network()
     net.train()
+    # assert(net.device == torch.device("cuda"))
 
     optimizer = torch.optim.Adam(net.parameters(), lr=self.opt.SGD_LR)
 
@@ -173,11 +178,11 @@ class Trainer(object):
       print(">> Done. DataLoader has {} batches of size {}.".format(len(train_loader), self.opt.SGD_BATCH_SIZE))
 
       for batch_idx, input_dict in enumerate(train_loader):
-        ev_input = input_dict["ev_input"].to(self.opt.DEVICE)
-        bets_input = input_dict["bets_input"].to(self.opt.DEVICE)
-        advt_target = input_dict["target"].to(self.opt.DEVICE)
+        ev_input = input_dict["ev_input"].to(self.opt.TRAIN_DEVICE)
+        bets_input = input_dict["bets_input"].to(self.opt.TRAIN_DEVICE)
+        advt_target = input_dict["target"].to(self.opt.TRAIN_DEVICE)
 
-        weights = input_dict["weights"].to(self.opt.DEVICE)
+        weights = input_dict["weights"].to(self.opt.TRAIN_DEVICE)
 
         optimizer.zero_grad()
 
@@ -221,10 +226,10 @@ class Trainer(object):
       torch.save(to_save, save_path)
 
     # Save the strategy network also.
-    if save_strategy_network:
-      save_path = os.path.join(save_folder, "strategy_network_{}.pth".format(t))
-      to_save = self.strategy_network.network().state_dict()
-      torch.save(to_save, save_path)
+    # if save_strategy_network:
+    #   save_path = os.path.join(save_folder, "strategy_network_{}.pth".format(t))
+    #   to_save = self.strategy_network.network().state_dict()
+    #   torch.save(to_save, save_path)
     
     print("Saved models to {}".format(save_folder))
 
@@ -232,6 +237,11 @@ class Trainer(object):
     """
     Evaluate the (total) exploitability of the value networks, as in Brown et. al.
     """
+    self.value_networks[0]._network = self.value_networks[0]._network.to(self.opt.TRAVERSE_DEVICE)
+    self.value_networks[1]._network = self.value_networks[1]._network.to(self.opt.TRAVERSE_DEVICE)
+    self.value_networks[0]._device = self.opt.TRAVERSE_DEVICE
+    self.value_networks[1]._device = self.opt.TRAVERSE_DEVICE
+
     manager = mp.Manager()
     save_lock = manager.Lock()
     info_queue = manager.Queue()
@@ -298,8 +308,8 @@ class Trainer(object):
         model_dict.update(torch.load(load_path))
         print("==> Loaded value network weights for {} from {}".format(player_name, load_path))
 
-    strt_load_path = os.path.join(load_weights_path, "strategy_network_{}.pth".format(t))
-    if os.path.exists(strt_load_path):
-      model_dict = self.strategy_network.network().state_dict()
-      model_dict.update(torch.load(strt_load_path))
-      print("==> Loaded strategy network weights from", strt_load_path)
+    # strt_load_path = os.path.join(load_weights_path, "strategy_network_{}.pth".format(t))
+    # if os.path.exists(strt_load_path):
+    #   model_dict = self.strategy_network.network().state_dict()
+    #   model_dict.update(torch.load(strt_load_path))
+    #   print("==> Loaded strategy network weights from", strt_load_path)

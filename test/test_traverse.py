@@ -119,28 +119,38 @@ class TraverseTest(unittest.TestCase):
     print(infoset.bet_history_vec)
 
   def test_traverse_timing(self):
-    t = 0
+    t = 1
     sb_index = 0
     traverse_player_idx = 0
 
-    round_state = create_new_round(sb_index)
-
     strategies = [
-      NetworkWrapper(Constants.BET_HISTORY_SIZE, Constants.NUM_ACTIONS, 8, 64, torch.device("cuda:0")),
-      NetworkWrapper(Constants.BET_HISTORY_SIZE, Constants.NUM_ACTIONS, 8, 64, torch.device("cuda:0"))
+      NetworkWrapper(Constants.BET_HISTORY_SIZE, Constants.NUM_ACTIONS, 8, 64, torch.device("cpu")),
+      NetworkWrapper(Constants.BET_HISTORY_SIZE, Constants.NUM_ACTIONS, 8, 64, torch.device("cpu"))
     ]
 
-    t0 = time.time()
+    profiler = {"create_new_round": 0, "make_precomputed_ev": 0, "traverse": 0}
+
+    tstart = time.time()
     N = 100
     for _ in range(N):
       ctr = [0]
+      t0 = time.time()
       round_state = create_new_round(sb_index)
+      elapsed = time.time() - t0
+      profiler["create_new_round"] += elapsed
+      t0 = time.time()
       precomputed_ev = make_precomputed_ev(round_state)
+      profiler["make_precomputed_ev"] += elapsed
+      elapsed = time.time() - t0
+      t0 = time.time()
       info = traverse(round_state, make_actions, make_infoset, traverse_player_idx, sb_index,
                       strategies, None, None, t, precomputed_ev, recursion_ctr=ctr)
+      elapsed = time.time() - t0
+      profiler["traverse"] += elapsed
       print(ctr)
-    elapsed = time.time() - t0
 
+    elapsed = time.time() - tstart
+    print(profiler)
     print("Took {} sec for {} traversals".format(elapsed, N))
 
   def test_ev_variance(self):
