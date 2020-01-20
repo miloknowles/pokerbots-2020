@@ -12,7 +12,7 @@ class Constants(object):
   BET_HISTORY_SIZE = 16 # 4 streets, 6 betting actions per street.
 
   # INFO_SET_SIZE = 1 + 2 + 5 + BET_HISTORY_SIZE
-  INFO_SET_SIZE = 1 + BET_HISTORY_SIZE # EV and betting actions.
+  INFO_SET_SIZE = 1 + 1 + BET_HISTORY_SIZE # EV and betting actions.
 
   ALL_ACTIONS = [
     FoldAction(),

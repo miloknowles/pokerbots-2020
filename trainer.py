@@ -7,107 +7,107 @@ import torch.multiprocessing as mp
 from torch.utils.data import DataLoader
 from tensorboardX import SummaryWriter
 
-from pypokerengine.api.emulator import Emulator
+# from pypokerengine.api.emulator import Emulator
 
 from constants import Constants
 from utils import *
-from traverse import traverse
+from traverse import traverse, make_actions, make_infoset, create_new_round, make_precomputed_ev
 from memory_buffer import MemoryBuffer
-from infoset import InfoSet
+from infoset import EvInfoSet
 from memory_buffer_dataset import MemoryBufferDataset
 from network_wrapper import NetworkWrapper
 
 
-def make_infoset_helper(hole_suit_rank, round_state):
-  """
-  Make an infoset representation for the player about to act.
-  """
-  # NOTE(milo): Acting position is 0 if this player is the SB (first to act) and 1 if BB.
-  small_blind_player_idx = (round_state["big_blind_pos"] + 1) % 2
-  acting_player_idx = int(round_state["next_player"])
+# def make_infoset_helper(hole_suit_rank, round_state):
+#   """
+#   Make an infoset representation for the player about to act.
+#   """
+#   # NOTE(milo): Acting position is 0 if this player is the SB (first to act) and 1 if BB.
+#   small_blind_player_idx = (round_state["big_blind_pos"] + 1) % 2
+#   acting_player_idx = int(round_state["next_player"])
 
-  # This is 0 if the current acting player is the SB and 1 if BB.
-  acting_player_blind = 0 if small_blind_player_idx == acting_player_idx else 1
+#   # This is 0 if the current acting player is the SB and 1 if BB.
+#   acting_player_blind = 0 if small_blind_player_idx == acting_player_idx else 1
 
-  # NOTE(milo): PyPokerEngine encodes cards with rank-suit i.e CJ.
-  board_suit_rank = round_state["community_card"]
+#   # NOTE(milo): PyPokerEngine encodes cards with rank-suit i.e CJ.
+#   board_suit_rank = round_state["community_card"]
 
-  bet_history_vec = torch.zeros(Constants.BET_HISTORY_SIZE)
-  h = round_state["action_histories"]
+#   bet_history_vec = torch.zeros(Constants.BET_HISTORY_SIZE)
+#   h = round_state["action_histories"]
   
-  # Always start out with SB + BB in the pot.
-  pot_total = (3 * Constants.SMALL_BLIND_AMOUNT)
-  for street_num, street in enumerate(["preflop", "flop", "turn", "river"]):
-    if street in h:
-      for i, action in enumerate(h[street]):
-        # Skip actions if they exceed the number of betting actions we consider.
-        if (street_num * Constants.BET_ACTIONS_PER_STREET + i) >= len(bet_history_vec):
-          continue
-        # Percentage of CURRENT pot.
-        bet_history_vec[street_num * Constants.BET_ACTIONS_PER_STREET + i] = action["amount"] / pot_total
-        pot_total += action["amount"]
+#   # Always start out with SB + BB in the pot.
+#   pot_total = (3 * Constants.SMALL_BLIND_AMOUNT)
+#   for street_num, street in enumerate(["preflop", "flop", "turn", "river"]):
+#     if street in h:
+#       for i, action in enumerate(h[street]):
+#         # Skip actions if they exceed the number of betting actions we consider.
+#         if (street_num * Constants.BET_ACTIONS_PER_STREET + i) >= len(bet_history_vec):
+#           continue
+#         # Percentage of CURRENT pot.
+#         bet_history_vec[street_num * Constants.BET_ACTIONS_PER_STREET + i] = action["amount"] / pot_total
+#         pot_total += action["amount"]
 
-  infoset = InfoSet(
-    encode_cards_suit_rank(hole_suit_rank),
-    encode_cards_suit_rank(board_suit_rank),
-    bet_history_vec,
-    acting_player_idx)
+#   infoset = InfoSet(
+#     encode_cards_suit_rank(hole_suit_rank),
+#     encode_cards_suit_rank(board_suit_rank),
+#     bet_history_vec,
+#     acting_player_idx)
 
-  return infoset
-
-
-def make_infoset(game_state, evt):
-  acting_player_idx = int(evt["round_state"]["next_player"])
-  players = game_state["table"].seats.players
-  hole_suit_rank = [
-    str(players[acting_player_idx].hole_card[0]),
-    str(players[acting_player_idx].hole_card[1])]
-
-  return make_infoset_helper(hole_suit_rank, evt["round_state"])
+#   return infoset
 
 
-def generate_actions(valid_actions, pot_amount):
-  """
-  Using the valid_actions from the game engine, mask out and scale the entire set of actions.
-  """
-  actions_mask = torch.zeros(len(Constants.ALL_ACTIONS))
-  actions_unscaled = deepcopy(Constants.ALL_ACTIONS)
+# def make_infoset(game_state, evt):
+#   acting_player_idx = int(evt["round_state"]["next_player"])
+#   players = game_state["table"].seats.players
+#   hole_suit_rank = [
+#     str(players[acting_player_idx].hole_card[0]),
+#     str(players[acting_player_idx].hole_card[1])]
 
-  for a in actions_unscaled:
+#   return make_infoset_helper(hole_suit_rank, evt["round_state"])
+
+
+# def generate_actions(valid_actions, pot_amount):
+#   """
+#   Using the valid_actions from the game engine, mask out and scale the entire set of actions.
+#   """
+#   actions_mask = torch.zeros(len(Constants.ALL_ACTIONS))
+#   actions_unscaled = deepcopy(Constants.ALL_ACTIONS)
+
+#   for a in actions_unscaled:
     
 
-  for item in valid_actions:
-    if item["action"] == "fold":
-      actions_mask[Constants.ACTION_FOLD] = 1
+#   for item in valid_actions:
+#     if item["action"] == "fold":
+#       actions_mask[Constants.ACTION_FOLD] = 1
 
-    elif item["action"] == "call":
-      actions_mask[Constants.ACTION_CALL] = 1
-      actions_scaled[Constants.ACTION_CALL][1] = item["amount"]
+#     elif item["action"] == "call":
+#       actions_mask[Constants.ACTION_CALL] = 1
+#       actions_scaled[Constants.ACTION_CALL][1] = item["amount"]
 
-    elif item["action"] == "raise":
-      min_raise, max_raise = item["amount"]["min"], item["amount"]["max"]
+#     elif item["action"] == "raise":
+#       min_raise, max_raise = item["amount"]["min"], item["amount"]["max"]
 
-      # actions_mask[Constants.ACTION_MINRAISE] = 1
-      actions_mask[Constants.ACTION_MAXRAISE] = 1
-      # actions_scaled[Constants.ACTION_MINRAISE][1] = min_raise
-      actions_scaled[Constants.ACTION_MAXRAISE][1] = max_raise
+#       # actions_mask[Constants.ACTION_MINRAISE] = 1
+#       actions_mask[Constants.ACTION_MAXRAISE] = 1
+#       # actions_scaled[Constants.ACTION_MINRAISE][1] = min_raise
+#       actions_scaled[Constants.ACTION_MAXRAISE][1] = max_raise
 
-      if pot_amount <= max_raise:
-        actions_mask[Constants.ACTION_POTRAISE] = 1
-        actions_scaled[Constants.ACTION_POTRAISE][1] = pot_amount
+#       if pot_amount <= max_raise:
+#         actions_mask[Constants.ACTION_POTRAISE] = 1
+#         actions_scaled[Constants.ACTION_POTRAISE][1] = pot_amount
 
-      # if 2 * pot_amount <= max_raise:
-      #   actions_mask[Constants.ACTION_TWOPOTRAISE] = 1
-      #   actions_scaled[Constants.ACTION_TWOPOTRAISE][1] = 2 * pot_amount
+#       # if 2 * pot_amount <= max_raise:
+#       #   actions_mask[Constants.ACTION_TWOPOTRAISE] = 1
+#       #   actions_scaled[Constants.ACTION_TWOPOTRAISE][1] = 2 * pot_amount
       
-      # if 3 * pot_amount <= max_raise:
-      #   actions_mask[Constants.ACTION_THREEPOTRAISE] = 1
-      #   actions_scaled[Constants.ACTION_THREEPOTRAISE][1] = 3 * pot_amount
+#       # if 3 * pot_amount <= max_raise:
+#       #   actions_mask[Constants.ACTION_THREEPOTRAISE] = 1
+#       #   actions_scaled[Constants.ACTION_THREEPOTRAISE][1] = 3 * pot_amount
 
-  return actions_scaled, actions_mask
+#   return actions_scaled, actions_mask
 
 
-def traverse_worker(worker_id, traverse_player, strategies, save_lock, opt, t, eval_mode,
+def traverse_worker(worker_id, traverse_player_idx, strategies, save_lock, opt, t, eval_mode,
                     info_queue):
   """
   A worker that traverses the game tree K times, saving things to memory buffers. Each worker
@@ -117,7 +117,7 @@ def traverse_worker(worker_id, traverse_player, strategies, save_lock, opt, t, e
   """
   advt_mem = MemoryBuffer(Constants.INFO_SET_SIZE, Constants.NUM_ACTIONS,
                           max_size=opt.SINGLE_PROC_MEM_BUFFER_MAX_SIZE,
-                          autosave_params=(opt.MEMORY_FOLDER, opt.ADVT_BUFFER_FMT.format(traverse_player)),
+                          autosave_params=(opt.MEMORY_FOLDER, opt.ADVT_BUFFER_FMT.format(traverse_player_idx)),
                           save_lock=save_lock) if eval_mode == False else None
   
   strt_mem = MemoryBuffer(Constants.INFO_SET_SIZE, Constants.NUM_ACTIONS,
@@ -135,22 +135,13 @@ def traverse_worker(worker_id, traverse_player, strategies, save_lock, opt, t, e
     ctr = [0]
 
     # Generate a random initialization, alternating the SB player each time.
-    emulator = Emulator()
-    emulator.set_game_rule(
-      player_num=k % 2,
-      max_round=5,
-      small_blind_amount=Constants.SMALL_BLIND_AMOUNT,
-      ante_amount=Constants.ANTE_AMOUNT)
+    sb_player_idx = k % 2
+    round_state = create_new_round(sb_player_idx)
 
-    players_info = {}
-    players_info[Constants.PLAYER1_UID] = {"name": Constants.PLAYER1_UID, "stack": Constants.INITIAL_STACK}
-    players_info[Constants.PLAYER2_UID] = {"name": Constants.PLAYER2_UID, "stack": Constants.INITIAL_STACK}
-
-    initial_state = emulator.generate_initial_game_state(players_info)
-    game_state, events = emulator.start_new_round(initial_state)
-
-    info = traverse(game_state, [events[-1]], emulator, generate_actions, make_infoset, traverse_player,
-             strategies, advt_mem, strt_mem, t, recursion_ctr=ctr, do_external_sampling=not eval_mode)
+    # TODO: make sure precomputed is correct.
+    precomputed_ev = make_precomputed_ev(round_state)
+    info = traverse(round_state, make_actions, make_infoset, traverse_player_idx, sb_player_idx,
+                    strategies, advt_mem, strt_mem, t, precomputed_ev, recursion_ctr=ctr)
 
     if info_queue is not None:
       info_queue.put(info, True, 0.1)
@@ -171,18 +162,21 @@ class Trainer(object):
     self.opt = opt
 
     self.value_networks = {
-      Constants.PLAYER1_UID: NetworkWrapper(Constants.NUM_STREETS, Constants.BET_HISTORY_SIZE,
-                                            Constants.NUM_ACTIONS, opt.EMBED_DIM, device=opt.DEVICE),
-      Constants.PLAYER2_UID: NetworkWrapper(Constants.NUM_STREETS, Constants.BET_HISTORY_SIZE,
-                                            Constants.NUM_ACTIONS, opt.EMBED_DIM, device=opt.DEVICE)
+      0: NetworkWrapper(Constants.BET_HISTORY_SIZE,
+                        Constants.NUM_ACTIONS, ev_embed_dim=opt.EV_EMBED_DIM,
+                        bet_embed_dim=opt.BET_EMBED_DIM, device=opt.DEVICE),
+      1: NetworkWrapper(Constants.BET_HISTORY_SIZE,
+                        Constants.NUM_ACTIONS, ev_embed_dim=opt.EV_EMBED_DIM,
+                        bet_embed_dim=opt.BET_EMBED_DIM, device=opt.DEVICE)
     }
-    self.value_networks[Constants.PLAYER1_UID]._network.share_memory()
-    self.value_networks[Constants.PLAYER2_UID]._network.share_memory()
+    self.value_networks[0]._network.share_memory()
+    self.value_networks[1]._network.share_memory()
     print("[DONE] Made value networks")
 
     # TODO(milo): Does this need to be different than the value networks?
-    self.strategy_network = NetworkWrapper(Constants.NUM_STREETS, Constants.BET_HISTORY_SIZE,
-                                           Constants.NUM_ACTIONS, opt.EMBED_DIM)
+    self.strategy_network = NetworkWrapper(Constants.BET_HISTORY_SIZE,
+                        Constants.NUM_ACTIONS, ev_embed_dim=opt.EV_EMBED_DIM,
+                        bet_embed_dim=opt.BET_EMBED_DIM, device=opt.DEVICE)
     print("[DONE] Made strategy network")
 
     self.writers = {}
@@ -192,16 +186,16 @@ class Trainer(object):
   def main(self):
     eval_t = 0
     for t in range(self.opt.NUM_CFR_ITERS):
-      for traverse_player in [Constants.PLAYER1_UID, Constants.PLAYER2_UID]:
-        self.do_cfr_iter_for_player(traverse_player, t)
-        self.train_value_network(traverse_player, t)
+      for traverse_player_idx in (0, 1):
+        self.do_cfr_iter_for_player(traverse_player_idx, t)
+        self.train_value_network(traverse_player_idx, t)
         self.eval_value_network("cfr", eval_t, None)
         eval_t += 1
     # TODO(milo): Train strategy network.
   
-  def do_cfr_iter_for_player(self, traverse_player, t):
-    self.value_networks[Constants.PLAYER1_UID]._network.share_memory()
-    self.value_networks[Constants.PLAYER2_UID]._network.share_memory()
+  def do_cfr_iter_for_player(self, traverse_player_idx, t):
+    self.value_networks[0]._network.share_memory()
+    self.value_networks[1]._network.share_memory()
 
     manager = mp.Manager()
     save_lock = manager.Lock()
@@ -211,7 +205,7 @@ class Trainer(object):
 
     mp.spawn(
       traverse_worker,
-      args=(traverse_player, self.value_networks, save_lock, self.opt, t, False, None),
+      args=(traverse_player_idx, self.value_networks, save_lock, self.opt, t, False, None),
       nprocs=self.opt.NUM_TRAVERSE_WORKERS, join=True, daemon=False)
 
     elapsed = time.time() - t0
@@ -233,23 +227,24 @@ class Trainer(object):
     weighted_se = weights_safe * (target - output).pow(2) / weights_safe.mean()
     return weighted_se.mean()
 
-  def train_value_network(self, traverse_player, t):
+  def train_value_network(self, traverse_player_idx, t):
     """
     Train a value network from scratch using samples from the traverse player's buffer.
     """
     losses = {}
 
     # This causes the network to be reset.
-    model_wrap = self.value_networks[traverse_player]
-    model_wrap = NetworkWrapper(Constants.NUM_STREETS, Constants.BET_HISTORY_SIZE,
-                                Constants.NUM_ACTIONS, self.opt.EMBED_DIM, device=self.opt.DEVICE)
+    model_wrap = self.value_networks[traverse_player_idx]
+    model_wrap = NetworkWrapper(Constants.BET_HISTORY_SIZE,
+                                Constants.NUM_ACTIONS, ev_embed_dim=self.opt.EV_EMBED_DIM,
+                                bet_embed_dim=self.opt.BET_EMBED_DIM, device=self.opt.DEVICE)
 
     net = model_wrap.network()
     net.train()
 
     optimizer = torch.optim.Adam(net.parameters(), lr=self.opt.SGD_LR)
 
-    buffer_name = self.opt.ADVT_BUFFER_FMT.format(traverse_player)
+    buffer_name = self.opt.ADVT_BUFFER_FMT.format(traverse_player_idx)
     train_dataset = MemoryBufferDataset(self.opt.MEMORY_FOLDER, buffer_name,
                                         self.opt.TRAIN_DATASET_SIZE)
     train_loader = DataLoader(train_dataset,
@@ -282,16 +277,16 @@ class Trainer(object):
         loss = self.linear_cfr_loss(output, advt_target, weights, t)
         # loss = torch.nn.functional.mse_loss(output, advt_target)
         loss.backward()
-        losses["mse_loss/{}/{}".format(t, traverse_player)] = loss.cpu().item()
+        losses["mse_loss/{}/{}".format(t, traverse_player_idx)] = loss.cpu().item()
 
         optimizer.step()
 
         if (batch_idx % self.opt.TRAINING_LOG_HZ) == 0:
-          self.log("train", traverse_player, t, losses, step)
+          self.log("train", traverse_player_idx, t, losses, step)
 
         # Only need to save the value network for the traversing player.
         if (batch_idx % self.opt.TRAINING_VALUE_NET_SAVE_HZ) == 0:
-          self.save_models(t, save_value_networks=[traverse_player], save_strategy_network=False)
+          self.save_models(t, save_value_networks=[traverse_player_idx], save_strategy_network=False)
 
         if (batch_idx % self.opt.TRAINING_VALUE_NET_EVAL_HZ) == 0 and batch_idx > 0:
           self.eval_value_network("train", t, step)
@@ -303,7 +298,7 @@ class Trainer(object):
     Save model weights to disk.
 
     t (int) : The CFR iteration that these models are being trained on.
-    save_value_networks (list of str) : Zero or more of [PLAYER1_UID, PLAYER2_UID].
+    save_value_networks (list of str) : Zero or more of [0, 1].
     save_strategy_network (bool) : Whether or not to save the current strategy network.
     """
     save_folder = os.path.join(self.opt.TRAIN_LOG_FOLDER, "models", "weights_{}".format(t))
@@ -337,7 +332,7 @@ class Trainer(object):
     # Use worker with eval_mode = True.
     mp.spawn(
       traverse_worker,
-      args=(Constants.PLAYER1_UID, self.value_networks, save_lock, self.opt, t, True, info_queue),
+      args=(0, self.value_networks, save_lock, self.opt, t, True, info_queue),
       nprocs=self.opt.NUM_TRAVERSE_WORKERS, join=True, daemon=False)
 
     elapsed = time.time() - t0
@@ -369,11 +364,11 @@ class Trainer(object):
     print("===> [EVAL] Exploitability | mean={} mbb/g | stdev={} | (cfr_iter={})".format(
         mean_mbb_per_game, stdev_mbb_per_game, t))
 
-  def log(self, mode, traverse_player, t, losses, steps):
+  def log(self, mode, traverse_player_idx, t, losses, steps):
     """
     Write an event to the tensorboard events file.
     """
-    loss = losses["mse_loss/{}/{}".format(t, traverse_player)]
+    loss = losses["mse_loss/{}/{}".format(t, traverse_player_idx)]
     print("==> TRAINING | steps={} | loss={} | cfr_iter={}".format(steps, loss, t))
 
     writer = self.writers[mode]
@@ -387,7 +382,7 @@ class Trainer(object):
     if not os.path.exists(load_weights_path):
       print("WARNING: Load weights path {} does not exist".format(load_weights_path))
 
-    for player_name in [Constants.PLAYER1_UID, Constants.PLAYER2_UID]:
+    for player_name in [0, 1]:
       load_path = os.path.join(load_weights_path, "value_network_{}.pth".format(player_name))
       if os.path.exists(load_path):
         model_dict = self.value_networks[player_name].network().state_dict()

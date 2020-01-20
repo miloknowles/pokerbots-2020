@@ -37,10 +37,14 @@ class Options(object):
                 type=int,
                 help="Print out debug statement after this many traversals",
                 default=500)
-    self.parser.add_argument("--EMBED_DIM",
+    self.parser.add_argument("--EV_EMBED_DIM",
                 type=int,
-                help="Size of vector embedding for cards",
-                default=64)
+                help="Size of vector embedding for EV",
+                default=8)
+    self.parser.add_argument("--BET_EMBED_DIM",
+                type=int,
+                help="Size of vector embedding for bet history",
+                default=128)
     self.parser.add_argument("--SGD_ITERS",
                 type=int,
                 help="Training gradient descent update iterations",

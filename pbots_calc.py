@@ -87,7 +87,7 @@ def calc(hands, board, dead, iters):
 
 class CalcWithLookup(object):
     def __init__(self):
-        with open("./preflop_odds.pkl", "rb") as f:
+        with open("/home/milo/pokerbots-2020/preflop_odds.pkl", "rb") as f:
             self.preflop_odds = pickle.load(f)
         # self.preflop_odds = pickle.load(open('./preflop_odds.pkl','rb'))
     
