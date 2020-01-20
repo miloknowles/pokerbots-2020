@@ -18,95 +18,6 @@ from memory_buffer_dataset import MemoryBufferDataset
 from network_wrapper import NetworkWrapper
 
 
-# def make_infoset_helper(hole_suit_rank, round_state):
-#   """
-#   Make an infoset representation for the player about to act.
-#   """
-#   # NOTE(milo): Acting position is 0 if this player is the SB (first to act) and 1 if BB.
-#   small_blind_player_idx = (round_state["big_blind_pos"] + 1) % 2
-#   acting_player_idx = int(round_state["next_player"])
-
-#   # This is 0 if the current acting player is the SB and 1 if BB.
-#   acting_player_blind = 0 if small_blind_player_idx == acting_player_idx else 1
-
-#   # NOTE(milo): PyPokerEngine encodes cards with rank-suit i.e CJ.
-#   board_suit_rank = round_state["community_card"]
-
-#   bet_history_vec = torch.zeros(Constants.BET_HISTORY_SIZE)
-#   h = round_state["action_histories"]
-  
-#   # Always start out with SB + BB in the pot.
-#   pot_total = (3 * Constants.SMALL_BLIND_AMOUNT)
-#   for street_num, street in enumerate(["preflop", "flop", "turn", "river"]):
-#     if street in h:
-#       for i, action in enumerate(h[street]):
-#         # Skip actions if they exceed the number of betting actions we consider.
-#         if (street_num * Constants.BET_ACTIONS_PER_STREET + i) >= len(bet_history_vec):
-#           continue
-#         # Percentage of CURRENT pot.
-#         bet_history_vec[street_num * Constants.BET_ACTIONS_PER_STREET + i] = action["amount"] / pot_total
-#         pot_total += action["amount"]
-
-#   infoset = InfoSet(
-#     encode_cards_suit_rank(hole_suit_rank),
-#     encode_cards_suit_rank(board_suit_rank),
-#     bet_history_vec,
-#     acting_player_idx)
-
-#   return infoset
-
-
-# def make_infoset(game_state, evt):
-#   acting_player_idx = int(evt["round_state"]["next_player"])
-#   players = game_state["table"].seats.players
-#   hole_suit_rank = [
-#     str(players[acting_player_idx].hole_card[0]),
-#     str(players[acting_player_idx].hole_card[1])]
-
-#   return make_infoset_helper(hole_suit_rank, evt["round_state"])
-
-
-# def generate_actions(valid_actions, pot_amount):
-#   """
-#   Using the valid_actions from the game engine, mask out and scale the entire set of actions.
-#   """
-#   actions_mask = torch.zeros(len(Constants.ALL_ACTIONS))
-#   actions_unscaled = deepcopy(Constants.ALL_ACTIONS)
-
-#   for a in actions_unscaled:
-    
-
-#   for item in valid_actions:
-#     if item["action"] == "fold":
-#       actions_mask[Constants.ACTION_FOLD] = 1
-
-#     elif item["action"] == "call":
-#       actions_mask[Constants.ACTION_CALL] = 1
-#       actions_scaled[Constants.ACTION_CALL][1] = item["amount"]
-
-#     elif item["action"] == "raise":
-#       min_raise, max_raise = item["amount"]["min"], item["amount"]["max"]
-
-#       # actions_mask[Constants.ACTION_MINRAISE] = 1
-#       actions_mask[Constants.ACTION_MAXRAISE] = 1
-#       # actions_scaled[Constants.ACTION_MINRAISE][1] = min_raise
-#       actions_scaled[Constants.ACTION_MAXRAISE][1] = max_raise
-
-#       if pot_amount <= max_raise:
-#         actions_mask[Constants.ACTION_POTRAISE] = 1
-#         actions_scaled[Constants.ACTION_POTRAISE][1] = pot_amount
-
-#       # if 2 * pot_amount <= max_raise:
-#       #   actions_mask[Constants.ACTION_TWOPOTRAISE] = 1
-#       #   actions_scaled[Constants.ACTION_TWOPOTRAISE][1] = 2 * pot_amount
-      
-#       # if 3 * pot_amount <= max_raise:
-#       #   actions_mask[Constants.ACTION_THREEPOTRAISE] = 1
-#       #   actions_scaled[Constants.ACTION_THREEPOTRAISE][1] = 3 * pot_amount
-
-#   return actions_scaled, actions_mask
-
-
 def traverse_worker(worker_id, traverse_player_idx, strategies, save_lock, opt, t, eval_mode,
                     info_queue):
   """
@@ -138,7 +49,6 @@ def traverse_worker(worker_id, traverse_player_idx, strategies, save_lock, opt, 
     sb_player_idx = k % 2
     round_state = create_new_round(sb_player_idx)
 
-    # TODO: make sure precomputed is correct.
     precomputed_ev = make_precomputed_ev(round_state)
     info = traverse(round_state, make_actions, make_infoset, traverse_player_idx, sb_player_idx,
                     strategies, advt_mem, strt_mem, t, precomputed_ev, recursion_ctr=ctr)
@@ -253,7 +163,8 @@ class Trainer(object):
 
     # Due to memory limitations, we can only store a subset of the dataset in memory at a time.
     # Calculate the number of times we'll have to resample and iterate over the dataset.
-    num_resample_iters = int((self.opt.SGD_ITERS * self.opt.SGD_BATCH_SIZE) / len(train_dataset))
+    num_resample_iters = int(float(self.opt.SGD_ITERS * self.opt.SGD_BATCH_SIZE) / len(train_dataset)) + 1
+    print("Will do {} resample iters".format(num_resample_iters))
 
     step = 0
     for resample_iter in range(num_resample_iters):
@@ -262,9 +173,7 @@ class Trainer(object):
       print(">> Done. DataLoader has {} batches of size {}.".format(len(train_loader), self.opt.SGD_BATCH_SIZE))
 
       for batch_idx, input_dict in enumerate(train_loader):
-        hole_cards_input = input_dict["hole_cards"].to(self.opt.DEVICE)
-        board_cards_input = input_dict["board_cards"].to(self.opt.DEVICE)
-
+        ev_input = input_dict["ev_input"].to(self.opt.DEVICE)
         bets_input = input_dict["bets_input"].to(self.opt.DEVICE)
         advt_target = input_dict["target"].to(self.opt.DEVICE)
 
@@ -273,7 +182,7 @@ class Trainer(object):
         optimizer.zero_grad()
 
         # Minimize MSE between predicted advantage and instantaneous regret samples.
-        output = net(hole_cards_input, board_cards_input, bets_input)
+        output = net(ev_input, bets_input)
         loss = self.linear_cfr_loss(output, advt_target, weights, t)
         # loss = torch.nn.functional.mse_loss(output, advt_target)
         loss.backward()
