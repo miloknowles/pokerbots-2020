@@ -1,13 +1,13 @@
 # This script will be run from the top level directory of the bot.
-PREV_BUILD_USER=$(head -n 1 ./.prev_build_user)
-echo "\nNOTE: Project was last built by = ${PREV_BUILD_USER}\n"
+PREV_BUILD_DIR=$(head -n 1 .PREV_BUILD_DIR)
 
-# Check if $USER has changed, if so do a clean build.
-if [ "${USER}" != "${PREV_BUILD_USER}" ]
+if [ "${PREV_BUILD_DIR}" != `pwd` ]
 then
-  echo "WARNING: current user ${USER} != ${PREV_BUILD_USER}, cleaning"
+  echo "WARNING: current top level directory `pwd` != ${PREV_BUILD_DIR}, cleaning"
   rm -rf build/ && mkdir build
-  echo "${USER}" > .prev_build_user
+  echo `pwd` > .PREV_BUILD_DIR
+  echo "Updated PREV_BUILD_DIR to `pwd`"
+  cat .PREV_BUILD_DIR
 fi
 
 # Do the cmake build.

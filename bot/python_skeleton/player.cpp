@@ -4,6 +4,12 @@
 
 namespace pb {
 
+
+static bool CanCheckFoldRemainder(const int delta, const int round_num) {
+  return delta > (1.5f * (1000.0f - static_cast<float>(round_num)) + 1);
+}
+
+
 static int MakeRelativeBet(const float frac, const int pot_size, const int min_raise, const int max_raise) {
   const int amt = static_cast<int>(frac * static_cast<float>(pot_size));
   const int clamped = std::min(max_raise, std::max(min_raise, amt));
@@ -24,12 +30,13 @@ Player::Player() {}
  * @param active Your player's index.
  */
 void Player::handle_new_round(GameState* game_state, RoundState* round_state, int active) {
-  //int my_bankroll = game_state->bankroll;  // the total number of chips you've gained or lost from the beginning of the game to the start of this round
+  int my_bankroll = game_state->bankroll;  // the total number of chips you've gained or lost from the beginning of the game to the start of this round
   float game_clock = game_state->game_clock;  // the total number of seconds your bot has left to play this game
   int round_num = game_state->round_num;  // the round number from 1 to NUM_ROUNDS
   //std::array<std::string, 2> my_cards = round_state->hands[active];  // your cards
   
   bool big_blind = static_cast<bool>(active);
+  check_fold_mode_ = CanCheckFoldRemainder(my_bankroll, round_num);
 
   printf("\n================== NEW ROUND: %d ==================\n", round_num);
   std::cout << "*** TIME REMAINING: " << game_clock << std::endl;
@@ -37,7 +44,7 @@ void Player::handle_new_round(GameState* game_state, RoundState* round_state, in
 
   street_ev_.clear();
   current_street_ = -1;
-  // history_ = HistoryTracker(big_blind);
+  history_ = HistoryTracker(big_blind);
 }
 
 /**
@@ -56,7 +63,7 @@ void Player::handle_round_over(GameState* game_state, TerminalState* terminal_st
   const int opp_stack = previous_state->stacks[1-active];  // the number of chips your opponent has remaining
   const int my_contribution = STARTING_STACK - my_stack;  // the number of chips you have contributed to the pot
   const int opp_contribution = STARTING_STACK - opp_stack;  // the number of chips your opponent has contributed to the pot
-  // history_.Update(my_contribution, opp_contribution, street);
+  history_.Update(my_contribution, opp_contribution, street);
 
   const std::array<std::string, 2> my_cards = previous_state->hands[active];  // your cards
   const std::array<std::string, 2> opp_cards = previous_state->hands[1-active];  // opponent's cards or "" if not revealed
@@ -96,7 +103,7 @@ void Player::handle_round_over(GameState* game_state, TerminalState* terminal_st
   }
 
   std::cout << "\n[ROUNDOVER] Final history:" << std::endl;
-  // history_.Print();
+  history_.Print();
   std::cout << std::endl;
 }
 
@@ -135,7 +142,13 @@ Action Player::get_action(GameState* game_state, RoundState* round_state, int ac
       std::cout << "*** RIVER ***" << std::endl;
     }
   }
-  // history_.Update(my_contribution, opp_contribution, street);
+  history_.Update(my_contribution, opp_contribution, street);
+
+  if (check_fold_mode_) {
+    std::cout << "*** [WIN] CHECK-FOLD MODE ACTIVATED ***" << std::endl;
+    const bool check_is_allowed = CHECK_ACTION_TYPE & legal_actions;
+    return check_is_allowed ? CheckAction() : FoldAction();
+  }
 
   // Check fold if no particles left.
   if (pf_.Nonzero() <= 0) {
@@ -192,8 +205,8 @@ Action Player::HandleActionPreflop(float EV, int round_num, int street, int pot_
   const bool is_our_first_action = (is_big_blind && my_contribution == BIG_BLIND) ||
                                    (!is_big_blind && my_contribution == SMALL_BLIND);
   
-  // const int num_betting_rounds = history_.TotalBets(0).first;
-  // printf("Num bettings rounds so far: %d\n", num_betting_rounds);
+  const int num_betting_rounds = history_.TotalBets(0).first;
+  printf("Num bettings rounds so far: %d\n", num_betting_rounds);
 
   if (is_our_first_action) {
     // CASE 1: First action and we are SMALLBLIND.

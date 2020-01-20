@@ -22,8 +22,10 @@ class Player : public Bot {
     int num_showdowns_seen_ = 0;
     int num_showdowns_converge_ = 50;
 
+    bool check_fold_mode_ = false;
+
     int current_street_ = -1;
-    // HistoryTracker history_{false};
+    HistoryTracker history_{false};
 
     // Keep track of some info for betting.
     std::unordered_map<int, float> street_ev_{};
