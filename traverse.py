@@ -166,6 +166,9 @@ def traverse(round_state, action_generator, infoset_generator, traverse_player_i
     if isinstance(round_state, TerminalState):
       node_info.strategy_ev = torch.Tensor(round_state.deltas)
       node_info.best_response_ev = node_info.strategy_ev
+      # print("TERMINAL STATE")
+      # print("*** strategy_ev=", node_info.strategy_ev)
+      # print("*** best_response_ev=", node_info.best_response_ev)
       return node_info
 
     active_player_idx = round_state.button % 2
@@ -196,6 +199,7 @@ def traverse(round_state, action_generator, infoset_generator, traverse_player_i
         if mask[i] <= 0:
           continue
         next_round_state = round_state.copy().proceed(a)
+        # print("TRAVERSE ACTION:", a)
         child_node_info = traverse(next_round_state,
                                    action_generator, infoset_generator,
                                    traverse_player_idx, sb_player_idx, strategies, advt_mem, strt_mem, t,
@@ -210,18 +214,29 @@ def traverse(round_state, action_generator, infoset_generator, traverse_player_i
       
       # Sum along every action multiplied by its probability of occurring.
       node_info.strategy_ev = (action_values * action_probs).sum(axis=1)
+      
+      # print("====> TRAVERSE PLAYER ACTION NODE <=====")
+      # print(round_state.bet_history)
+      # print("strategy_ev=", node_info.strategy_ev)
 
       # Compute the instantaneous regrets for the traversing player.
-      instant_regrets_tp = (action_values[traverse_player_idx] - (node_info.strategy_ev[traverse_player_idx] * mask))
+      instant_regrets_tp = mask * (action_values[traverse_player_idx] - node_info.strategy_ev[traverse_player_idx])
+
+      # print("action_values=", action_values[traverse_player_idx])
+      # print("instant_regrets=", instant_regrets_tp)
 
       # The acting player chooses the BEST action with probability 1, while the opponent best
       # response EV depends on the reach probability of their next acting situation.
       node_info.best_response_ev[plyr_idx] = torch.max(br_values[plyr_idx,:])
       node_info.best_response_ev[opp_idx] = torch.sum(action_probs * br_values[opp_idx,:])
 
+      # print("best_response_plyr=", node_info.best_response_ev[plyr_idx])
+      # print("best_response_opp=", node_info.best_response_ev[opp_idx])
+
       # Exploitability is the difference in payoff between a local best response strategy and the
       # full mixed strategy.
       node_info.exploitability = node_info.best_response_ev - node_info.strategy_ev
+      # print("exploitability=", node_info.exploitability)
 
       # Add the instantaneous regrets to advantage memory for the traversing player.
       if advt_mem is not None:
@@ -249,6 +264,8 @@ def traverse(round_state, action_generator, infoset_generator, traverse_player_i
       # EXTERNAL SAMPLING: choose only ONE action for the non-traversal player.
       action = actions[torch.multinomial(action_probs, 1).item()]
       next_round_state = round_state.copy().proceed(action)
+
+      # print("NON-TRAVERSE ACTION:", action)
 
       return traverse(next_round_state,
                       action_generator, infoset_generator, traverse_player_idx, sb_player_idx,

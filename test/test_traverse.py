@@ -1,4 +1,4 @@
-import unittest, time
+import unittest, time, random
 from traverse import *
 from network_wrapper import NetworkWrapper
 from engine import FoldAction, CallAction, CheckAction, RaiseAction
@@ -119,7 +119,7 @@ class TraverseTest(unittest.TestCase):
     print(infoset.bet_history_vec)
 
   def test_traverse_timing(self):
-    t = 1
+    t = 0
     sb_index = 0
     traverse_player_idx = 0
 
@@ -159,6 +159,28 @@ class TraverseTest(unittest.TestCase):
     stdev = np.sqrt(variance)
     print("stdev={}".format(stdev))
 
+  def test_traverse_deterministic(self):
+    t = 0
+    sb_index = 0
+    traverse_player_idx = 0
+
+    random.seed(1234)
+    round_state = create_new_round(sb_index)
+    print(round_state.hands)
+    print(round_state.deck.peek(5))
+
+    strategies = [
+      NetworkWrapper(Constants.BET_HISTORY_SIZE, Constants.NUM_ACTIONS, 8, 64, torch.device("cuda:0")),
+      NetworkWrapper(Constants.BET_HISTORY_SIZE, Constants.NUM_ACTIONS, 8, 64, torch.device("cuda:0"))
+    ]
+
+    ctr = [0]
+    precomputed_ev = make_precomputed_ev(round_state)
+    info = traverse(round_state, make_actions, make_infoset, traverse_player_idx, sb_index,
+                    strategies, None, None, t, precomputed_ev, recursion_ctr=ctr)
+    print(info.exploitability)
+    print(info.strategy_ev)
+    print(info.best_response_ev)
 
 if __name__ == "__main__":
   unittest.main()
