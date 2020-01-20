@@ -37,6 +37,7 @@ class MemoryBufferDataset(Dataset):
     self._weights = None
     self._items = None
 
+    # Sample indices between 0 and N, then total number of items in the dataset.
     idx = torch.randint(0, self._N, (self._n,)).long()
     cumul_idx = 0
     for i in self._manifest_df.index:
@@ -59,12 +60,14 @@ class MemoryBufferDataset(Dataset):
 
   def __len__(self):
     """
-    This dataset will hold at most "n" things, but maybe have fewer than that if the number of items
-    on disk ("N") is less than the max size.
+    # This dataset will hold at most "n" things, but maybe have fewer than that if the number of items
+    # on disk ("N") is less than the max size.
     """
-    return min(self._n, self._N)
+    # return min(self._n, self._N)
+    return self._n
 
   def __getitem__(self, idx):
+    # print("__getitem__:", idx)
     infoset = unpack_ev_infoset(self._infosets[idx])
     ev_input = infoset.get_ev_input_tensors()
 

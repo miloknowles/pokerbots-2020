@@ -107,6 +107,7 @@ class Trainer(object):
     # TODO(milo): Train strategy network.
   
   def do_cfr_iter_for_player(self, traverse_player_idx, t):
+    print("\nDoing CFR iteration t={} for player {}".format(t, traverse_player_idx))
     self.value_networks[0]._network = self.value_networks[0]._network.to(self.opt.TRAVERSE_DEVICE)
     self.value_networks[1]._network = self.value_networks[1]._network.to(self.opt.TRAVERSE_DEVICE)
     self.value_networks[0]._device = self.opt.TRAVERSE_DEVICE
@@ -114,7 +115,6 @@ class Trainer(object):
 
     manager = mp.Manager()
     save_lock = manager.Lock()
-    progress_queue = manager.Queue()
 
     t0 = time.time()
 
@@ -140,13 +140,13 @@ class Trainer(object):
     # NOTE(milo): Need to add 1 to the weights to deal with zeroth CFR iteration.
     weights_safe = (weights + 1.0)
     weighted_se = weights_safe * (target - output).pow(2) / weights_safe.mean()
-    # print(weighted_se)
     return weighted_se.mean()
 
   def train_value_network(self, traverse_player_idx, t):
     """
     Train a value network from scratch using samples from the traverse player's buffer.
     """
+    print("\nTraining value network for {} from scratch (t={})".format(traverse_player_idx, t))
     losses = {}
 
     # This causes the network to be reset.
@@ -163,22 +163,33 @@ class Trainer(object):
     buffer_name = self.opt.ADVT_BUFFER_FMT.format(traverse_player_idx)
     train_dataset = MemoryBufferDataset(self.opt.MEMORY_FOLDER, buffer_name,
                                         self.opt.TRAIN_DATASET_SIZE)
-    train_loader = DataLoader(train_dataset,
-                              batch_size=self.opt.SGD_BATCH_SIZE,
-                              num_workers=self.opt.NUM_DATA_WORKERS)
+    # train_loader = DataLoader(train_dataset,
+    #                           batch_size=self.opt.SGD_BATCH_SIZE,
+    #                           num_workers=self.opt.NUM_DATA_WORKERS)
 
     # Due to memory limitations, we can only store a subset of the dataset in memory at a time.
     # Calculate the number of times we'll have to resample and iterate over the dataset.
-    num_resample_iters = int(float(self.opt.SGD_ITERS * self.opt.SGD_BATCH_SIZE) / len(train_dataset)) + 1
-    print("Will do {} resample iters".format(num_resample_iters))
+    # num_resample_iters = int(float(self.opt.SGD_ITERS * self.opt.SGD_BATCH_SIZE) / len(train_dataset)) + 1
+    total_items = self.opt.SGD_ITERS * self.opt.SGD_BATCH_SIZE
+    num_resample_iters = int(max(1.0, float(total_items) / self.opt.TRAIN_DATASET_SIZE))
+    print("Will do {} resample iters (need {} total items, dataset size is {})".format(num_resample_iters, total_items, len(train_dataset)))
 
     step = 0
     for resample_iter in range(num_resample_iters):
-      print(">> Doing resample iteration {}/{} ...".format(resample_iter, num_resample_iters))
+      print("> Doing resample iteration {}/{} ...".format(resample_iter, num_resample_iters))
       train_dataset.resample()
-      print(">> Done. DataLoader has {} batches of size {}.".format(len(train_loader), self.opt.SGD_BATCH_SIZE))
+      train_loader = DataLoader(train_dataset,
+                                batch_size=self.opt.SGD_BATCH_SIZE,
+                                num_workers=self.opt.NUM_DATA_WORKERS,
+                                shuffle=True)
+      print("> Done. DataLoader has {} batches of size {}.".format(len(train_loader), self.opt.SGD_BATCH_SIZE))
+
+      print(train_dataset._weights)
 
       for batch_idx, input_dict in enumerate(train_loader):
+        if (batch_idx > self.opt.SGD_ITERS):
+          print("Finished batch {}, didn't need to use whole dataloader".format(batch_idx))
+          break
         ev_input = input_dict["ev_input"].to(self.opt.TRAIN_DEVICE)
         bets_input = input_dict["bets_input"].to(self.opt.TRAIN_DEVICE)
         advt_target = input_dict["target"].to(self.opt.TRAIN_DEVICE)
@@ -188,8 +199,6 @@ class Trainer(object):
         # print(advt_target[:5])
 
         weights = input_dict["weights"].to(self.opt.TRAIN_DEVICE)
-        # print(weights[:5])
-
         optimizer.zero_grad()
 
         # Minimize MSE between predicted advantage and instantaneous regret samples.
@@ -251,6 +260,7 @@ class Trainer(object):
     """
     Evaluate the (total) exploitability of the value networks, as in Brown et. al.
     """
+    print("\nEvaluating value network for player {} (t={})".format(traverse_player_idx, t))
     self.value_networks[0]._network = self.value_networks[0]._network.to(self.opt.TRAVERSE_DEVICE)
     self.value_networks[1]._network = self.value_networks[1]._network.to(self.opt.TRAVERSE_DEVICE)
     self.value_networks[0]._device = self.opt.TRAVERSE_DEVICE
