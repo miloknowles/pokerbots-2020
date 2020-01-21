@@ -1,9 +1,10 @@
-import time, unittest
+import time, unittest, random
 
 import torch
 
 from memory_buffer import MemoryBuffer
-from infoset import EvInfoSet, unpack_ev_infoset
+from infoset import EvInfoSet, unpack_ev_infoset, bucket_small
+from traverse import *
 from utils import encode_cards_rank_suit
 
 
@@ -78,6 +79,48 @@ class EvInfoSetTest(unittest.TestCase):
     ev_t = infoset.get_ev_input_tensors()
     self.assertEqual(ev_t.shape, (1, 1))
     self.assertAlmostEqual(ev_t.item(), ev)
+
+
+class BucketTest(unittest.TestCase):
+  def test_bucket_small(self):
+    random.seed(123)
+    # P2 is the small blind.
+    sb_index = 1
+    round_state = create_new_round(sb_index)
+
+    # SB calls, finishing preflop.
+    infoset = make_infoset(round_state, 1, True)
+    bucket = bucket_small(infoset)
+    print(bucket)
+    round_state = round_state.proceed(CallAction())
+
+    # BB bets 4.
+    infoset = make_infoset(round_state, 0, False)
+    bucket = bucket_small(infoset)
+    print(bucket)
+    round_state = round_state.proceed(RaiseAction(4))
+
+    # SB raises to 8.
+    infoset = make_infoset(round_state, 1, True)
+    bucket = bucket_small(infoset)
+    print(bucket)
+    round_state = round_state.proceed(RaiseAction(8))
+
+    # BB raises to 12.
+    infoset = make_infoset(round_state, 0, False)
+    bucket = bucket_small(infoset)
+    print(bucket)
+    round_state = round_state.proceed(RaiseAction(30))
+
+    # SB calls, ending flop.
+    infoset = make_infoset(round_state, 1, True)
+    bucket = bucket_small(infoset)
+    print(bucket)
+    round_state = round_state.proceed(CallAction())
+
+    # Both check on the turn.
+    round_state = round_state.proceed(CheckAction())
+    round_state = round_state.proceed(CheckAction())
 
 
 if __name__ == "__main__":

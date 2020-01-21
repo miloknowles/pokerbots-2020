@@ -65,7 +65,6 @@ def make_infoset(round_state, player_idx, player_is_sb, precomputed_ev=None):
     return EvInfoSet(ev, h, 0 if player_is_sb else 1)
   
   else:
-    assert(False)
     # hand = "{}:xx".format(str(round_state.hands[player_idx][0]) + str(round_state.hands[player_idx][1]))
     hand = [str(round_state.hands[player_idx][0]), str(round_state.hands[player_idx][1])]
     board = "".join([str(c) for c in round_state.deck.peek(round_state.street)])
@@ -83,7 +82,7 @@ def make_infoset(round_state, player_idx, player_is_sb, precomputed_ev=None):
     ev = EV_CALCULATOR.calc(hand, str.encode(board), b"", iters)
     # ev = calc(str.encode(hand), str.encode(board), b"", 1000).ev[0]
 
-    return EvInfoSet(ev, h, 0 if player_is_sb else 1)
+    return EvInfoSet(ev, h, 0 if player_is_sb else 1, get_street_0123(round_state.street))
 
 
 def make_actions(round_state):
