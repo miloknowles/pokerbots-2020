@@ -14,12 +14,24 @@ from traverse import make_actions, make_infoset, create_new_round, make_precompu
 from infoset import EvInfoSet
 
 
-def traverse_worker(worker_id, traverse_plyr_idx, regrets, avg_strategy, r_lock, avg_lock, opt, t):
+def traverse_worker(worker_id, traverse_plyr_idx, regret_filenames, avg_strategy_filename, r_lock, avg_lock, opt, t):
   """
   A worker that traverses the game tree K times. Each worker gets a copy of the regret buffers,
   and we merge all the results at the end.
   """
   num_traversals_per_worker = int(opt.NUM_TRAVERSALS_PER_ITER / opt.NUM_TRAVERSE_WORKERS)
+
+  t0 = time.time()
+  regrets = {
+    0: RegretMatchedStrategy(),
+    1: RegretMatchedStrategy()
+  }
+  regrets[0].load(regret_filenames[0])
+  regrets[1].load(regret_filenames[1])
+  avg_strategy = RegretMatchedStrategy()
+  avg_strategy.load(avg_strategy_filename)
+  elapsed = time.time() - t0
+  print("[WORKER #{}] Loaded everything from disk in {} sec".format(worker_id, elapsed))
   
   t0 = time.time()
   for k in range(num_traversals_per_worker):
@@ -61,6 +73,22 @@ class Trainer(object):
     self.writers = {}
     self.writers["cfr"] = SummaryWriter(os.path.join(opt.TRAIN_LOG_FOLDER, "cfr"))
 
+    avg_strt_exists = os.path.exists(os.path.dirname(opt.AVG_STRT_FMT))
+    r0_exists = os.path.exists(os.path.dirname(opt.REGRETS_FMT.format(0)))
+    r1_exists = os.path.exists(os.path.dirname(opt.REGRETS_FMT.format(1)))
+
+    if avg_strt_exists and r0_exists and r1_exists:
+      print("WARNING: Found existing files, resuming from where we left off")
+      self.regrets[0].load(opt.REGRETS_FMT.format(0))
+      self.regrets[1].load(opt.REGRETS_FMT.format(1))
+      self.avg_strategy.load(opt.AVG_STRT_FMT)
+    else:
+      # Save to create these initial files.
+      print("NOTE: Doing initial save so that stuff exists")
+      self.regrets[0].save(opt.REGRETS_FMT.format(0))
+      self.regrets[1].save(opt.REGRETS_FMT.format(1))
+      self.avg_strategy.save(opt.AVG_STRT_FMT)
+
   def main(self):
     eval_t = 0
     for t in range(self.opt.NUM_CFR_ITERS):
@@ -69,7 +97,6 @@ class Trainer(object):
 
         # NOTE: Since we have several workers adding things to disk, need to reload their merged results.
         self.load(regrets_to_load=[traverse_plyr_idx], load_avg_strt=True)
-
         self.evaluate(eval_t)
         self.log_sizes(eval_t)
         eval_t += 1
@@ -98,17 +125,20 @@ class Trainer(object):
 
     t0 = time.time()
 
+    regret_filenames = [self.opt.REGRETS_FMT.format(plyr) for plyr in (0, 1)]
+    avg_strt_filename = self.opt.AVG_STRT_FMT
+
     mp.spawn(
       traverse_worker,
-      args=(traverse_plyr_idx, self.regrets, self.avg_strategy, r_lock, avg_lock, self.opt, t),
+      args=(traverse_plyr_idx, regret_filenames, avg_strt_filename, r_lock, avg_lock, self.opt, t),
       nprocs=self.opt.NUM_TRAVERSE_WORKERS, join=True, daemon=False)
 
     elapsed = time.time() - t0
     print("Time for {} traversals across {} workers: {} sec".format(
       self.opt.NUM_TRAVERSALS_PER_ITER, self.opt.NUM_TRAVERSE_WORKERS, elapsed))
 
-  def evaluate(self, steps):
-    print("\nEvaluating average strategy after {} steps".format(steps))
+  def evaluate(self, step):
+    print("\nEvaluating average strategy after {} steps".format(step))
 
     t0 = time.time()
     exploits = []
@@ -132,15 +162,17 @@ class Trainer(object):
     print("Time for {} eval traversals {} sec".format(self.opt.NUM_TRAVERSALS_EVAL, elapsed))
 
     mbb_per_game = 1e3 * torch.Tensor(exploits) / (2.0 * Constants.SMALL_BLIND_AMOUNT)
-    mean_mbb_per_game = mbb_per_game.mean()
-    stdev_mbb_per_game = mbb_per_game.std()
+    mean_mbb_per_game = mbb_per_game.mean().item()
+    stdev_mbb_per_game = mbb_per_game.std().item()
+
+    print("===> [EVAL] [AVG STRATEGY] Exploitability | mean={} mbb/g | stdev={} | (step={})".format(
+        mean_mbb_per_game, stdev_mbb_per_game, step))
 
     writer = self.writers["cfr"]
-    writer.add_scalar("avg_exploit_mbbg_mean", mean_mbb_per_game, steps)
-    writer.add_scalar("avg_exploit_mbbg_stdev", stdev_mbb_per_game, steps)
+    print("Writer step:", step)
+    writer.add_scalar("exploit/mbbg_mean", mean_mbb_per_game, int(step))
+    writer.add_scalar("exploit/mbbg_stdev", stdev_mbb_per_game, int(step))
     writer.close()
-    print("===> [EVAL] [AVG STRATEGY] Exploitability | mean={} mbb/g | stdev={} | (steps={})".format(
-        mean_mbb_per_game, stdev_mbb_per_game, steps))
 
   def log_sizes(self, step):
     writer = self.writers["cfr"]
