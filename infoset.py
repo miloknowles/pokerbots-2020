@@ -151,3 +151,7 @@ def bucket_small(infoset):
     pips[i % 2] += infoset.bet_history_vec[i]
 
   return h
+
+
+def bucket_small_join(b):
+  return '.'.join(b[:3]) + '|' + '.'.join(b[3:7]) + '|' + '.'.join(b[7:11]) + '|' + '.'.join(b[11:])

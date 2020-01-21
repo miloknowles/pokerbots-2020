@@ -3,7 +3,7 @@ import time, unittest, random
 import torch
 
 from memory_buffer import MemoryBuffer
-from infoset import EvInfoSet, unpack_ev_infoset, bucket_small
+from infoset import EvInfoSet, unpack_ev_infoset, bucket_small, bucket_small_join
 from traverse import *
 from utils import encode_cards_rank_suit
 
@@ -178,7 +178,7 @@ class BucketTest(unittest.TestCase):
     print(infoset.bet_history_vec)
 
     bucket = bucket_small(infoset)
-    print(bucket)
+    print(bucket_small_join(bucket))
 
 
 if __name__ == "__main__":
