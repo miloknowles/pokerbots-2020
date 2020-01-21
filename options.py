@@ -114,7 +114,10 @@ class Options(object):
 
     # Call THIS_FMT.format(PLAYER_UID) to get the right name.
     options.ADVT_BUFFER_FMT = "advt_mem_{}"
-    options.STRT_BUFFER_FMT = "strt_mem"  
+    options.STRT_BUFFER_FMT = "strt_mem"
+
+    options.REGRETS_FMT = os.path.join(options.MEMORY_FOLDER, "total_regrets_{}.pkl")
+    options.AVG_STRT_FMT = os.path.join(options.MEMORY_FOLDER, "avg_strategy.pkl")
 
   def parse(self):
     """

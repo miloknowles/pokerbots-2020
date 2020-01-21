@@ -47,7 +47,7 @@ class RegretMatchedStrategy(object):
       # As advocated by Brown et. al., choose the action with highest advantage when all of them are
       # less than zero.
       if r_plus.sum() < 1e-5:
-        total_regret -= total_regret.min()       # Make nonnegative.
+        total_regret -= total_regret.min()      # Make nonnegative.
         total_regret *= valid_mask              # Mask out illegal actions.
         r = torch.zeros(Constants.NUM_ACTIONS)  # Probability 1 for best action.  
         r[torch.argmax(total_regret)] = 1.0
@@ -67,8 +67,32 @@ class RegretMatchedStrategy(object):
       self._regrets = pickle.load(f)
     print("Loaded {} items from {}".format(self.size(), filename))
 
+  def merge_and_save(self, filename, lock):
+    lock.acquire()
 
-def traverse_cfr(round_state, traverse_plyr_idx, sb_plyr_idx, regrets, avg_strategy, t, precomputed_ev, rctr=[0]):
+    existing_regrets = {}
+    if os.path.exists(filename):
+      print("[MERGE] File already exists, loading and combining with myself")
+      with open(filename, "rb") as f:
+        existing_regrets = pickle.load(f)
+    
+    print("[MERGE] Merging {} existing with my {}".format(len(existing_regrets), self.size()))
+    for key in self._regrets:
+      if key not in existing_regrets:
+        existing_regrets[key] = torch.zeros(Constants.NUM_ACTIONS)
+      existing_regrets[key] += self._regrets[key]
+
+    print("[MERGE] Total of {} regrets after merge".format(len(existing_regrets)))
+
+    os.makedirs(os.path.abspath(os.path.dirname(filename)), exist_ok=True)
+    with open(filename, "wb") as f:
+      pickle.dump(existing_regrets, f)
+
+    print("[MERGE] Done with merge, releasing lock")
+    lock.release()
+
+
+def traverse_cfr(round_state, traverse_plyr_idx, sb_plyr_idx, regrets, avg_strategy, t, precomputed_ev, rctr=[0], allow_updates=True):
   """
   Traverse the game tree with external and chance sampling.
 
@@ -111,7 +135,9 @@ def traverse_cfr(round_state, traverse_plyr_idx, sb_plyr_idx, regrets, avg_strat
         if mask[i] <= 0:
           continue
         next_round_state = round_state.copy().proceed(a)
-        child_node_info = traverse_cfr(next_round_state, traverse_plyr_idx, sb_plyr_idx, regrets, avg_strategy, t, precomputed_ev, rctr=rctr)
+        child_node_info = traverse_cfr(
+            next_round_state, traverse_plyr_idx, sb_plyr_idx, regrets,
+            avg_strategy, t, precomputed_ev, rctr=rctr, allow_updates=allow_updates)
         
         # Expected value of the acting player taking this action and then continuing according to their strategy.
         action_values[:,i] = child_node_info.strategy_ev
@@ -136,7 +162,8 @@ def traverse_cfr(round_state, traverse_plyr_idx, sb_plyr_idx, regrets, avg_strat
       node_info.exploitability = node_info.best_response_ev - node_info.strategy_ev
 
       # Add the instantaneous regrets to advantage memory for the traversing player.
-      regrets[traverse_plyr_idx].add_regret(infoset, instant_regrets_tp)
+      if allow_updates:
+        regrets[traverse_plyr_idx].add_regret(infoset, instant_regrets_tp)
 
       return node_info
 
@@ -151,11 +178,13 @@ def traverse_cfr(round_state, traverse_plyr_idx, sb_plyr_idx, regrets, avg_strat
       assert torch.allclose(action_probs.sum(), torch.ones(1))
 
       # Add the action probabilities to the average strategy buffer.
-      avg_strategy.add_regret(infoset, action_probs)
+      if allow_updates:
+        avg_strategy.add_regret(infoset, action_probs)
 
       # EXTERNAL SAMPLING: choose only ONE action for the non-traversal player.
       action = actions[torch.multinomial(action_probs, 1).item()]
       next_round_state = round_state.copy().proceed(action)
 
-      return traverse_cfr(next_round_state, traverse_plyr_idx, sb_plyr_idx, regrets, avg_strategy, t, precomputed_ev, rctr=rctr)
+      return traverse_cfr(next_round_state, traverse_plyr_idx, sb_plyr_idx, regrets,
+                          avg_strategy, t, precomputed_ev, rctr=rctr, allow_updates=allow_updates)
 
