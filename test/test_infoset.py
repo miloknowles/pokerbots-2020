@@ -153,6 +153,52 @@ class BucketTest(unittest.TestCase):
     round_state = round_state.proceed(CheckAction())
     round_state = round_state.proceed(CheckAction())
 
+  def test_bucket_small_02(self):
+    random.seed(123)
+    # P1 is the small blind.
+    sb_index = 0
+    round_state = create_new_round(sb_index)
+
+    # SB raises to 4.
+    infoset = make_infoset(round_state, 0, True)
+    bucket = bucket_small(infoset)
+    print(bucket)
+    round_state = round_state.proceed(RaiseAction(4))
+
+    # BB calls, ending preflop.
+    infoset = make_infoset(round_state, 1, False)
+    bucket = bucket_small(infoset)
+    print("Should see opponent raise preflop")
+    print(bucket)
+    round_state = round_state.proceed(CallAction())
+
+    # BB checks.
+    infoset = make_infoset(round_state, 1, False)
+    bucket = bucket_small(infoset)
+    print(bucket)
+    round_state = round_state.proceed(CheckAction())
+
+    # SB raises to 2.
+    infoset = make_infoset(round_state, 0, True)
+    bucket = bucket_small(infoset)
+    print("Should see self raise preflop")
+    print(bucket)
+    round_state = round_state.proceed(RaiseAction(2))
+
+    # BB raises to 40.
+    infoset = make_infoset(round_state, 1, False)
+    bucket = bucket_small(infoset)
+    print("Should see opponent raise preflop and flop")
+    print(bucket)
+    round_state = round_state.proceed(RaiseAction(40))
+
+    # SB calls, ending flop.
+    infoset = make_infoset(round_state, 0, True)
+    bucket = bucket_small(infoset)
+    print("Should see self raise preflop and flop and opponent raise flop")
+    print(bucket)
+    round_state = round_state.proceed(CallAction())
+
   def test_exceed_action_limit(self):
     # P2 is the small blind.
     sb_index = 1
@@ -166,16 +212,30 @@ class BucketTest(unittest.TestCase):
     round_state = round_state.proceed(RaiseAction(4))
     round_state = round_state.proceed(RaiseAction(6))
     round_state = round_state.proceed(RaiseAction(8))
+
+    infoset = make_infoset(round_state, 0, False)
+    bucket = bucket_small(infoset)
+    print(bucket_small_join(bucket))
+
     round_state = round_state.proceed(RaiseAction(10))
+
+    infoset = make_infoset(round_state, 1, True)
+    bucket = bucket_small(infoset)
+    print(bucket_small_join(bucket))
+
     round_state = round_state.proceed(RaiseAction(12))
     round_state = round_state.proceed(RaiseAction(14))
+
+    infoset = make_infoset(round_state, 1, True)
+    bucket = bucket_small(infoset)
+    print(bucket_small_join(bucket))
+
     round_state = round_state.proceed(RaiseAction(16))
     round_state = round_state.proceed(CallAction())
     
     infoset = make_infoset(round_state, 0, False)
     expected = torch.Tensor([1, 2, 1, 0, 2, 4, 14, 12, 0, 0, 0, 0, 0, 0, 0, 0])
     self.assertTrue((infoset.bet_history_vec == expected).all())
-    print(infoset.bet_history_vec)
 
     bucket = bucket_small(infoset)
     print(bucket_small_join(bucket))

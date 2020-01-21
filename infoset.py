@@ -117,7 +117,8 @@ def bucket_small(infoset):
     
     # Detect a raise.
     amt_after_action = pips[i % 2] + infoset.bet_history_vec[i]
-    action_is_fold = amt_after_action < pips[1 - (i % 2)]
+    action_is_fold = (amt_after_action < pips[1 - (i % 2)]) and infoset.bet_history_vec[i] == 0
+    action_is_wrapped_raise = (amt_after_action < pips[1 - (i % 2)]) and infoset.bet_history_vec[i] > 0
     if action_is_fold:
       break
     action_is_check = amt_after_action == pips[1 - (i % 2)] and infoset.bet_history_vec[i] == 0 
@@ -129,24 +130,29 @@ def bucket_small(infoset):
       else:
         h[opp_raised_offset + street] = 'R'
 
-      # Raise is defined as a percentage of the called pot.
-      if street == infoset.street:
-        call_amt = abs(pips[0] - pips[1])
-        raise_amt = (infoset.bet_history_vec[i] - call_amt) / (cumul[i-1] + call_amt)
-        action_offset = (i - 2) if street == 0 else i % Constants.BET_ACTIONS_PER_STREET
+    # Raise is defined as a percentage of the called pot.
+    if street == infoset.street and i >= 2:
+      call_amt = abs(pips[0] - pips[1])
+      raise_amt = (infoset.bet_history_vec[i] - call_amt) / (cumul[i-1] + call_amt)
+      action_offset = (i - 2) if street == 0 else i % Constants.BET_ACTIONS_PER_STREET
 
-        if action_is_check:
+      if action_is_check:
+        if action_offset == 0:
           h[street_actions_offset + action_offset] = 'CK'
-        elif action_is_call:
-          h[street_actions_offset + action_offset] = 'CL'
         else:
-          assert(raise_amt > 0)
-          if raise_amt <= 0.5:
-            h[street_actions_offset + action_offset] = 'HP'
-          elif raise_amt <= 1.0:
-            h[street_actions_offset + action_offset] = '1P'
-          else:
-            h[street_actions_offset + action_offset] = '2P'
+          break
+      elif action_is_call:
+        h[street_actions_offset + action_offset] = 'CL'
+      elif action_is_wrapped_raise:
+        h[street_actions_offset + action_offset] = '?P'
+      else:
+        assert(raise_amt > 0)
+        if raise_amt <= 0.5:
+          h[street_actions_offset + action_offset] = 'HP'
+        elif raise_amt <= 1.0:
+          h[street_actions_offset + action_offset] = '1P'
+        else:
+          h[street_actions_offset + action_offset] = '2P'
 
     pips[i % 2] += infoset.bet_history_vec[i]
 
