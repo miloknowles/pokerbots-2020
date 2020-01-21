@@ -96,9 +96,18 @@ class Trainer(object):
     eval_t = 0
     for t in range(self.opt.NUM_CFR_ITERS):
       for traverse_player_idx in (0, 1):
+        print("Weights before TRAVERSE")
+        print(self.value_networks[traverse_player_idx].network().ev1.bias)
+        print(self.value_networks[1 - traverse_player_idx].network().ev1.bias)
         self.do_cfr_iter_for_player(traverse_player_idx, t)
         self.train_value_network(traverse_player_idx, t)
+        print("Weights after TRAINING:")
+        print(self.value_networks[traverse_player_idx].network().ev1.bias)
+        print(self.value_networks[1 - traverse_player_idx].network().ev1.bias)
         self.eval_value_network("cfr", eval_t, None, traverse_player_idx)
+        print("Weights after EVAL:")
+        print(self.value_networks[traverse_player_idx].network().ev1.bias)
+        print(self.value_networks[1 - traverse_player_idx].network().ev1.bias)
         eval_t += 1
     # TODO(milo): Train strategy network.
   
@@ -108,6 +117,7 @@ class Trainer(object):
     self.value_networks[1]._network = self.value_networks[1]._network.to(self.opt.TRAVERSE_DEVICE)
     self.value_networks[0]._device = self.opt.TRAVERSE_DEVICE
     self.value_networks[1]._device = self.opt.TRAVERSE_DEVICE
+    print()
 
     manager = mp.Manager()
     save_lock = manager.Lock()
@@ -222,12 +232,12 @@ class Trainer(object):
     print("\nTraining value network for {} from scratch (t={})".format(traverse_player_idx, t))
     losses = {}
 
-    # This causes the network to be reset.
-    model_wrap = self.value_networks[traverse_player_idx]
-    model_wrap = NetworkWrapper(Constants.BET_HISTORY_SIZE,
-                                Constants.NUM_ACTIONS, ev_embed_dim=self.opt.EV_EMBED_DIM,
-                                bet_embed_dim=self.opt.BET_EMBED_DIM, device=self.opt.TRAIN_DEVICE)
-    net = model_wrap.network()
+    # NOTE: This causes the network to be reset.
+    self.value_networks[traverse_player_idx] = NetworkWrapper(
+        Constants.BET_HISTORY_SIZE,
+        Constants.NUM_ACTIONS, ev_embed_dim=self.opt.EV_EMBED_DIM,
+        bet_embed_dim=self.opt.BET_EMBED_DIM, device=self.opt.TRAIN_DEVICE)
+    net = self.value_networks[traverse_player_idx].network()
     net.train()
 
     optimizer = torch.optim.Adam(net.parameters(), lr=self.opt.SGD_LR)
