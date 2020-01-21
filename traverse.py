@@ -62,7 +62,7 @@ def make_infoset(round_state, player_idx, player_is_sb, precomputed_ev=None):
 
   if precomputed_ev is not None:
     ev = precomputed_ev[round_state.street][player_idx]
-    return EvInfoSet(ev, h, 0 if player_is_sb else 1)
+    return EvInfoSet(ev, h, 0 if player_is_sb else 1, get_street_0123(round_state.street))
   
   else:
     # hand = "{}:xx".format(str(round_state.hands[player_idx][0]) + str(round_state.hands[player_idx][1]))
@@ -70,12 +70,12 @@ def make_infoset(round_state, player_idx, player_is_sb, precomputed_ev=None):
     board = "".join([str(c) for c in round_state.deck.peek(round_state.street)])
 
     # Use fewer iters on later streets.
-    if len(board) == 3:
-      iters = 400
-    elif len(board) == 4:
-      iters = 200
-    elif len(board) == 5:
-      iters = 100
+    if len(board) == 6:
+      iters = 5000
+    elif len(board) == 8:
+      iters = 4000
+    elif len(board) == 10:
+      iters = 1326
     else:
       iters = 1
 

@@ -82,7 +82,7 @@ class EvInfoSetTest(unittest.TestCase):
 
 
 class BucketTest(unittest.TestCase):
-  def test_bucket_small(self):
+  def test_bucket_small_01(self):
     random.seed(123)
     # P2 is the small blind.
     sb_index = 1
@@ -92,35 +92,93 @@ class BucketTest(unittest.TestCase):
     infoset = make_infoset(round_state, 1, True)
     bucket = bucket_small(infoset)
     print(bucket)
+    self.assertEqual(bucket[0], 'SB')
+    self.assertEqual(bucket[1], 'P')
+    self.assertEqual(bucket[2], 'H2')
+    self.assertGreaterEqual(infoset.ev, 0.60)
     round_state = round_state.proceed(CallAction())
 
     # BB bets 4.
     infoset = make_infoset(round_state, 0, False)
+    # print(round_state.hands)
+    # print(round_state.deck.peek(5))
     bucket = bucket_small(infoset)
     print(bucket)
+    self.assertEqual(bucket[0], 'BB')
+    self.assertEqual(bucket[1], 'F')
+    self.assertEqual(bucket[2], 'H1')
+    self.assertGreaterEqual(infoset.ev, 0.40)
     round_state = round_state.proceed(RaiseAction(4))
 
     # SB raises to 8.
     infoset = make_infoset(round_state, 1, True)
     bucket = bucket_small(infoset)
     print(bucket)
+    self.assertEqual(bucket[0], 'SB')
+    self.assertEqual(bucket[1], 'F')
+    self.assertEqual(bucket[2], 'H1')
+    self.assertGreaterEqual(infoset.ev, 0.40)
+    self.assertEqual(bucket[7 + 1], 'R') # Opponent did a flop raise.
+    self.assertEqual(bucket[11 + 0], '1P') # First action of street was 1P raise.
     round_state = round_state.proceed(RaiseAction(8))
 
     # BB raises to 12.
     infoset = make_infoset(round_state, 0, False)
     bucket = bucket_small(infoset)
     print(bucket)
+    self.assertEqual(bucket[0], 'BB')
+    self.assertEqual(bucket[1], 'F')
+    self.assertEqual(bucket[2], 'H1')
+    self.assertGreaterEqual(infoset.ev, 0.40)
+    self.assertEqual(bucket[7 + 1], 'R') # Opponent did a flop raise.
+    self.assertEqual(bucket[3 + 1] , 'R') # Player did a flop raise.
+    self.assertEqual(bucket[11 + 1], 'HP') # Second action was half pot raise.
     round_state = round_state.proceed(RaiseAction(30))
 
     # SB calls, ending flop.
     infoset = make_infoset(round_state, 1, True)
     bucket = bucket_small(infoset)
     print(bucket)
+    self.assertEqual(bucket[0], 'SB')
+    self.assertEqual(bucket[1], 'F')
+    self.assertEqual(bucket[2], 'H1')
+    self.assertGreaterEqual(infoset.ev, 0.40)
+    self.assertEqual(bucket[7 + 1], 'R') # Opponent did a flop raise.
+    self.assertEqual(bucket[3 + 1] , 'R') # Player did a flop raise.
+    self.assertEqual(bucket[11 + 1], 'HP') # Second action was half pot raise.
+    self.assertEqual(bucket[11 + 2], '2P') # Third action was a 2pot raise.
     round_state = round_state.proceed(CallAction())
 
     # Both check on the turn.
     round_state = round_state.proceed(CheckAction())
     round_state = round_state.proceed(CheckAction())
+
+  def test_exceed_action_limit(self):
+    # P2 is the small blind.
+    sb_index = 1
+    round_state = create_new_round(sb_index)
+
+    # SB calls, BB checks.
+    round_state = round_state.proceed(CallAction())
+
+    # Do 8 bets/raises to exceed the max 6 actions.
+    round_state = round_state.proceed(RaiseAction(2))
+    round_state = round_state.proceed(RaiseAction(4))
+    round_state = round_state.proceed(RaiseAction(6))
+    round_state = round_state.proceed(RaiseAction(8))
+    round_state = round_state.proceed(RaiseAction(10))
+    round_state = round_state.proceed(RaiseAction(12))
+    round_state = round_state.proceed(RaiseAction(14))
+    round_state = round_state.proceed(RaiseAction(16))
+    round_state = round_state.proceed(CallAction())
+    
+    infoset = make_infoset(round_state, 0, False)
+    expected = torch.Tensor([1, 2, 1, 0, 2, 4, 14, 12, 0, 0, 0, 0, 0, 0, 0, 0])
+    self.assertTrue((infoset.bet_history_vec == expected).all())
+    print(infoset.bet_history_vec)
+
+    bucket = bucket_small(infoset)
+    print(bucket)
 
 
 if __name__ == "__main__":
