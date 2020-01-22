@@ -1,4 +1,3 @@
-import ray
 import torch
 
 import numpy as np

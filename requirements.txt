@@ -1,5 +1,3 @@
+eval7
 tensorflow
 tensorboardX>=1.8
-ray>=0.8.0
-PyPokerEngine==1.0.1
-PyPokerGUI==0.0.7

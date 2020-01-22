@@ -1,10 +1,7 @@
-import ray
-from copy import deepcopy
 import os, time
 
 import torch
 import torch.multiprocessing as mp
-from torch.utils.data import DataLoader
 from tensorboardX import SummaryWriter
 
 from constants import Constants
