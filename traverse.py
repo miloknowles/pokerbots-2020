@@ -52,11 +52,15 @@ def make_infoset(round_state, player_idx, player_is_sb, precomputed_ev=None):
   player_idx (int) : 0 if P1 is acting, 1 if P2 is acting.
   player_is_sb (bool) : Is the acting player the SB?
   """
-  h =  torch.zeros(Constants.BET_HISTORY_SIZE)
+  h = torch.zeros(2 + Constants.BET_HISTORY_SIZE)
   for street, actions in enumerate(round_state.bet_history):
-    offset = street * Constants.BET_ACTIONS_PER_STREET
+    offset = street * Constants.BET_ACTIONS_PER_STREET + (2 if street > 0 else 0)
     for i, add_amt in enumerate(actions):
-      i = min(i, Constants.BET_ACTIONS_PER_STREET - 2 + i % 2)
+      if street > 0:
+        i = min(i, Constants.BET_ACTIONS_PER_STREET - 2 + i % 2)
+      else:
+        bet_actions_preflop = Constants.BET_ACTIONS_PER_STREET + 2
+        i = min(i, bet_actions_preflop - 2 + i % 2)
       h[offset + i] += add_amt
 
   if precomputed_ev is not None:

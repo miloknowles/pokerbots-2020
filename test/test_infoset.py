@@ -199,6 +199,55 @@ class BucketTest(unittest.TestCase):
     print(bucket)
     round_state = round_state.proceed(CallAction())
 
+  def test_bucket_small_03(self):
+    # BB.T.H2|x.R.R.x|R.R.x.x|2P.x.x.x': tensor([168., 160., 142., 181., 152., 144.])
+    random.seed(123)
+    sb_index = 0
+    round_state = create_new_round(sb_index)
+    round_state = round_state.proceed(RaiseAction(4))   # SB raises.
+
+    infoset = make_infoset(round_state, 1, False)
+    bucket = bucket_small(infoset)
+    print(bucket)
+
+    round_state = round_state.proceed(RaiseAction(8))     # BB raises.
+
+    infoset = make_infoset(round_state, 1, False)
+    bucket = bucket_small(infoset)
+    print(bucket)
+
+    round_state = round_state.proceed(RaiseAction(12))  # SB raises.
+
+    infoset = make_infoset(round_state, 1, False)
+    # print(infoset.bet_history_vec)
+    bucket = bucket_small(infoset)
+    print(bucket)
+
+    round_state = round_state.proceed(RaiseAction(16))   # BB raises.
+    round_state = round_state.proceed(RaiseAction(20))  # SB raises.
+
+    infoset = make_infoset(round_state, 1, False)
+    bucket = bucket_small(infoset)
+    print(bucket)
+
+    round_state = round_state.proceed(CallAction())     # BB calls.
+
+    infoset = make_infoset(round_state, 1, False)
+    bucket = bucket_small(infoset)
+    print(bucket)
+
+    round_state = round_state.proceed(CheckAction())    # BB checks.
+
+    infoset = make_infoset(round_state, 0, True)
+    bucket = bucket_small(infoset)
+    print(bucket)
+
+    round_state = round_state.proceed(CheckAction())    # SB checks.
+
+    infoset = make_infoset(round_state, 1, False)
+    bucket = bucket_small(infoset)
+    print(bucket)
+
   def test_exceed_action_limit(self):
     # P2 is the small blind.
     sb_index = 1

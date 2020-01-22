@@ -93,7 +93,7 @@ class Trainer(object):
         self.accumulate_regret(traverse_plyr_idx, t)
 
         # NOTE: Since we have several workers adding things to disk, need to reload their merged results.
-        self.load(regrets_to_load=[traverse_plyr_idx], load_avg_strt=True)
+        self.load(regrets_to_load=[traverse_plyr_idx, 1-traverse_plyr_idx], load_avg_strt=True)
         self.evaluate(eval_t)
         eval_t += 1
 

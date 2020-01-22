@@ -98,7 +98,8 @@ def bucket_small(infoset):
   else:
     h[2] = 'H3'
 
-  assert(len(infoset.bet_history_vec) == Constants.BET_HISTORY_SIZE)
+  # NOTE: 2 extra actions at the start of preflop (adding blinds).
+  assert(len(infoset.bet_history_vec) == (2 + Constants.BET_HISTORY_SIZE))
   
   pips = [0, 0]
   plyr_raised_offset = 3
@@ -107,11 +108,17 @@ def bucket_small(infoset):
   
   cumul = torch.cumsum(infoset.bet_history_vec, dim=0)
 
-  for i in range(0, Constants.BET_HISTORY_SIZE):
-    if (i % Constants.BET_ACTIONS_PER_STREET) == 0:
+  for i in range(0, Constants.BET_HISTORY_SIZE+2):
+    is_new_street = (i == 0) or ((i - 2) % Constants.BET_ACTIONS_PER_STREET) == 0 and i > 2
+    if is_new_street:
       pips = [0, 0]
 
-    street = i // Constants.BET_ACTIONS_PER_STREET
+    street = (i-2) // Constants.BET_ACTIONS_PER_STREET if i > 2 else 0
+
+    # Avoid encoding ghost actions.
+    if street > infoset.street:
+      break
+
     is_player = (street == 0 and (i % 2) == infoset.player_position) or \
                 (street > 0 and (i % 2) != infoset.player_position)
     
@@ -119,11 +126,13 @@ def bucket_small(infoset):
     amt_after_action = pips[i % 2] + infoset.bet_history_vec[i]
     action_is_fold = (amt_after_action < pips[1 - (i % 2)]) and infoset.bet_history_vec[i] == 0
     action_is_wrapped_raise = (amt_after_action < pips[1 - (i % 2)]) and infoset.bet_history_vec[i] > 0
+
     if action_is_fold:
       break
-    action_is_check = amt_after_action == pips[1 - (i % 2)] and infoset.bet_history_vec[i] == 0 
-    action_is_call = amt_after_action == pips[1 - (i % 2)] and infoset.bet_history_vec[i] > 0
-    action_is_raise = amt_after_action > pips[1 - (i % 2)]
+
+    action_is_check = (amt_after_action == pips[1 - (i % 2)]) and infoset.bet_history_vec[i] == 0 
+    action_is_call = (amt_after_action == pips[1 - (i % 2)]) and infoset.bet_history_vec[i] > 0
+    action_is_raise = (amt_after_action > pips[1 - (i % 2)])
     if (action_is_raise) and i >= 2:
       if is_player:
         h[plyr_raised_offset + street] = 'R'
@@ -134,10 +143,10 @@ def bucket_small(infoset):
     if street == infoset.street and i >= 2:
       call_amt = abs(pips[0] - pips[1])
       raise_amt = (infoset.bet_history_vec[i] - call_amt) / (cumul[i-1] + call_amt)
-      action_offset = (i - 2) if street == 0 else i % Constants.BET_ACTIONS_PER_STREET
+      action_offset = (i - 2) if street == 0 else (i - 2) % Constants.BET_ACTIONS_PER_STREET
 
       if action_is_check:
-        if action_offset == 0:
+        if action_offset == 0 and not is_player:
           h[street_actions_offset + action_offset] = 'CK'
         else:
           break
