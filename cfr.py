@@ -4,8 +4,23 @@ import torch
 from constants import Constants
 from engine import *
 from utils import apply_mask_and_normalize, apply_mask_and_uniform
-from traverse import create_new_round, make_actions, make_infoset, get_street_0123, make_precomputed_ev, TreeNodeInfo
+from traverse import create_new_round, make_actions, make_infoset, get_street_0123, make_precomputed_ev
 from infoset import bucket_small, bucket_small_join
+
+
+class TreeNodeInfo(object):
+  def __init__(self):
+    """
+    NOTE: The zero index always refers to PLAYER1 and the 1th index is PLAYER2.
+    """
+    # Expected value for each player at this node if they play according to their current strategy.
+    self.strategy_ev = torch.zeros(2)
+
+    # Expected value for each player if they choose a best-response strategy given the other.
+    self.best_response_ev = torch.zeros(2)
+
+    # The difference in EV between the best response strategy and the current strategy.
+    self.exploitability = torch.zeros(2)
 
 
 class RegretMatchedStrategy(object):
@@ -53,8 +68,9 @@ class RegretMatchedStrategy(object):
       #   r[torch.argmax(total_regret)] = 1.0
       # else:
       #   r = r_plus
-      if r_plus.sum() < 1e-5:
-        r = valid_mask
+      # If no positive regrets, return a UNIFORM strategy.
+      if r_plus.sum() < 1e-3:
+        r = torch.ones(Constants.NUM_ACTIONS)
       else:
         r = r_plus
 
@@ -96,107 +112,96 @@ class RegretMatchedStrategy(object):
     lock.release()
 
 
-def traverse_cfr(round_state, traverse_plyr_idx, sb_plyr_idx, regrets, avg_strategy, t, arrival_probability,
-                 precomputed_ev, rctr=[0], allow_updates=True):
+def traverse_cfr(round_state, traverse_plyr, sb_plyr_idx, regrets, strategies, t,
+                 reach_probabilities, precomputed_ev, rctr=[0], allow_updates=True):
   """
   Traverse the game tree with external and chance sampling.
 
   NOTE: Only the traverse player updates their regrets. When the non-traverse player acts,
   they add their strategy to the average strategy.
   """
-  # assert(arrival_probability > 0)
-
   with torch.no_grad():
     node_info = TreeNodeInfo()
 
     rctr[0] += 1
-    other_player_idx = (1 - traverse_plyr_idx)
+    other_plyr = (1 - traverse_plyr)
   
     #================== TERMINAL NODE ====================
     if isinstance(round_state, TerminalState):
-      node_info.strategy_ev = torch.Tensor(round_state.deltas)
+      node_info.strategy_ev = torch.Tensor(round_state.deltas)      # TODO: make sure this is correct.
+      # There are no choices to make here; the best response payoff is the outcome.
       node_info.best_response_ev = node_info.strategy_ev
       return node_info
 
     active_plyr_idx = round_state.button % 2
-    is_traverse_player_action = (active_plyr_idx == traverse_plyr_idx)
+    is_traverse_player_action = (active_plyr_idx == traverse_plyr)
 
     #============== TRAVERSE PLAYER ACTION ===============
     if is_traverse_player_action:
-      infoset = make_infoset(round_state, traverse_plyr_idx, (traverse_plyr_idx == sb_plyr_idx), precomputed_ev)
+      infoset = make_infoset(round_state, traverse_plyr, (traverse_plyr == sb_plyr_idx), precomputed_ev)
       actions, mask = make_actions(round_state)
 
       # Do regret matching to get action probabilities.
-      action_probs = regrets[traverse_plyr_idx].get_strategy(infoset, mask)
-      # action_probs = apply_mask_and_normalize(action_probs, mask)
+      action_probs = regrets[traverse_plyr].get_strategy(infoset, mask)
       action_probs = apply_mask_and_uniform(action_probs, mask)
-      assert torch.allclose(action_probs.sum(), torch.ones(1))
+      assert torch.allclose(action_probs.sum(), torch.ones(1), rtol=1e-3, atol=1e-3)
 
-      action_values = torch.zeros(2, len(actions))
-      br_values = torch.zeros(2, len(actions))
-      instant_regrets = torch.zeros(len(actions))
-
-      plyr_idx = traverse_plyr_idx
-      opp_idx = (1 - plyr_idx)
+      action_values = torch.zeros(2, len(actions))     # Expected payoff if we take an action and play according to sigma.
+      br_values = torch.zeros(2, len(actions))         # Expected payoff if we take an action and play according to BR.
+      immediate_regrets = torch.zeros(len(actions))    # Regret for not choosing an action over the current strategy.
 
       for i, a in enumerate(actions):
-        # TODO: I think you should remove the p < 0 check here...
-        if mask[i] <= 0: # or action_probs[i] <= 0:
+        if action_probs[i].item() <= 0: # NOTE: this should handle masked actions also.
           continue
+        assert(mask[i] > 0)
         next_round_state = round_state.copy().proceed(a)
+        next_reach_prob = reach_probabilities.clone()
+        next_reach_prob[traverse_plyr] *= action_probs[i]
         child_node_info = traverse_cfr(
-            next_round_state, traverse_plyr_idx, sb_plyr_idx, regrets,
-            avg_strategy, t, arrival_probability * action_probs[i], precomputed_ev,
+            next_round_state, traverse_plyr, sb_plyr_idx, regrets,
+            strategies, t, next_reach_prob, precomputed_ev,
             rctr=rctr, allow_updates=allow_updates)
-        
-        # Expected value of the acting player taking this action and then continuing according to their strategy.
-        action_values[:,i] = child_node_info.strategy_ev
 
-        # Expected value for each player if the acting player takes this action and then they both
-        # follow a best-response strategy.
+        action_values[:,i] = child_node_info.strategy_ev
         br_values[:,i] = child_node_info.best_response_ev
       
       # Sum along every action multiplied by its probability of occurring.
       node_info.strategy_ev = (action_values * action_probs).sum(axis=1)
+      immediate_regrets_tp = mask * (action_values[traverse_plyr] - node_info.strategy_ev[traverse_plyr])
 
-      # Compute the instantaneous regrets for the traversing player.
-      instant_regrets_tp = mask * (action_values[traverse_plyr_idx] - node_info.strategy_ev[traverse_plyr_idx])
+      # Best response strategy: the acting player chooses the BEST action with probability 1.
+      node_info.best_response_ev[traverse_plyr] = torch.max(br_values[traverse_plyr,:])
+      node_info.best_response_ev[other_plyr] = torch.sum(action_probs * br_values[other_plyr,:])
 
-      # The acting player chooses the BEST action with probability 1, while the opponent best
-      # response EV depends on the reach probability of their next acting situation.
-      node_info.best_response_ev[plyr_idx] = torch.max(br_values[plyr_idx,:])
-      node_info.best_response_ev[opp_idx] = torch.sum(action_probs * br_values[opp_idx,:])
-
-      # Exploitability is the difference in payoff between a local best response strategy and the
-      # full mixed strategy.
+      # Exploitability is the difference in payoff between a local best response strategy and the full mixed strategy.
       node_info.exploitability = (node_info.best_response_ev - node_info.strategy_ev)
 
-      # Add the instantaneous regrets to advantage memory for the traversing player.
       if allow_updates:
-        regrets[traverse_plyr_idx].add_regret(infoset, arrival_probability * instant_regrets_tp)
+        # TODO: some conflicting info about which reach prob should multiply the avg strategy
+        strategies[traverse_plyr].add_regret(infoset, reach_probabilities[other_plyr] * action_probs)
+        regrets[traverse_plyr].add_regret(infoset, reach_probabilities[other_plyr] * immediate_regrets_tp)
 
       return node_info
 
     #================== NON-TRAVERSE PLAYER ACTION =================
     else:
-      infoset = make_infoset(round_state, other_player_idx, (other_player_idx == sb_plyr_idx), precomputed_ev)
+      infoset = make_infoset(round_state, other_plyr, (other_plyr == sb_plyr_idx), precomputed_ev)
 
       # External sampling: choose a random action for the non-traversing player.
       actions, mask = make_actions(round_state)
-      action_probs = regrets[other_player_idx].get_strategy(infoset, mask)
+      action_probs = regrets[other_plyr].get_strategy(infoset, mask)
       action_probs = apply_mask_and_uniform(action_probs, mask)
-      # action_probs = apply_mask_and_normalize(action_probs, mask)
-      assert torch.allclose(action_probs.sum(), torch.ones(1))
+      assert torch.allclose(action_probs.sum(), torch.ones(1), rtol=1e-3, atol=1e-3)
 
       # Add the action probabilities to the average strategy buffer.
-      if allow_updates:
-        avg_strategy.add_regret(infoset, arrival_probability * action_probs)
+      # if allow_updates:
+        # avg_strategy.add_regret(infoset, arrival_probability * action_probs)
 
       # EXTERNAL SAMPLING: choose only ONE action for the non-traversal player.
       action = actions[torch.multinomial(action_probs, 1).item()]
       next_round_state = round_state.copy().proceed(action)
-
-      return traverse_cfr(next_round_state, traverse_plyr_idx, sb_plyr_idx, regrets,
-                          avg_strategy, t, arrival_probability, precomputed_ev,
+      next_reach_prob = reach_probabilities.clone()
+      return traverse_cfr(next_round_state, traverse_plyr, sb_plyr_idx, regrets,
+                          strategies, t, reach_probabilities, precomputed_ev,
                           rctr=rctr, allow_updates=allow_updates)
 

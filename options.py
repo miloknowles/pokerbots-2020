@@ -117,7 +117,7 @@ class Options(object):
     options.STRT_BUFFER_FMT = "strt_mem"
 
     options.REGRETS_FMT = os.path.join(options.MEMORY_FOLDER, "total_regrets_{}.pkl")
-    options.AVG_STRT_FMT = os.path.join(options.MEMORY_FOLDER, "avg_strategy.pkl")
+    options.STRATEGIES_FMT = os.path.join(options.MEMORY_FOLDER, "avg_strategy_{}.pkl")
 
   def parse(self):
     """

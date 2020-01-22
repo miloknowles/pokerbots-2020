@@ -121,19 +121,19 @@ def make_actions(round_state):
   return actions_unscaled, actions_mask
 
 
-class TreeNodeInfo(object):
-  def __init__(self):
-    """
-    NOTE: The zero index always refers to PLAYER1 and the 1th index is PLAYER2.
-    """
-    # Expected value for each player at this node if they play according to their current strategy.
-    self.strategy_ev = torch.zeros(2)
+# class TreeNodeInfo(object):
+#   def __init__(self):
+#     """
+#     NOTE: The zero index always refers to PLAYER1 and the 1th index is PLAYER2.
+#     """
+#     # Expected value for each player at this node if they play according to their current strategy.
+#     self.strategy_ev = torch.zeros(2)
 
-    # Expected value for each player if they choose a best-response strategy given the other.
-    self.best_response_ev = torch.zeros(2)
+#     # Expected value for each player if they choose a best-response strategy given the other.
+#     self.best_response_ev = torch.zeros(2)
 
-    # The difference in EV between the best response strategy and the current strategy.
-    self.exploitability = torch.zeros(2)
+#     # The difference in EV between the best response strategy and the current strategy.
+#     self.exploitability = torch.zeros(2)
 
 
 def create_new_round(button_player):
