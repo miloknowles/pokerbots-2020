@@ -1,4 +1,4 @@
-python ../train_cfr.py --EXPERIMENT_NAME mc_cfr_01 \
+python ../train_cfr.py --EXPERIMENT_NAME mc_cfr_02 \
   --NUM_TRAVERSE_WORKERS 28 \
   --NUM_TRAVERSALS_PER_ITER 10000 \
   --NUM_TRAVERSALS_EVAL 1000 \
