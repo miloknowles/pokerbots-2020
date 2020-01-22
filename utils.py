@@ -61,6 +61,16 @@ def apply_mask_and_normalize(probs, mask):
   return p
 
 
+def apply_mask_and_uniform(probs, mask):
+  p = probs * mask
+
+  if p.sum() == 0:
+    p = mask
+  p = p / torch.sum(p)
+
+  return p
+
+
 def sample_uniform_action(valid_actions):
   item = valid_actions[np.random.randint(len(valid_actions))]
   amount = item["amount"]

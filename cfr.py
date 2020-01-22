@@ -3,7 +3,7 @@ import pickle, os
 import torch
 from constants import Constants
 from engine import *
-from utils import apply_mask_and_normalize
+from utils import apply_mask_and_normalize, apply_mask_and_uniform
 from traverse import create_new_round, make_actions, make_infoset, get_street_0123, make_precomputed_ev, TreeNodeInfo
 from infoset import bucket_small, bucket_small_join
 
@@ -46,11 +46,15 @@ class RegretMatchedStrategy(object):
 
       # As advocated by Brown et. al., choose the action with highest advantage when all of them are
       # less than zero.
+      # if r_plus.sum() < 1e-5:
+      #   total_regret -= total_regret.min()      # Make nonnegative.
+      #   total_regret *= valid_mask              # Mask out illegal actions.
+      #   r = torch.zeros(Constants.NUM_ACTIONS)  # Probability 1 for best action.  
+      #   r[torch.argmax(total_regret)] = 1.0
+      # else:
+      #   r = r_plus
       if r_plus.sum() < 1e-5:
-        total_regret -= total_regret.min()      # Make nonnegative.
-        total_regret *= valid_mask              # Mask out illegal actions.
-        r = torch.zeros(Constants.NUM_ACTIONS)  # Probability 1 for best action.  
-        r[torch.argmax(total_regret)] = 1.0
+        r = valid_mask
       else:
         r = r_plus
 
@@ -124,7 +128,8 @@ def traverse_cfr(round_state, traverse_plyr_idx, sb_plyr_idx, regrets, avg_strat
 
       # Do regret matching to get action probabilities.
       action_probs = regrets[traverse_plyr_idx].get_strategy(infoset, mask)
-      action_probs = apply_mask_and_normalize(action_probs, mask)
+      # action_probs = apply_mask_and_normalize(action_probs, mask)
+      action_probs = apply_mask_and_uniform(action_probs, mask)
       assert torch.allclose(action_probs.sum(), torch.ones(1))
 
       action_values = torch.zeros(2, len(actions))
@@ -178,7 +183,8 @@ def traverse_cfr(round_state, traverse_plyr_idx, sb_plyr_idx, regrets, avg_strat
       # External sampling: choose a random action for the non-traversing player.
       actions, mask = make_actions(round_state)
       action_probs = regrets[other_player_idx].get_strategy(infoset, mask)
-      action_probs = apply_mask_and_normalize(action_probs, mask)
+      action_probs = apply_mask_and_uniform(action_probs, mask)
+      # action_probs = apply_mask_and_normalize(action_probs, mask)
       assert torch.allclose(action_probs.sum(), torch.ones(1))
 
       # Add the action probabilities to the average strategy buffer.
