@@ -98,7 +98,6 @@ class Trainer(object):
         # NOTE: Since we have several workers adding things to disk, need to reload their merged results.
         self.load(regrets_to_load=[traverse_plyr_idx], load_avg_strt=True)
         self.evaluate(eval_t)
-        self.log_sizes(eval_t)
         eval_t += 1
 
   def load(self, regrets_to_load=[0, 1], load_avg_strt=True):
@@ -168,14 +167,12 @@ class Trainer(object):
     print("===> [EVAL] [AVG STRATEGY] Exploitability | mean={} mbb/g | stdev={} | (step={})".format(
         mean_mbb_per_game, stdev_mbb_per_game, step))
 
+    # Looks like everything has to be logged in one function...
     writer = self.writers["cfr"]
-    print("Writer step:", step)
     writer.add_scalar("exploit/mbbg_mean", mean_mbb_per_game, int(step))
     writer.add_scalar("exploit/mbbg_stdev", stdev_mbb_per_game, int(step))
-    writer.close()
 
-  def log_sizes(self, step):
-    writer = self.writers["cfr"]
+    # Log the sizes of each memory.
     writer.add_scalar("num_infosets/regrets/0", self.regrets[0].size(), step)
     writer.add_scalar("num_infosets/regrets/1", self.regrets[1].size(), step)
     writer.add_scalar("num_infosets/avg_strategy", self.avg_strategy.size(), step)
