@@ -92,13 +92,16 @@ class RegretMatchedStrategy(object):
     lock.release()
 
 
-def traverse_cfr(round_state, traverse_plyr_idx, sb_plyr_idx, regrets, avg_strategy, t, precomputed_ev, rctr=[0], allow_updates=True):
+def traverse_cfr(round_state, traverse_plyr_idx, sb_plyr_idx, regrets, avg_strategy, t, arrival_probability,
+                 precomputed_ev, rctr=[0], allow_updates=True):
   """
   Traverse the game tree with external and chance sampling.
 
   NOTE: Only the traverse player updates their regrets. When the non-traverse player acts,
   they add their strategy to the average strategy.
   """
+  assert(arrival_probability > 0)
+
   with torch.no_grad():
     node_info = TreeNodeInfo()
 
@@ -132,12 +135,13 @@ def traverse_cfr(round_state, traverse_plyr_idx, sb_plyr_idx, regrets, avg_strat
       opp_idx = (1 - plyr_idx)
 
       for i, a in enumerate(actions):
-        if mask[i] <= 0:
+        if mask[i] <= 0 or action_probs[i] <= 0:
           continue
         next_round_state = round_state.copy().proceed(a)
         child_node_info = traverse_cfr(
             next_round_state, traverse_plyr_idx, sb_plyr_idx, regrets,
-            avg_strategy, t, precomputed_ev, rctr=rctr, allow_updates=allow_updates)
+            avg_strategy, t, arrival_probability * action_probs[i], precomputed_ev,
+            rctr=rctr, allow_updates=allow_updates)
         
         # Expected value of the acting player taking this action and then continuing according to their strategy.
         action_values[:,i] = child_node_info.strategy_ev
@@ -159,11 +163,11 @@ def traverse_cfr(round_state, traverse_plyr_idx, sb_plyr_idx, regrets, avg_strat
 
       # Exploitability is the difference in payoff between a local best response strategy and the
       # full mixed strategy.
-      node_info.exploitability = node_info.best_response_ev - node_info.strategy_ev
+      node_info.exploitability = (node_info.best_response_ev - node_info.strategy_ev)
 
       # Add the instantaneous regrets to advantage memory for the traversing player.
       if allow_updates:
-        regrets[traverse_plyr_idx].add_regret(infoset, instant_regrets_tp)
+        regrets[traverse_plyr_idx].add_regret(infoset, arrival_probability * instant_regrets_tp)
 
       return node_info
 
@@ -179,12 +183,13 @@ def traverse_cfr(round_state, traverse_plyr_idx, sb_plyr_idx, regrets, avg_strat
 
       # Add the action probabilities to the average strategy buffer.
       if allow_updates:
-        avg_strategy.add_regret(infoset, action_probs)
+        avg_strategy.add_regret(infoset, arrival_probability * action_probs)
 
       # EXTERNAL SAMPLING: choose only ONE action for the non-traversal player.
       action = actions[torch.multinomial(action_probs, 1).item()]
       next_round_state = round_state.copy().proceed(action)
 
       return traverse_cfr(next_round_state, traverse_plyr_idx, sb_plyr_idx, regrets,
-                          avg_strategy, t, precomputed_ev, rctr=rctr, allow_updates=allow_updates)
+                          avg_strategy, t, arrival_probability, precomputed_ev,
+                          rctr=rctr, allow_updates=allow_updates)
 

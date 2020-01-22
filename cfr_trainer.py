@@ -40,7 +40,7 @@ def traverse_worker(worker_id, traverse_plyr_idx, regret_filenames, avg_strategy
 
     precomputed_ev = make_precomputed_ev(round_state)
     info = traverse_cfr(round_state, traverse_plyr_idx, sb_plyr_idx, regrets, avg_strategy,
-                        t, precomputed_ev, rctr=ctr, allow_updates=True)
+                        t, 1.0, precomputed_ev, rctr=ctr, allow_updates=True)
 
     if (k % opt.TRAVERSE_DEBUG_PRINT_HZ) == 0:
       elapsed = time.time() - t0
@@ -150,7 +150,7 @@ class Trainer(object):
 
       # NOTE: disable updates to memories.
       info = traverse_cfr(round_state, 0, sb_plyr_idx, strategies, self.avg_strategy,
-                          1234, precomputed_ev, rctr=[0], allow_updates=False)
+                          1234, 1.0, precomputed_ev, rctr=[0], allow_updates=False)
       exploits.append(info.exploitability.sum())
 
     elapsed = time.time() - t0
