@@ -126,7 +126,6 @@ def bucket_small(infoset):
     amt_after_action = pips[i % 2] + infoset.bet_history_vec[i]
     action_is_fold = (amt_after_action < pips[1 - (i % 2)]) and infoset.bet_history_vec[i] == 0
     action_is_wrapped_raise = (amt_after_action < pips[1 - (i % 2)]) and infoset.bet_history_vec[i] > 0
-
     if action_is_fold:
       break
 
@@ -146,7 +145,9 @@ def bucket_small(infoset):
       action_offset = (i - 2) if street == 0 else (i - 2) % Constants.BET_ACTIONS_PER_STREET
 
       if action_is_check:
-        if action_offset == 0 and not is_player:
+        bet_occurs_after = infoset.bet_history_vec[i+1] > 0
+        # How do we know if this is a check or an action that hasn't happened?
+        if action_offset == 0 and (not is_player or bet_occurs_after):
           h[street_actions_offset + action_offset] = 'CK'
         else:
           break

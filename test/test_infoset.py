@@ -248,6 +248,34 @@ class BucketTest(unittest.TestCase):
     bucket = bucket_small(infoset)
     print(bucket)
 
+    round_state = round_state.proceed(RaiseAction(10)) # BB raises.
+    round_state = round_state.proceed(CallAction())     # SB calls.
+
+    infoset = make_infoset(round_state, 1, False)
+    bucket = bucket_small(infoset)
+    print(bucket)
+
+    round_state = round_state.proceed(CheckAction())     # BB checks.
+    
+    infoset = make_infoset(round_state, 0, True)
+    bucket = bucket_small(infoset)
+    print(bucket)
+
+    round_state = round_state.proceed(RaiseAction(10)) # SB raises.
+    round_state = round_state.proceed(RaiseAction(40)) # BB raises.
+    round_state = round_state.proceed(RaiseAction(60)) # SB raises.
+    round_state = round_state.proceed(RaiseAction(100)) # BB raises.
+
+    infoset = make_infoset(round_state, 0, True)
+    bucket = bucket_small(infoset)
+    print(bucket)
+
+    round_state = round_state.proceed(RaiseAction(120)) # SB raises.
+    infoset = make_infoset(round_state, 1, False)
+    bucket = bucket_small(infoset)
+    print(bucket)
+
+
   def test_exceed_action_limit(self):
     # P2 is the small blind.
     sb_index = 1
