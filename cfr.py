@@ -104,7 +104,7 @@ def traverse_cfr(round_state, traverse_plyr_idx, sb_plyr_idx, regrets, avg_strat
   NOTE: Only the traverse player updates their regrets. When the non-traverse player acts,
   they add their strategy to the average strategy.
   """
-  assert(arrival_probability > 0)
+  # assert(arrival_probability > 0)
 
   with torch.no_grad():
     node_info = TreeNodeInfo()
@@ -140,7 +140,8 @@ def traverse_cfr(round_state, traverse_plyr_idx, sb_plyr_idx, regrets, avg_strat
       opp_idx = (1 - plyr_idx)
 
       for i, a in enumerate(actions):
-        if mask[i] <= 0 or action_probs[i] <= 0:
+        # TODO: I think you should remove the p < 0 check here...
+        if mask[i] <= 0: # or action_probs[i] <= 0:
           continue
         next_round_state = round_state.copy().proceed(a)
         child_node_info = traverse_cfr(
