@@ -113,7 +113,8 @@ class RegretMatchedStrategy(object):
 
 
 def traverse_cfr(round_state, traverse_plyr, sb_plyr_idx, regrets, strategies, t,
-                 reach_probabilities, precomputed_ev, rctr=[0], allow_updates=True):
+                 reach_probabilities, precomputed_ev, rctr=[0], allow_updates=True,
+                 do_external_sampling=True):
   """
   Traverse the game tree with external and chance sampling.
 
@@ -160,7 +161,7 @@ def traverse_cfr(round_state, traverse_plyr, sb_plyr_idx, regrets, strategies, t
         child_node_info = traverse_cfr(
             next_round_state, traverse_plyr, sb_plyr_idx, regrets,
             strategies, t, next_reach_prob, precomputed_ev,
-            rctr=rctr, allow_updates=allow_updates)
+            rctr=rctr, allow_updates=allow_updates, do_external_sampling=do_external_sampling)
 
         action_values[:,i] = child_node_info.strategy_ev
         br_values[:,i] = child_node_info.best_response_ev
@@ -185,23 +186,70 @@ def traverse_cfr(round_state, traverse_plyr, sb_plyr_idx, regrets, strategies, t
 
     #================== NON-TRAVERSE PLAYER ACTION =================
     else:
-      infoset = make_infoset(round_state, other_plyr, (other_plyr == sb_plyr_idx), precomputed_ev)
+      if do_external_sampling:
+        infoset = make_infoset(round_state, other_plyr, (other_plyr == sb_plyr_idx), precomputed_ev)
 
-      # External sampling: choose a random action for the non-traversing player.
-      actions, mask = make_actions(round_state)
-      action_probs = regrets[other_plyr].get_strategy(infoset, mask)
-      action_probs = apply_mask_and_uniform(action_probs, mask)
-      assert torch.allclose(action_probs.sum(), torch.ones(1), rtol=1e-3, atol=1e-3)
+        # External sampling: choose a random action for the non-traversing player.
+        actions, mask = make_actions(round_state)
+        action_probs = regrets[other_plyr].get_strategy(infoset, mask)
+        action_probs = apply_mask_and_uniform(action_probs, mask)
+        assert torch.allclose(action_probs.sum(), torch.ones(1), rtol=1e-3, atol=1e-3)
 
-      # Add the action probabilities to the average strategy buffer.
-      # if allow_updates:
-        # avg_strategy.add_regret(infoset, arrival_probability * action_probs)
+        # Add the action probabilities to the average strategy buffer.
+        # if allow_updates:
+          # avg_strategy.add_regret(infoset, arrival_probability * action_probs)
 
-      # EXTERNAL SAMPLING: choose only ONE action for the non-traversal player.
-      action = actions[torch.multinomial(action_probs, 1).item()]
-      next_round_state = round_state.copy().proceed(action)
-      next_reach_prob = reach_probabilities.clone()
-      return traverse_cfr(next_round_state, traverse_plyr, sb_plyr_idx, regrets,
-                          strategies, t, reach_probabilities, precomputed_ev,
-                          rctr=rctr, allow_updates=allow_updates)
+        # EXTERNAL SAMPLING: choose only ONE action for the non-traversal player.
+        action = actions[torch.multinomial(action_probs, 1).item()]
+        next_round_state = round_state.copy().proceed(action)
+        next_reach_prob = reach_probabilities.clone()
+        return traverse_cfr(next_round_state, traverse_plyr, sb_plyr_idx, regrets,
+                            strategies, t, reach_probabilities, precomputed_ev,
+                            rctr=rctr, allow_updates=allow_updates,
+                            do_external_sampling=do_external_sampling)
 
+      else:
+        infoset = make_infoset(round_state, other_plyr, (other_plyr == sb_plyr_idx), precomputed_ev)
+        actions, mask = make_actions(round_state)
+
+        # Do regret matching to get action probabilities.
+        action_probs = regrets[other_plyr].get_strategy(infoset, mask)
+        action_probs = apply_mask_and_uniform(action_probs, mask)
+        assert torch.allclose(action_probs.sum(), torch.ones(1), rtol=1e-3, atol=1e-3)
+
+        action_values = torch.zeros(2, len(actions))     # Expected payoff if we take an action and play according to sigma.
+        br_values = torch.zeros(2, len(actions))         # Expected payoff if we take an action and play according to BR.
+        immediate_regrets = torch.zeros(len(actions))    # Regret for not choosing an action over the current strategy.
+
+        for i, a in enumerate(actions):
+          if action_probs[i].item() <= 0: # NOTE: this should handle masked actions also.
+            continue
+          assert(mask[i] > 0)
+          next_round_state = round_state.copy().proceed(a)
+          next_reach_prob = reach_probabilities.clone()
+          next_reach_prob[other_plyr] *= action_probs[i]
+          child_node_info = traverse_cfr(
+              next_round_state, traverse_plyr, sb_plyr_idx, regrets,
+              strategies, t, next_reach_prob, precomputed_ev,
+              rctr=rctr, allow_updates=allow_updates, do_external_sampling=do_external_sampling)
+
+          action_values[:,i] = child_node_info.strategy_ev
+          br_values[:,i] = child_node_info.best_response_ev
+        
+        # Sum along every action multiplied by its probability of occurring.
+        node_info.strategy_ev = (action_values * action_probs).sum(axis=1)
+        immediate_regrets_tp = mask * (action_values[other_plyr] - node_info.strategy_ev[other_plyr])
+
+        # Best response strategy: the acting player chooses the BEST action with probability 1.
+        node_info.best_response_ev[other_plyr] = torch.max(br_values[other_plyr,:])
+        node_info.best_response_ev[traverse_plyr] = torch.sum(action_probs * br_values[traverse_plyr,:])
+
+        # Exploitability is the difference in payoff between a local best response strategy and the full mixed strategy.
+        node_info.exploitability = (node_info.best_response_ev - node_info.strategy_ev)
+
+        if allow_updates:
+          # TODO: some conflicting info about which reach prob should multiply the avg strategy
+          strategies[other_plyr].add_regret(infoset, reach_probabilities[traverse_plyr] * action_probs)
+          regrets[other_plyr].add_regret(infoset, reach_probabilities[traverse_plyr] * immediate_regrets_tp)
+
+        return node_info
