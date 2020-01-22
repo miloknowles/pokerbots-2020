@@ -49,10 +49,9 @@ def traverse_worker(worker_id, traverse_plyr_idx, regret_filenames, avg_strategy
 
   # Save all the buffers one last time.
   print("[WORKER #{}] Final autosave ...".format(worker_id))
-  regrets_filename = opt.REGRETS_FMT.format(traverse_plyr_idx)
-  regrets[traverse_plyr_idx].merge_and_save(regrets_filename, r_lock)
+  regret_save_filename = regret_filenames[traverse_plyr_idx]
+  regrets[traverse_plyr_idx].merge_and_save(regret_save_filename, r_lock)
 
-  avg_strategy_filename = opt.AVG_STRT_FMT
   avg_strategy.merge_and_save(avg_strategy_filename, avg_lock)
   print('[WORKER #{}] Done!'.format(worker_id))
 
@@ -93,7 +92,7 @@ class Trainer(object):
         self.accumulate_regret(traverse_plyr_idx, t)
 
         # NOTE: Since we have several workers adding things to disk, need to reload their merged results.
-        self.load(regrets_to_load=[traverse_plyr_idx, 1-traverse_plyr_idx], load_avg_strt=True)
+        self.load(regrets_to_load=[0, 1], load_avg_strt=True)
         self.evaluate(eval_t)
         eval_t += 1
 
