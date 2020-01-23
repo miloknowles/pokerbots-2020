@@ -147,5 +147,35 @@ TEST(HistoryTrackerTest, testUpdateBb) {
 }
 
 
-TEST(InfoSetTest, testMakeInfoSet) {
+TEST(InfoSetTest, testBetHistoryWraps) {
+  HistoryTracker tracker_(true);
+
+  // SB raises.
+  tracker_.Update(2, 4, 0);
+
+  // BB raises, SB re-raises.
+  tracker_.Update(8, 12, 0);
+
+  // BB reraises, SB re-raises.
+  tracker_.Update(16, 20, 0);
+
+  // BB reraises, SB re-raises.
+  tracker_.Update(24, 30, 0);
+
+  // BB calls, ending preflop.
+  tracker_.Update(30, 30, 3);
+
+  const EvInfoSet info = MakeInfoSet(tracker_, 1, false, 0.73, 3);
+  info.Print();
+
+  tracker_.Update(40, 50, 3);
+  tracker_.Update(60, 70, 3);
+  tracker_.Update(80, 90, 3);
+  tracker_.Update(100, 120, 3);
+  const EvInfoSet info2 = MakeInfoSet(tracker_, 1, false, 0.73, 3);
+  info2.Print();
+
+  tracker_.Update(120, 120, 4);
+  const EvInfoSet info3 = MakeInfoSet(tracker_, 1, false, 0.73, 4);
+  info3.Print();  
 }
