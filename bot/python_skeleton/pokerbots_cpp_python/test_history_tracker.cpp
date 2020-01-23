@@ -18,10 +18,15 @@ TEST(HistoryTrackerTest, testUpdateSb) {
   tracker_.Update(1, 2, 0);
   tracker_.Print();
 
+  EvInfoSet infoset = MakeInfoSet(tracker_, 0, true, 0.83, 0);
+  infoset.Print();
+
   // Make the SB call, BB bet.
   tracker_.Update(2, 6, 0);
   const auto& v1 = tracker_.History();
   tracker_.Print();
+  infoset = MakeInfoSet(tracker_, 0, true, 0.83, 0);
+  infoset.Print();
   EXPECT_EQ(1, v1.size());
   EXPECT_EQ(1, v1[0][0]);
   EXPECT_EQ(2, v1[0][1]);
@@ -32,6 +37,8 @@ TEST(HistoryTrackerTest, testUpdateSb) {
   tracker_.Update(10, 10, 0);
   const auto& v2 = tracker_.History();
   tracker_.Print();
+  infoset = MakeInfoSet(tracker_, 0, true, 0.83, 0);
+  infoset.Print();
   EXPECT_EQ(1, v2.size());
   EXPECT_EQ(1, v2[0][0]);
   EXPECT_EQ(2, v2[0][1]);
@@ -43,6 +50,8 @@ TEST(HistoryTrackerTest, testUpdateSb) {
   // BB checks the flop.
   tracker_.Update(10, 10, 3);
   tracker_.Print();
+  infoset = MakeInfoSet(tracker_, 0, true, 0.83, 0);
+  infoset.Print();
   const auto& v3 = tracker_.History();
   EXPECT_EQ(2, v3.size());
   EXPECT_EQ(0, v3[1][0]);
@@ -51,6 +60,8 @@ TEST(HistoryTrackerTest, testUpdateSb) {
   tracker_.Update(17, 23, 3);
   const auto& v4 = tracker_.History();
   tracker_.Print();
+  infoset = MakeInfoSet(tracker_, 0, true, 0.83, 0);
+  infoset.Print();
   EXPECT_EQ(0, v4[1][0]);
   EXPECT_EQ(7, v4[1][1]);
   EXPECT_EQ(13, v4[1][2]);
@@ -58,6 +69,8 @@ TEST(HistoryTrackerTest, testUpdateSb) {
   // SB calls, done with flop, go to turn, BB bets 20.
   tracker_.Update(23, 43, 4);
   tracker_.Print();
+  infoset = MakeInfoSet(tracker_, 0, true, 0.83, 0);
+  infoset.Print();
   const auto& v5 = tracker_.History();
   EXPECT_EQ(3, v5.size());
   EXPECT_EQ(6, v5[1][3]);
@@ -66,6 +79,8 @@ TEST(HistoryTrackerTest, testUpdateSb) {
   // SB raises, BB raises.
   tracker_.Update(50, 60, 4);
   tracker_.Print();
+  infoset = MakeInfoSet(tracker_, 0, true, 0.83, 0);
+  infoset.Print();
   const auto& v6 = tracker_.History();
   EXPECT_EQ(3, v6.size());
   EXPECT_EQ(20, v6[2][0]);
@@ -75,9 +90,13 @@ TEST(HistoryTrackerTest, testUpdateSb) {
   // SB calls turn, go to river, BB checks.
   tracker_.Update(60, 60, 5);
   tracker_.Print();
+  infoset = MakeInfoSet(tracker_, 0, true, 0.83, 0);
+  infoset.Print();
 
   tracker_.Update(60, 60, 5);
   tracker_.Print();
+  infoset = MakeInfoSet(tracker_, 0, true, 0.83, 0);
+  infoset.Print();
   const auto& v7 = tracker_.History();
   EXPECT_EQ(4, v7.size());
   EXPECT_EQ(0, v7[3][0]);
@@ -125,4 +144,8 @@ TEST(HistoryTrackerTest, testUpdateBb) {
   tracker_.Print();
   EXPECT_EQ(0, v4[2][0]);
   EXPECT_EQ(0, v4[2][1]);
+}
+
+
+TEST(InfoSetTest, testMakeInfoSet) {
 }
