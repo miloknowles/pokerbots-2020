@@ -144,10 +144,16 @@ class Trainer(object):
       precomputed_ev = make_precomputed_ev(round_state)
 
       # NOTE: disable updates to memories.
+      ctr = [0]
       info = traverse_cfr(round_state, 0, sb_plyr_idx, self.strategies, self.strategies,
-                          1234, torch.ones(2), precomputed_ev, rctr=[0], allow_updates=False,
+                          1234, torch.ones(2), precomputed_ev, rctr=ctr, allow_updates=False,
                           do_external_sampling=False)
       exploits.append(info.exploitability.sum())
+
+      if (k % self.opt.TRAVERSE_DEBUG_PRINT_HZ) == 0:
+        print("Finished {}/{} eval traversals | exploit={} | explored={}".format(
+            k, self.opt.NUM_TRAVERSALS_EVAL, info.exploitability.sum(), ctr[0]))
+
 
     elapsed = time.time() - t0
     print("Time for {} eval traversals {} sec".format(self.opt.NUM_TRAVERSALS_EVAL, elapsed))

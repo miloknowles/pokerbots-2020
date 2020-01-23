@@ -247,6 +247,7 @@ def traverse_cfr(round_state, traverse_plyr, sb_plyr_idx, regrets, strategies, t
         # Exploitability is the difference in payoff between a local best response strategy and the full mixed strategy.
         node_info.exploitability = (node_info.best_response_ev - node_info.strategy_ev)
 
+        # TODO(milo): Should the non-traverse player be updated also???
         if allow_updates:
           # TODO: some conflicting info about which reach prob should multiply the avg strategy
           strategies[other_plyr].add_regret(infoset, reach_probabilities[traverse_plyr] * action_probs)

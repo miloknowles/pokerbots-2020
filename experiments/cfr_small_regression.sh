@@ -1,6 +1,0 @@
-python ../train_cfr.py --EXPERIMENT_NAME mc_cfr_regression \
-  --NUM_TRAVERSE_WORKERS 1 \
-  --NUM_TRAVERSALS_PER_ITER 40 \
-  --NUM_TRAVERSALS_EVAL 100 \
-  --TRAVERSE_DEBUG_PRINT_HZ 10 \
-  --NUM_CFR_ITERS 100 \
