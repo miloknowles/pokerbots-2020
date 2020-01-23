@@ -34,12 +34,10 @@ if (NOT BUILD_PYTHON_WRAPPER)
   target_link_libraries(cpp_skeleton
     ${Boost_LIBRARIES})
   add_executable(cpp_player
-    # cpp_skeleton/actions.cpp
-    # cpp_skeleton/bot.hpp
-    # cpp_skeleton/runner.cpp
-    # cpp_skeleton/states.cpp
-    player.hpp
-    player.cpp
+    cfr_player.cpp
+    cfr_player.hpp
+    # player.hpp
+    # player.cpp
     main.cpp)
   target_link_libraries(cpp_player
     # ${Boost_LIBRARIES}
