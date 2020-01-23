@@ -91,60 +91,38 @@ TEST(HistoryTrackerTest, testUpdateBb) {
 
   // Initialization - small and big blinds paid out.
   const auto& v0 = tracker_.History();
-  // EXPECT_EQ(1, v0[0]);
-  // EXPECT_EQ(2, v0[1]);
+  EXPECT_EQ(1, v0[0][0]);
+  EXPECT_EQ(2, v0[0][1]);
 
-  // SB called.
-  tracker_.Update(2, 2, 0);
+  // SB calls, ending preflop.
+  tracker_.Update(2, 2, 3);
   const auto& v1 = tracker_.History();
-  // EXPECT_EQ(1, v1[0]);
-  // EXPECT_EQ(2, v1[1]);
-  // EXPECT_EQ(1, v1[2]);
   tracker_.Print();
+  EXPECT_EQ(2, v1.size());
+  EXPECT_EQ(1, v1[0][0]);
+  EXPECT_EQ(2, v1[0][1]);
+  EXPECT_EQ(1, v1[0][2]);
 
-  // BB bet and SB raised.
-  tracker_.Update(10, 20, 0);
+  // Flop: BB bet and SB raised.
+  tracker_.Update(10, 20, 3);
   const auto& v2 = tracker_.History();
-  // EXPECT_EQ(1, v2[0]);
-  // EXPECT_EQ(2, v2[1]);
-  // EXPECT_EQ(1, v2[2]);
-  // EXPECT_EQ(8, v2[3]);
-  // EXPECT_EQ(18, v2[4]);
   tracker_.Print();
+  EXPECT_EQ(1, v2[0][0]);
+  EXPECT_EQ(2, v2[0][1]);
+  EXPECT_EQ(1, v2[0][2]);
+  EXPECT_EQ(8, v2[1][0]);
+  EXPECT_EQ(18, v2[1][1]);
 
-  // BB called on preflop and then BB checks the flop.
-  tracker_.Update(20, 20, 3);
+  // BB called, ending flop. This is before BB's first action on turn.
+  tracker_.Update(20, 20, 4);
   const auto& v3 = tracker_.History();
-  // EXPECT_EQ(10, v3[5]);
-  // EXPECT_EQ(0, v3[8]);
   tracker_.Print();
-}
+  EXPECT_EQ(10, v3[1][2]);
 
-TEST(HistoryTrackerTest, test_01) {
-  // B posts the blind of 1
-  // A posts the blind of 2
-  // B dealt Th Ts [9h 9s]
-  // A dealt 5c 5d [4c 4d]
-  // B calls
-  // A checks
-  // Flop 8h Ad Qs [3h Kd 8s], B (2), A (2)
-  // A checks
-  // B bets 2
-  // A calls
-  // Turn 8h Ad Qs 9s [3h Kd 8s As], B (4), A (4)
-  // A checks
-  // B checks
-  // River 8h Ad Qs 9s 4d [3h Kd 8s As 5d], B (4), A (4)
-  // A checks
-  // B bets 2
-  // A calls
-  // B shows Th Ts [9h 9s]
-  // A shows 5c 5d [4c 4d]
-  // B awarded 6
-  // A awarded -6
-  HistoryTracker tracker(true);
-  tracker.Update(2, 2, 0);
-  tracker.Update(2, 2, 3);
-  tracker.Update(2, 4, 3);
-  tracker.Print();
+  // Turn: BB checks, SB checks.
+  tracker_.Update(20, 20, 4);
+  const auto& v4 = tracker_.History();
+  tracker_.Print();
+  EXPECT_EQ(0, v4[2][0]);
+  EXPECT_EQ(0, v4[2][1]);
 }
