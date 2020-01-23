@@ -49,8 +49,9 @@ def traverse_worker(worker_id, traverse_plyr, regret_filenames, strategy_filenam
 
   # Save all the buffers one last time.
   print("[WORKER #{}] Doing final save".format(worker_id))
-  regrets[traverse_plyr].merge_and_save(regret_filenames[traverse_plyr], r_lock)
-  strategies[traverse_plyr].merge_and_save(strategy_filenames[traverse_plyr], s_lock)
+  for i in (0, 1):
+    regrets[i].merge_and_save(regret_filenames[i], r_lock)
+    strategies[i].merge_and_save(strategy_filenames[i], s_lock)
   print('[WORKER #{}] Done!'.format(worker_id))
 
 
@@ -95,7 +96,8 @@ class Trainer(object):
         # Accumulate regrets/strategy profiles for the traverse player. At the end, all of this data
         # is saved to disk and then lost from memory, so we should reload it.
         self.accumulate_regret(traverse_plyr, t)
-        self.load(regrets_to_load=[traverse_plyr], strategies_to_load=[traverse_plyr])
+        self.load()
+        # self.load(regrets_to_load=[traverse_plyr], strategies_to_load=[traverse_plyr])
         self.evaluate(cfr_steps)
         cfr_steps += 1
 
