@@ -205,8 +205,8 @@ Action Player::HandleActionPreflop(float EV, int round_num, int street, int pot_
   const bool is_our_first_action = (is_big_blind && my_contribution == BIG_BLIND) ||
                                    (!is_big_blind && my_contribution == SMALL_BLIND);
   
-  const int num_betting_rounds = history_.TotalBets(0).first;
-  printf("Num bettings rounds so far: %d\n", num_betting_rounds);
+  // const int num_betting_rounds = history_.TotalBets(0).first;
+  // printf("Num bettings rounds so far: %d\n", num_betting_rounds);
 
   if (is_our_first_action) {
     // CASE 1: First action and we are SMALLBLIND.

@@ -22,7 +22,9 @@ add_library(${PROJECT_NAME} SHARED
   # OMPEval/omp/Util.h
   OMPEval/libdivide/libdivide.h
   permutation_filter.cpp
-  permutation_filter.hpp)
+  permutation_filter.hpp
+  history_tracker.cpp
+  history_tracker.hpp)
 target_link_libraries(${PROJECT_NAME}
   pthread
   ${CMAKE_CURRENT_SOURCE_DIR}/libpbots_calc.so)
@@ -61,6 +63,7 @@ endif()
 if(BUILD_TESTS)
   enable_testing()  
   set(TEST_SOURCES
+    test_history_tracker.cpp
     test_permutation_filter.cpp)
 
   # Make a single executable for all tests.
@@ -71,4 +74,10 @@ if(BUILD_TESTS)
     pthread)
   set_target_properties(${PROJECT_NAME}_test PROPERTIES COMPILE_FLAGS "-std=c++11")
   add_test(NAME ${PROJECT_NAME}_test COMMAND ${PROJECT_NAME}_test --gtest_color=yes)
+
+  add_custom_command(
+    TARGET ${PROJECT_NAME}_test POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy
+            ${CMAKE_CURRENT_SOURCE_DIR}/preflop_equity.txt
+            ${CMAKE_CURRENT_BINARY_DIR}/preflop_equity.txt)
 endif()

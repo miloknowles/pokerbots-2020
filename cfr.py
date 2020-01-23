@@ -195,10 +195,6 @@ def traverse_cfr(round_state, traverse_plyr, sb_plyr_idx, regrets, strategies, t
         action_probs = apply_mask_and_uniform(action_probs, mask)
         assert torch.allclose(action_probs.sum(), torch.ones(1), rtol=1e-3, atol=1e-3)
 
-        # Add the action probabilities to the average strategy buffer.
-        # if allow_updates:
-          # avg_strategy.add_regret(infoset, arrival_probability * action_probs)
-
         # EXTERNAL SAMPLING: choose only ONE action for the non-traversal player.
         action = actions[torch.multinomial(action_probs, 1).item()]
         next_round_state = round_state.copy().proceed(action)
