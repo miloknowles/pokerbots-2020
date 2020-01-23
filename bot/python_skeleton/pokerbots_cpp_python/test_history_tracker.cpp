@@ -50,7 +50,7 @@ TEST(HistoryTrackerTest, testUpdateSb) {
   // BB checks the flop.
   tracker_.Update(10, 10, 3);
   tracker_.Print();
-  infoset = MakeInfoSet(tracker_, 0, true, 0.83, 0);
+  infoset = MakeInfoSet(tracker_, 0, true, 0.83, 3);
   infoset.Print();
   const auto& v3 = tracker_.History();
   EXPECT_EQ(2, v3.size());
@@ -60,7 +60,7 @@ TEST(HistoryTrackerTest, testUpdateSb) {
   tracker_.Update(17, 23, 3);
   const auto& v4 = tracker_.History();
   tracker_.Print();
-  infoset = MakeInfoSet(tracker_, 0, true, 0.83, 0);
+  infoset = MakeInfoSet(tracker_, 0, true, 0.83, 3);
   infoset.Print();
   EXPECT_EQ(0, v4[1][0]);
   EXPECT_EQ(7, v4[1][1]);
@@ -69,7 +69,7 @@ TEST(HistoryTrackerTest, testUpdateSb) {
   // SB calls, done with flop, go to turn, BB bets 20.
   tracker_.Update(23, 43, 4);
   tracker_.Print();
-  infoset = MakeInfoSet(tracker_, 0, true, 0.83, 0);
+  infoset = MakeInfoSet(tracker_, 0, true, 0.83, 4);
   infoset.Print();
   const auto& v5 = tracker_.History();
   EXPECT_EQ(3, v5.size());
@@ -79,7 +79,7 @@ TEST(HistoryTrackerTest, testUpdateSb) {
   // SB raises, BB raises.
   tracker_.Update(50, 60, 4);
   tracker_.Print();
-  infoset = MakeInfoSet(tracker_, 0, true, 0.83, 0);
+  infoset = MakeInfoSet(tracker_, 0, true, 0.83, 4);
   infoset.Print();
   const auto& v6 = tracker_.History();
   EXPECT_EQ(3, v6.size());
@@ -90,12 +90,15 @@ TEST(HistoryTrackerTest, testUpdateSb) {
   // SB calls turn, go to river, BB checks.
   tracker_.Update(60, 60, 5);
   tracker_.Print();
-  infoset = MakeInfoSet(tracker_, 0, true, 0.83, 0);
+  infoset = MakeInfoSet(tracker_, 0, true, 0.83, 5);
   infoset.Print();
+
+  const auto& bucket = BucketInfoSetSmall(infoset);
+  std::cout << BucketSmallJoin(bucket) << std::endl;
 
   tracker_.Update(60, 60, 5);
   tracker_.Print();
-  infoset = MakeInfoSet(tracker_, 0, true, 0.83, 0);
+  infoset = MakeInfoSet(tracker_, 0, true, 0.83, 5);
   infoset.Print();
   const auto& v7 = tracker_.History();
   EXPECT_EQ(4, v7.size());

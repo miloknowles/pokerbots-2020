@@ -4,6 +4,7 @@
 #include <unordered_map>
 #include <cassert>
 #include <vector>
+#include <string>
 #include <utility>
 
 namespace pb {
@@ -13,16 +14,11 @@ static constexpr int kMaxActionsPerStreet = 4;
 typedef std::vector<std::vector<int>> FlexHistory;
 typedef std::array<int, 2 + 4*kMaxActionsPerStreet> FixedHistory;
 
+
 inline int GetStreet0123(const int street_sz) {
   return street_sz == 0 ? 0 : (street_sz - 2);
 }
 
-struct BettingInfo {
-  BettingInfo() = default;
-  int num_bets = 0;
-  int num_calls = 0;
-  int num_raises = 0;
-};
 
 class HistoryTracker {
  public:
@@ -40,22 +36,6 @@ class HistoryTracker {
   void UpdatePlayer(int my_contrib, int street);
   void UpdateOpponent(int opp_contrib, int street);
 
-  // // Total number of actions taken by each player to increase the pot size during a street.
-  // std::pair<int, int> TotalBets(int street) const {
-  //   const auto& info = GetBettingInfo(street);
-  //   const int ply_bets = info.first.num_raises + info.first.num_bets;
-  //   const int opp_bets = info.second.num_raises + info.second.num_bets;
-  //   return std::make_pair(ply_bets, opp_bets);
-  // }
-
-  // // Was the first action of a street a CHECK?
-  // bool FirstActionWasCheck(int street) const {
-  //   const int offset = kMaxActionsPerStreet * GetStreet0123(street);
-  //   return history_.at(offset) == 0;
-  // }
-
-  // std::pair<BettingInfo, BettingInfo> GetBettingInfo(int street) const;
-
   void Print() const {
     for (const std::vector<int>& st : history_) {
       for (const int add_amt : st) {
@@ -66,7 +46,6 @@ class HistoryTracker {
     std::cout << std::endl;
   }
 
-  // std::vector<int> Vector() const { return std::vector<int>(history_.begin(), history_.end()); }
   FlexHistory History() const { return history_; }
 
  private:
@@ -79,7 +58,6 @@ class HistoryTracker {
 
   // Encodes the actions taken so far (bets as % of pot).
   int next_action_idx_ = 2;
-  // std::array<int, 4*kMaxActionsPerStreet> history_{};
   FlexHistory history_{};
 };
 
@@ -121,6 +99,35 @@ inline EvInfoSet MakeInfoSet(const HistoryTracker& ht, int player_idx, bool play
   }
 
   return EvInfoSet(ev, fh, player_is_sb ? 0 : 1, GetStreet0123(current_street));
+}
+
+
+/*
+Apply a tiny abstraction to an infoset.
+- SB or BB (0 or 1)
+- Hand strengths are bucketed into { 0-40%, 40-60%, 60-80%, 80-100% }
+- Current street has 5 betting actions of { 0, C, P/2, P, 2P }
+- Previous streets are summarized by:
+  - 0 or 1: whether the player raised
+  - 0 or 1: whether the opponent raised
+
+[ SB/BB,
+  CURRENT_HS,
+  P_RAISED_P, P_RAISED_F, P_RAISED_T, P_RAISED_R,
+  O_RAISED_P, O_RAISED_F, O_RAISED_T, O_RAISED_R,
+  A0, A1, A2, A3
+  CURRENT_STREET
+]
+*/
+std::vector<std::string> BucketInfoSetSmall(const EvInfoSet& infoset);
+
+
+inline std::string BucketSmallJoin(const std::vector<std::string>& b) {
+  const std::string meta = b[0] + "." + b[1] + "." + b[2];
+  const std::string plyr = b[3] + "." + b[4] + "." + b[5] + "." + b[6];
+  const std::string opp = b[7] + "." + b[8] + "." + b[9] + "." + b[10];
+  const std::string street = b[11] + "." + b[12] + "." + b[13] + "." + b[14];
+  return meta + "|" + plyr + "|" + opp + "|" + street;
 }
 
 }

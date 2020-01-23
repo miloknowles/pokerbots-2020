@@ -80,50 +80,115 @@ void HistoryTracker::UpdateOpponent(int opp_contrib, int street) {
 }
 
 
-// std::pair<BettingInfo, BettingInfo> HistoryTracker::GetBettingInfo(int street) const {
-//   BettingInfo ply;
-//   BettingInfo opp;
-//   const int player_parity = (street == 0) ? is_big_blind_ : !is_big_blind_;
-//   const int start_idx = kMaxActionsPerStreet * GetStreet0123(street);
-//   const int end_idx = start_idx + kMaxActionsPerStreet;
+std::vector<std::string> BucketInfoSetSmall(const EvInfoSet& infoset) {
+  std::vector<std::string> h(1 + 1 + 1 + 4 + 4 + 4);
+  std::fill(h.begin(), h.end(), "x");
 
-//   std::array<int, 2> pips = { 0, 0 };
-//   for (int i = start_idx; i < end_idx; ++i) {
-//     const int add_amt = history_.at(i);
-//     if ((i % 2) == player_parity) {
-//       if (i >= 2) {
-//         // Either a bet or a raise.
-//         if ((pips[0] + add_amt) > pips[1]) {
-//           if (pips[1] == pips[0]) {
-//             ply.num_bets += 1;
-//           } else {
-//             ply.num_raises += 1;
-//           }
-//         // Must be a call.
-//         } else if (add_amt > 0) {
-//           ply.num_calls += 1;
-//         }
-//       }
-//       pips[0] += add_amt;
-//     } else {
-//       if (i >= 2) {
-//         // Either a bet or a raise.
-//         if ((pips[1] + add_amt) > pips[0]) {
-//           if (pips[0] == pips[1]) {
-//             opp.num_bets += 1;
-//           } else {
-//             opp.num_raises += 1;
-//           }
-//         // Must be a call.
-//         } else if (add_amt > 0) {
-//           opp.num_calls += 1;
-//         } 
-//       }
-//       pips[1] += add_amt;
-//     }
-//   }
+  h[0] = infoset.player_position == 0 ? "SB" : "BB";
+  if (infoset.street == 0) {
+    h[1] = "P";
+  } else if (infoset.street == 1) {
+    h[1] = "F";
+  } else if (infoset.street == 2) {
+    h[1] = "T"; 
+  } else {
+    h[1] = "R";
+  }
 
-//   return std::make_pair(ply, opp);
-// }
+  if (infoset.ev < 0.4) {
+    h[2] = "H0";
+  } else if (infoset.ev < 0.6) {
+    h[2] = "H1";
+  } else if (infoset.ev < 0.8) {
+    h[2] = "H2";
+  } else {
+    h[2] = "H3";
+  }
+
+  assert(infoset.bet_history_vec.size() == (2 + 4*kMaxActionsPerStreet));
+
+  std::array<int, 2> pips = { 0, 0 };
+  const int plyr_raised_offset = 3;
+  const int opp_raised_offset = 7;
+  const int street_actions_offset = 11;
+
+  std::vector<int> cumul = { infoset.bet_history_vec.at(0) };
+  for (int i = 1; i < infoset.bet_history_vec.size(); ++i) {
+    cumul.emplace_back(cumul.at(i-1) + infoset.bet_history_vec.at(i));
+  }
+
+  for (const int v : cumul) {
+    std::cout << v << " ";
+  }
+  std::cout << std::endl;
+
+  for (int i = 0; i < (2 + 4*kMaxActionsPerStreet); ++i) {
+    const bool is_new_street = ((i == 0) || ((i - 2) % kMaxActionsPerStreet) == 0) && i > 2;
+
+    if (is_new_street) {
+      pips = { 0, 0 };
+    }
+
+    const int street = i > 2 ? (i - 2) / kMaxActionsPerStreet : 0;
+    if (street > infoset.street) {
+      break;
+    }
+
+    const bool is_player = (street == 0 && ((i % 2) == infoset.player_position)) ||
+                           (street > 0 && ((i % 2) != infoset.player_position));
+    
+    const int amt_after_action = pips[i % 2] + infoset.bet_history_vec.at(i);
+    const bool action_is_fold = (amt_after_action < pips[1 - (i % 2)]) && (infoset.bet_history_vec[i] == 0);
+    const bool action_is_wrapped_raise = (amt_after_action < pips[1 - (i % 2)]) && (infoset.bet_history_vec[i] > 0);
+
+    if (action_is_fold) {
+      break;
+    }
+
+    const bool action_is_check = (amt_after_action == pips[1 - (i % 2)]) && (infoset.bet_history_vec[i] == 0); 
+    const bool action_is_call = (amt_after_action == pips[1 - (i % 2)]) && (infoset.bet_history_vec[i] > 0);
+    const bool action_is_raise = (amt_after_action > pips[1 - (i % 2)]);
+
+    if (action_is_raise && (i >= 2)) {
+      if (is_player) {
+        h[plyr_raised_offset + street] = "R";
+      } else {
+        h[opp_raised_offset + street] = "R";
+      }
+    }
+
+    if (street == infoset.street && (i >= 2)) {
+      const int call_amt = std::abs(pips[0] - pips[1]);
+      const int raise_amt = (infoset.bet_history_vec[i] - call_amt) / (cumul[i-1] + call_amt);
+      const int action_offset = (street == 0) ? (i - 2) : ((i - 2) % kMaxActionsPerStreet);
+
+      if (action_is_check) {
+        const bool bet_occurs_after = (i < (infoset.bet_history_vec.size() - 1)) && (infoset.bet_history_vec[i+1] > 0);
+        if (action_offset == 0 && !(is_player || bet_occurs_after)) {
+          h[street_actions_offset + action_offset] = "CK";
+        } else {
+          break;
+        }
+      } else if (action_is_call) {
+        h[street_actions_offset + action_offset] = "CL";
+      } else if (action_is_wrapped_raise) {
+        h[street_actions_offset + action_offset] = "?P";
+      } else {
+        assert(raise_amt > 0);
+        if (raise_amt <= 0.5) {
+          h[street_actions_offset + action_offset] = "HP";
+        } else if (raise_amt <= 1.0) {
+          h[street_actions_offset + action_offset] = "1P";
+        } else {
+          h[street_actions_offset + action_offset] = "2P";
+        }
+      }
+    }
+
+    pips[i % 2] += infoset.bet_history_vec.at(i);
+  }
+
+  return h;
+}
 
 }
