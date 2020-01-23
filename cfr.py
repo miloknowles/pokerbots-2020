@@ -179,7 +179,7 @@ def traverse_cfr(round_state, traverse_plyr, sb_plyr_idx, regrets, strategies, t
 
       if allow_updates:
         # TODO: some conflicting info about which reach prob should multiply the avg strategy
-        strategies[traverse_plyr].add_regret(infoset, reach_probabilities[other_plyr] * action_probs)
+        strategies[traverse_plyr].add_regret(infoset, reach_probabilities[traverse_plyr] * action_probs)
         regrets[traverse_plyr].add_regret(infoset, reach_probabilities[other_plyr] * immediate_regrets_tp)
 
       return node_info
@@ -246,7 +246,7 @@ def traverse_cfr(round_state, traverse_plyr, sb_plyr_idx, regrets, strategies, t
         # TODO(milo): Should the non-traverse player be updated also???
         if allow_updates:
           # TODO: some conflicting info about which reach prob should multiply the avg strategy
-          strategies[other_plyr].add_regret(infoset, reach_probabilities[traverse_plyr] * action_probs)
+          strategies[other_plyr].add_regret(infoset, reach_probabilities[other_plyr] * action_probs)
           regrets[other_plyr].add_regret(infoset, reach_probabilities[traverse_plyr] * immediate_regrets_tp)
 
         return node_info
