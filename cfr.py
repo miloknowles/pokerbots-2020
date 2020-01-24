@@ -288,7 +288,9 @@ def traverse_cfr(round_state, traverse_plyr, sb_plyr_idx, regrets, strategies, t
     
     else:
       for i, a in enumerate(actions):
-        if action_probs[i].item() <= 0: # NOTE: this should handle masked actions also.
+        # if action_probs[i].item() <= 0: # NOTE: this should handle masked actions also.
+          # continue
+        if mask[i].item() <= 0:
           continue
         assert(mask[i] > 0)
         next_round_state = round_state.copy().proceed(a)
