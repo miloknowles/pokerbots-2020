@@ -102,7 +102,7 @@ class RoundState(namedtuple('_RoundState', ['button', 'street', 'pips', 'stacks'
         
         # NOTE: MIT engine ALWAYS has the SB player == 0 and sets button to 1. Had to fix that...
         if isinstance(action, CallAction):
-            if self.button == self.sb_player:
+            if (self.button == self.sb_player) and self.street == 0:
                 self.bet_history[-1].append(1)
                 return RoundState(self.button + 1, 0, [BIG_BLIND] * 2, [STARTING_STACK - BIG_BLIND] * 2, self.hands, self.deck, self, self.bet_history, self.sb_player)
             # both players acted

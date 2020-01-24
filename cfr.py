@@ -314,7 +314,8 @@ def traverse_cfr(round_state, traverse_plyr, sb_plyr_idx, regrets, strategies, t
       node_info.exploitability = (node_info.best_response_ev - node_info.strategy_ev)
 
       if allow_updates:
-        # TODO: what should reach prob be?
+        # NOTE: Zinkevich et. al. multiple the immediate regret by the opponent reach probability,
+        # and the strategy by the player reach probability.
         strategies[active_plyr_idx].add_regret(infoset, reach_probabilities[active_plyr_idx] * action_probs)
         regrets[active_plyr_idx].add_regret(infoset, reach_probabilities[inactive_plyr_idx] * immediate_regrets_tp)
 
