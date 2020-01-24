@@ -348,6 +348,53 @@ class BucketTest(unittest.TestCase):
     bucket = bucket_small(infoset)
     print(bucket_small_join(bucket))
 
+  def test_bucket_small_04(self):
+    # Round #4, B (93), A (-93)
+    # B posts the blind of 1
+    # A posts the blind of 2
+    # B dealt Qs 8c [Ts Jc]
+    # A dealt Js Kh [4s Ah]
+    # B calls
+    # A checks
+    # Flop 7d 2h 5s [Qd 2h 6s], B (2), A (2)
+    # A checks
+    # B bets 2
+    sb_index = 1
+    round_state = create_new_round(sb_index)
+
+    print("Start of preflop, no actions yet")
+    infoset = make_infoset(round_state, 1, True)
+    bucket = bucket_small(infoset)
+    print(bucket_small_join(bucket))
+
+    round_state = round_state.proceed(CallAction())
+
+    print("SB called on preflop")
+    infoset = make_infoset(round_state, 0, False)
+    bucket = bucket_small(infoset)
+    print(bucket_small_join(bucket))
+
+    round_state = round_state.proceed(CheckAction())
+
+    print("BB checked on preflop, first action of flop")
+    infoset = make_infoset(round_state, 0, False)
+    bucket = bucket_small(infoset)
+    print(bucket_small_join(bucket))
+
+    round_state = round_state.proceed(CheckAction())
+
+    print("BB checked on flop")
+    infoset = make_infoset(round_state, 1, True)
+    bucket = bucket_small(infoset)
+    print(bucket_small_join(bucket))
+
+    round_state = round_state.proceed(RaiseAction(2))
+
+    print("SB bet 2")
+    infoset = make_infoset(round_state, 0, False)
+    bucket = bucket_small(infoset)
+    print(bucket_small_join(bucket))
+    
 
 if __name__ == "__main__":
   unittest.main()
