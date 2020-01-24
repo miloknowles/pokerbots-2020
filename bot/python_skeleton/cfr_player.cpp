@@ -1,4 +1,7 @@
 #include <iostream>
+#include <fstream>
+#include <sstream>
+#include <boost/algorithm/string.hpp>
 
 #include "cfr_player.hpp"
 
@@ -35,7 +38,7 @@ std::pair<ActionVec, ActionMask> MakeActions(RoundState* round_state, int active
   const bool force_fold_call = bet_actions_this_street >= (kMaxActionsPerStreet - 1);
 
   ActionMask actions_mask;
-  std::fill(actions_mask.begin(), actions_mask.end(), 1);
+  std::fill(actions_mask.begin(), actions_mask.end(), 0);
 
   // NOTE: These are HALF POT multiples.
   ActionVec actions_unscaled = {
@@ -50,7 +53,8 @@ std::pair<ActionVec, ActionMask> MakeActions(RoundState* round_state, int active
   for (int i = 0; i < actions_unscaled.size(); ++i) {
     const Action& a = actions_unscaled.at(i);
 
-    if ((a.action_type & legal_actions) && !(a.action_type == RAISE_ACTION_TYPE && force_fold_call)) {
+    const bool action_is_allowed = a.action_type & legal_actions;
+    if (action_is_allowed && !(a.action_type == RAISE_ACTION_TYPE && force_fold_call)) {
       actions_mask.at(i) = 1;
     }
 
@@ -71,7 +75,27 @@ std::pair<ActionVec, ActionMask> MakeActions(RoundState* round_state, int active
 /**
  * Called when a new game starts. Called exactly once.
  */
-CfrPlayer::CfrPlayer() {}
+CfrPlayer::CfrPlayer() {
+  std::string line;
+  std::ifstream infile("./avg_strategy.txt");
+
+  while (std::getline(infile, line)) {
+    std::istringstream iss(line);
+
+    std::vector<std::string> strs;
+    boost::split(strs, line, boost::is_any_of(" "));
+
+    const std::string key = strs.at(0);
+    ActionRegrets regrets_this_key;
+    assert(strs.size() == (1 + regrets_this_key.size()));
+    for (int i = 0; i < regrets_this_key.size(); ++i) {
+      regrets_this_key.at(i) = std::stod(strs.at(i + 1));
+    }
+    regrets_.emplace(key, regrets_this_key);
+  }
+
+  std::cout << "Read in regrets for " << regrets_.size() << " bucketed infosets" << std::endl;
+}
 
 /**
  * Called when a new round starts. Called NUM_ROUNDS times.

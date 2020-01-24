@@ -50,4 +50,10 @@ if (NOT BUILD_PYTHON_WRAPPER)
     COMMAND ${CMAKE_COMMAND} -E copy
             ${CMAKE_SOURCE_DIR}/pokerbots_cpp_python/preflop_equity.txt
             ${CMAKE_CURRENT_BINARY_DIR}/preflop_equity.txt)
+
+  add_custom_command(
+    TARGET cpp_player POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy
+            ${CMAKE_SOURCE_DIR}/avg_strategy.txt
+            ${CMAKE_CURRENT_BINARY_DIR}/avg_strategy.txt)
 endif()
