@@ -6,8 +6,7 @@ from tensorboardX import SummaryWriter
 
 from constants import Constants
 from utils import *
-from cfr import traverse_cfr, RegretMatchedStrategy
-from traverse import make_actions, make_infoset, create_new_round, make_precomputed_ev
+from cfr import *
 from infoset import EvInfoSet
 
 
