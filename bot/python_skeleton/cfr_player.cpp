@@ -269,6 +269,8 @@ Action CfrPlayer::RegretMatching(const std::string& key, const ActionVec& action
     regrets_.emplace(key, uniform);
   }
 
+  std::cout << "Getting action for: " << key << std::endl;
+
   const ActionRegrets& regrets = regrets_.at(key);
   ActionRegrets masked_regrets;
 

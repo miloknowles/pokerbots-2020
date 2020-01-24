@@ -99,10 +99,12 @@ class RoundState(namedtuple('_RoundState', ['button', 'street', 'pips', 'stacks'
         if isinstance(action, FoldAction):
             delta = self.stacks[0] - STARTING_STACK if active == 0 else STARTING_STACK - self.stacks[1]
             return TerminalState([delta, -delta], self)
+        
+        # NOTE: MIT engine ALWAYS has the SB player == 0 and sets button to 1. Had to fix that...
         if isinstance(action, CallAction):
-            if self.button == 0:  # sb calls bb
+            if self.button == self.sb_player:
                 self.bet_history[-1].append(1)
-                return RoundState(1, 0, [BIG_BLIND] * 2, [STARTING_STACK - BIG_BLIND] * 2, self.hands, self.deck, self, self.bet_history, self.sb_player)
+                return RoundState(self.button + 1, 0, [BIG_BLIND] * 2, [STARTING_STACK - BIG_BLIND] * 2, self.hands, self.deck, self, self.bet_history, self.sb_player)
             # both players acted
             new_pips = list(self.pips)
             new_stacks = list(self.stacks)

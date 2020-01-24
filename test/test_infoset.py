@@ -4,7 +4,7 @@ import torch
 
 from memory_buffer import MemoryBuffer
 from infoset import EvInfoSet, unpack_ev_infoset, bucket_small, bucket_small_join
-from traverse import *
+from cfr import *
 from utils import encode_cards_rank_suit
 
 
@@ -88,7 +88,7 @@ class BucketTest(unittest.TestCase):
     sb_index = 1
     round_state = create_new_round(sb_index)
 
-    # SB calls, finishing preflop.
+    # SB calls, NOT finishing preflop.
     infoset = make_infoset(round_state, 1, True)
     bucket = bucket_small(infoset)
     print(bucket)
@@ -98,11 +98,20 @@ class BucketTest(unittest.TestCase):
     self.assertGreaterEqual(infoset.ev, 0.60)
     round_state = round_state.proceed(CallAction())
 
+    # BB checks, ending the preflop.
+    infoset = make_infoset(round_state, 0, False)
+    bucket = bucket_small(infoset)
+    print("SB called preflop:")
+    print(bucket)
+
+    round_state = round_state.proceed(CheckAction())
+
     # BB bets 4.
     infoset = make_infoset(round_state, 0, False)
     # print(round_state.hands)
     # print(round_state.deck.peek(5))
     bucket = bucket_small(infoset)
+    print("BB first action of flop:")
     print(bucket)
     self.assertEqual(bucket[0], 'BB')
     self.assertEqual(bucket[1], 'F')
@@ -302,6 +311,9 @@ class BucketTest(unittest.TestCase):
 
     # SB calls.
     round_state = round_state.proceed(CallAction())
+
+    # BB checks.
+    round_state = round_state.proceed(CheckAction())
 
     # Do 8 bets/raises to exceed the max 6 actions.
     round_state = round_state.proceed(RaiseAction(2))
