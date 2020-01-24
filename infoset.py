@@ -157,9 +157,9 @@ def bucket_small(infoset):
         h[street_actions_offset + action_offset] = '?P'
       else:
         assert(raise_amt > 0)
-        if raise_amt <= 0.5:
+        if raise_amt <= 0.75:
           h[street_actions_offset + action_offset] = 'HP'
-        elif raise_amt <= 1.0:
+        elif raise_amt <= 1.5:
           h[street_actions_offset + action_offset] = '1P'
         else:
           h[street_actions_offset + action_offset] = '2P'

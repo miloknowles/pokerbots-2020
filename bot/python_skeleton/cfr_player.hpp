@@ -82,6 +82,21 @@ class CfrPlayer : public Bot {
     Action get_action(GameState* game_state, RoundState* round_state, int active);
 
     Action RegretMatching(const std::string& key, const ActionVec& actions, const ActionMask& mask);
+
+    void MaybePrintNewStreet(int street);
+
+    // Backup action handlers (when CFR fails).
+    Action HandleActionPreflop(float ev, int round_num, int street, int pot_size, int continue_cost,
+                               int legal_actions, int min_raise, int max_raise, int my_contribution,
+                               int opp_contribution, bool is_big_blind);
+
+    Action HandleActionFlop(float ev, int round_num, int street, int pot_size, int continue_cost,
+                               int legal_actions, int min_raise, int max_raise, int my_contribution,
+                               int opp_contribution, bool is_big_blind);
+    
+    Action HandleActionTurn(float ev, int round_num, int street, int pot_size, int continue_cost,
+                               int legal_actions, int min_raise, int max_raise, int my_contribution,
+                               int opp_contribution, bool is_big_blind);
 };
 
 }
