@@ -232,7 +232,6 @@ Action CfrPlayer::get_action(GameState* game_state, RoundState* round_state, int
   const std::vector<std::string> bucket = BucketInfoSetSmall(infoset);
   const std::string key = BucketSmallJoin(bucket);
 
-  // TODO: look up key in map and do regret matching.
   const auto& actions_and_mask = MakeActions(round_state, active, history_);
   return RegretMatching(key, actions_and_mask.first, actions_and_mask.second);
 }

@@ -3,6 +3,13 @@
 
 namespace pb {
 
+static inline void PrintVector(const std::vector<int>& vec) {
+  for (const int t : vec) {
+    std::cout << t << " ";
+  }
+  std::cout << "\n";
+}
+
 
 void HistoryTracker::Update(int my_contrib, int opp_contrib, int street) {
   const bool did_start_new_street = (prev_street_ != street);
@@ -11,6 +18,7 @@ void HistoryTracker::Update(int my_contrib, int opp_contrib, int street) {
     // If we don't have a previous street, don't need to do call detection below.
     if (street > 0) {
       std::vector<int>& prev_street_adds = history_.back();
+      // PrintVector(prev_street_adds);
 
       // The amount that was put in the pot by each player during the last street.
       const int prev_street_pip = std::min(my_contrib, opp_contrib) - prev_street_contrib_;
@@ -21,8 +29,18 @@ void HistoryTracker::Update(int my_contrib, int opp_contrib, int street) {
 
       const int call_amt_0 = prev_street_pip - pips[0];
       const int call_amt_1 = prev_street_pip - pips[1];
-      assert(!(call_amt_0 > 0 && call_amt_1 > 0));
-      if (call_amt_0 > 0) {
+      
+      // If both players owe money in the last round, it must have been because I raised and they called.
+      if (call_amt_0 > 0 && call_amt_1 > 0) {
+        const int next_idx = prev_street_adds.size();
+        if (next_idx % 2 == 0) {
+          prev_street_adds.emplace_back(call_amt_0);
+          prev_street_adds.emplace_back(call_amt_1);
+        } else {
+          prev_street_adds.emplace_back(call_amt_1);
+          prev_street_adds.emplace_back(call_amt_0);
+        }
+      } else if (call_amt_0 > 0) {
         prev_street_adds.emplace_back(call_amt_0);
       } else if (call_amt_1 > 0) {
         prev_street_adds.emplace_back(call_amt_1);
@@ -106,6 +124,7 @@ std::vector<std::string> BucketInfoSetSmall(const EvInfoSet& infoset) {
   }
 
   assert(infoset.bet_history_vec.size() == (2 + 4*kMaxActionsPerStreet));
+  // PrintVector(std::vector<int>(infoset.bet_history_vec.begin(), infoset.bet_history_vec.end()));
 
   std::array<int, 2> pips = { 0, 0 };
   const int plyr_raised_offset = 3;
@@ -116,11 +135,6 @@ std::vector<std::string> BucketInfoSetSmall(const EvInfoSet& infoset) {
   for (int i = 1; i < infoset.bet_history_vec.size(); ++i) {
     cumul.emplace_back(cumul.at(i-1) + infoset.bet_history_vec.at(i));
   }
-
-  for (const int v : cumul) {
-    std::cout << v << " ";
-  }
-  std::cout << std::endl;
 
   for (int i = 0; i < (2 + 4*kMaxActionsPerStreet); ++i) {
     const bool is_new_street = ((i == 0) || ((i - 2) % kMaxActionsPerStreet) == 0) && i > 2;
@@ -159,7 +173,7 @@ std::vector<std::string> BucketInfoSetSmall(const EvInfoSet& infoset) {
 
     if (street == infoset.street && (i >= 2)) {
       const int call_amt = std::abs(pips[0] - pips[1]);
-      const int raise_amt = (infoset.bet_history_vec[i] - call_amt) / (cumul[i-1] + call_amt);
+      const float raise_amt = static_cast<float>(infoset.bet_history_vec[i] - call_amt) / static_cast<float>(cumul[i-1] + call_amt);
       const int action_offset = (street == 0) ? (i - 2) : ((i - 2) % kMaxActionsPerStreet);
 
       if (action_is_check) {
