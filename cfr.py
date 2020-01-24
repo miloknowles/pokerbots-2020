@@ -276,7 +276,6 @@ def traverse_cfr(round_state, traverse_plyr, sb_plyr_idx, regrets, strategies, t
     immediate_regrets = torch.zeros(len(actions))    # Regret for not choosing an action over the current strategy.
 
     if active_plyr_idx != traverse_plyr and do_external_sampling:
-      assert(False)
       # EXTERNAL SAMPLING: choose only ONE action for the non-traversal player.
       action = actions[torch.multinomial(action_probs, 1).item()]
       next_round_state = round_state.copy().proceed(action)
