@@ -313,7 +313,7 @@ def traverse_cfr(round_state, traverse_plyr, sb_plyr_idx, regrets, strategies, t
       # Exploitability is the difference in payoff between a local best response strategy and the full mixed strategy.
       node_info.exploitability = (node_info.best_response_ev - node_info.strategy_ev)
 
-      if allow_updates:
+      if allow_updates and active_plyr_idx == traverse_plyr:
         # NOTE: Zinkevich et. al. multiple the immediate regret by the opponent reach probability,
         # and the strategy by the player reach probability.
         strategies[active_plyr_idx].add_regret(infoset, reach_probabilities[active_plyr_idx] * action_probs)
