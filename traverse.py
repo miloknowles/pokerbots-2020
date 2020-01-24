@@ -137,7 +137,7 @@ def create_new_round(button_player):
   if button_player == 1:
     pips.reverse()
     stacks.reverse()
-  round_state = RoundState(button_player, 0, pips, stacks, hands, deck, None, [[1, 2]])
+  round_state = RoundState(button_player, 0, pips, stacks, hands, deck, None, [[1, 2]], button_player)
   return round_state
 
 

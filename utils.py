@@ -64,7 +64,7 @@ def apply_mask_and_normalize(probs, mask):
 def apply_mask_and_uniform(probs, mask):
   p = probs * mask
 
-  if p.sum() == 0:
+  if p.sum() <= 1e-3:
     p = mask
   p = p / torch.sum(p)
 

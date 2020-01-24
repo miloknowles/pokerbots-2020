@@ -31,7 +31,7 @@ PVALUE = lambda name, value: ', {} ({})'.format(name, value)
 STATUS = lambda players: ''.join([PVALUE(p.name, p.bankroll) for p in players])
 
 
-class RoundState(namedtuple('_RoundState', ['button', 'street', 'pips', 'stacks', 'hands', 'deck', 'previous_state', 'bet_history'])):
+class RoundState(namedtuple('_RoundState', ['button', 'street', 'pips', 'stacks', 'hands', 'deck', 'previous_state', 'bet_history', 'sb_player'])):
     '''
     Encodes the game tree for one round of poker.
     '''
@@ -87,7 +87,9 @@ class RoundState(namedtuple('_RoundState', ['button', 'street', 'pips', 'stacks'
         self.bet_history.append([])
 
         new_street = 3 if self.street == 0 else self.street + 1
-        return RoundState(1, new_street, [0, 0], self.stacks, self.hands, self.deck, self, self.bet_history)
+
+        # NOTE: The MIT engine starts all new streets with button = 1 (2nd player always).
+        return RoundState(1 - self.sb_player, new_street, [0, 0], self.stacks, self.hands, self.deck, self, self.bet_history, self.sb_player)
 
     def proceed(self, action):
         '''
@@ -100,14 +102,14 @@ class RoundState(namedtuple('_RoundState', ['button', 'street', 'pips', 'stacks'
         if isinstance(action, CallAction):
             if self.button == 0:  # sb calls bb
                 self.bet_history[-1].append(1)
-                return RoundState(1, 0, [BIG_BLIND] * 2, [STARTING_STACK - BIG_BLIND] * 2, self.hands, self.deck, self, self.bet_history)
+                return RoundState(1, 0, [BIG_BLIND] * 2, [STARTING_STACK - BIG_BLIND] * 2, self.hands, self.deck, self, self.bet_history, self.sb_player)
             # both players acted
             new_pips = list(self.pips)
             new_stacks = list(self.stacks)
             contribution = new_pips[1-active] - new_pips[active]
             new_stacks[active] -= contribution
             new_pips[active] += contribution
-            state = RoundState(self.button + 1, self.street, new_pips, new_stacks, self.hands, self.deck, self, self.bet_history)
+            state = RoundState(self.button + 1, self.street, new_pips, new_stacks, self.hands, self.deck, self, self.bet_history, self.sb_player)
 
             # Update the betting history.
             self.bet_history[-1].append(contribution)
@@ -121,7 +123,7 @@ class RoundState(namedtuple('_RoundState', ['button', 'street', 'pips', 'stacks'
         
             # let opponent act
             self.bet_history[-1].append(0)
-            return RoundState(self.button + 1, self.street, self.pips, self.stacks, self.hands, self.deck, self, self.bet_history)
+            return RoundState(self.button + 1, self.street, self.pips, self.stacks, self.hands, self.deck, self, self.bet_history, self.sb_player)
         # isinstance(action, RaiseAction)
         new_pips = list(self.pips)
         new_stacks = list(self.stacks)
@@ -132,8 +134,8 @@ class RoundState(namedtuple('_RoundState', ['button', 'street', 'pips', 'stacks'
 
         new_stacks[active] -= contribution
         new_pips[active] += contribution
-        return RoundState(self.button + 1, self.street, new_pips, new_stacks, self.hands, self.deck, self, self.bet_history)
+        return RoundState(self.button + 1, self.street, new_pips, new_stacks, self.hands, self.deck, self, self.bet_history, self.sb_player)
 
     def copy(self):
         return RoundState(self.button, self.street, deepcopy(self.pips), deepcopy(self.stacks),
-                          self.hands, self.deck, self.previous_state, deepcopy(self.bet_history))
+                          self.hands, self.deck, self.previous_state, deepcopy(self.bet_history), self.sb_player)

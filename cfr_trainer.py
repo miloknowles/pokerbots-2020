@@ -33,7 +33,7 @@ def traverse_worker(worker_id, traverse_plyr, regret_filenames, strategy_filenam
     ctr = [0]
 
     # Generate a random initialization, alternating the SB player each time.
-    sb_plyr_idx = k % 2
+    sb_plyr_idx = 1 - (k % 2)
     round_state = create_new_round(sb_plyr_idx)
 
     precomputed_ev = make_precomputed_ev(round_state)
