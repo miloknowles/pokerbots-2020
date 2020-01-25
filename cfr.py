@@ -243,7 +243,7 @@ class RegretMatchedStrategy(object):
 
 def traverse_cfr(round_state, traverse_plyr, sb_plyr_idx, regrets, strategies, t,
                  reach_probabilities, precomputed_ev, rctr=[0], allow_updates=True,
-                 do_external_sampling=True):
+                 do_external_sampling=True, skip_unreachable_actions=False):
   """
   Traverse the game tree with external and chance sampling.
 
@@ -283,14 +283,14 @@ def traverse_cfr(round_state, traverse_plyr, sb_plyr_idx, regrets, strategies, t
       return traverse_cfr(next_round_state, traverse_plyr, sb_plyr_idx, regrets,
                           strategies, t, reach_probabilities, precomputed_ev,
                           rctr=rctr, allow_updates=allow_updates,
-                          do_external_sampling=do_external_sampling)
+                          do_external_sampling=do_external_sampling,
+                          skip_unreachable_actions=skip_unreachable_actions)
     
     else:
       for i, a in enumerate(actions):
-        # if action_probs[i].item() <= 0: # NOTE: this should handle masked actions also.
-          # continue
-        if mask[i].item() <= 0:
+        if mask[i].item() <= 0 or (skip_unreachable_actions and action_probs[i] <= 0):
           continue
+
         assert(mask[i] > 0)
         next_round_state = round_state.copy().proceed(a)
         next_reach_prob = reach_probabilities.clone()
@@ -298,7 +298,8 @@ def traverse_cfr(round_state, traverse_plyr, sb_plyr_idx, regrets, strategies, t
         child_node_info = traverse_cfr(
             next_round_state, traverse_plyr, sb_plyr_idx, regrets,
             strategies, t, next_reach_prob, precomputed_ev,
-            rctr=rctr, allow_updates=allow_updates, do_external_sampling=do_external_sampling)
+            rctr=rctr, allow_updates=allow_updates, do_external_sampling=do_external_sampling,
+            skip_unreachable_actions=skip_unreachable_actions)
 
         action_values[:,i] = child_node_info.strategy_ev
         br_values[:,i] = child_node_info.best_response_ev

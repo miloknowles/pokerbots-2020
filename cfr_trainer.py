@@ -38,7 +38,7 @@ def traverse_worker(worker_id, traverse_plyr, regret_filenames, strategy_filenam
     precomputed_ev = make_precomputed_ev(round_state)
     info = traverse_cfr(round_state, traverse_plyr, sb_plyr_idx, regrets, strategies,
                         t, torch.ones(2), precomputed_ev, rctr=ctr, allow_updates=True,
-                        do_external_sampling=True)
+                        do_external_sampling=True, skip_unreachable_actions=False)
 
     if (k % opt.TRAVERSE_DEBUG_PRINT_HZ) == 0:
       elapsed = time.time() - t0
@@ -148,7 +148,7 @@ class Trainer(object):
       ctr = [0]
       info = traverse_cfr(round_state, 0, sb_plyr_idx, self.strategies, self.strategies,
                           1234, torch.ones(2), precomputed_ev, rctr=ctr, allow_updates=False,
-                          do_external_sampling=True)
+                          do_external_sampling=False, skip_unreachable_actions=True)
       exploits.append(info.exploitability.sum())
 
       if (k % self.opt.TRAVERSE_DEBUG_PRINT_HZ) == 0:
