@@ -157,13 +157,11 @@ class Trainer(object):
       print("best_response_ev=", info.best_response_ev)
 
       # The exploitability for this player is the best response EV of opponent.
-      # exploits[k, plyr_idx] = info.exploitability[plyr_idx]
       exploits[k] = info.exploitability.sum()
-      # exploits.append(info.exploitability.sum())
 
       if (k % self.opt.TRAVERSE_DEBUG_PRINT_HZ) == 0:
         print("Finished {}/{} eval traversals | exploit={} | explored={}".format(
-            k, self.opt.NUM_TRAVERSALS_EVAL, info.exploitability[plyr_idx], ctr[0]))
+            k, self.opt.NUM_TRAVERSALS_EVAL, info.exploitability.sum(), ctr[0]))
 
 
     elapsed = time.time() - t0

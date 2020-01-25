@@ -166,11 +166,11 @@ class RegretMatchedStrategy(object):
     """
     assert(len(r) == Constants.NUM_ACTIONS)
 
-    t0 = time.time()
+    # t0 = time.time()
     bucket = bucket_small(infoset)
     bstring = bucket_small_join(bucket)
-    elapsed = time.time() - t0
-    print("Bucket=", elapsed)
+    # elapsed = time.time() - t0
+    # print("Bucket=", elapsed)
 
     if bstring not in self._regrets:
       self._regrets[bstring] = torch.zeros(Constants.NUM_ACTIONS)
@@ -257,21 +257,21 @@ def traverse_cfr(round_state, traverse_plyr, sb_plyr_idx, regrets, strategies, t
     active_plyr_idx = round_state.button % 2
     inactive_plyr_idx = (1 - active_plyr_idx)
 
-    t0 = time.time()
+    # t0 = time.time()
     infoset = make_infoset(round_state, active_plyr_idx, (active_plyr_idx == sb_plyr_idx), precomputed_ev)
-    elapsed = time.time() - t0
-    print("Make infoset=", elapsed)
-    t0 = time.time()
+    # elapsed = time.time() - t0
+    # print("Make infoset=", elapsed)
+    # t0 = time.time()
     actions, mask = make_actions(round_state)
-    elapsed = time.time() - t0
-    print("Make actions=", elapsed)
+    # elapsed = time.time() - t0
+    # print("Make actions=", elapsed)
 
     # Do regret matching to get action probabilities.
-    t0 = time.time()
+    # t0 = time.time()
     action_probs = regrets[active_plyr_idx].get_strategy(infoset, mask)
     action_probs = apply_mask_and_uniform(action_probs, mask)
-    elapsed = time.time() - t0
-    print("Get strategy=", elapsed)
+    # elapsed = time.time() - t0
+    # print("Get strategy=", elapsed)
 
     sum_to_one = torch.allclose(action_probs.sum(), torch.ones(1), rtol=1e-3, atol=1e-3)
     if not sum_to_one:
