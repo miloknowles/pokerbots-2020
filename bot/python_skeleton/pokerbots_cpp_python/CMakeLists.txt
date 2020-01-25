@@ -42,6 +42,7 @@ add_library(${PROJECT_NAME}_cfr SHARED
   infoset.hpp
   engine_modified.cpp
   engine_modified.hpp
+  cfr.cpp
   cfr.hpp)
 target_link_libraries(${PROJECT_NAME}_cfr
   pbots_calc
