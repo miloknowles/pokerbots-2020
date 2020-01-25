@@ -124,6 +124,9 @@ class Trainer(object):
     regret_filenames = [self.opt.REGRETS_FMT.format(plyr) for plyr in (0, 1)]
     strategy_filenames = [self.opt.STRATEGIES_FMT.format(plyr) for plyr in (0, 1)]
 
+    print(regret_filenames)
+    print(strategy_filenames)
+
     t0 = time.time()
     mp.spawn(
       traverse_worker,

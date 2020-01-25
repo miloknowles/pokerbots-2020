@@ -277,6 +277,8 @@ def traverse_cfr(round_state, traverse_plyr, sb_plyr_idx, regrets, strategies, t
 
     if active_plyr_idx != traverse_plyr and do_external_sampling:
       # EXTERNAL SAMPLING: choose only ONE action for the non-traversal player.
+      action_probs += 0.05 * mask # Small chance of choosing every action.
+      action_probs /= action_probs.sum()
       action = actions[torch.multinomial(action_probs, 1).item()]
       next_round_state = round_state.copy().proceed(action)
       next_reach_prob = reach_probabilities.clone()
@@ -318,7 +320,7 @@ def traverse_cfr(round_state, traverse_plyr, sb_plyr_idx, regrets, strategies, t
       if allow_updates and active_plyr_idx == traverse_plyr:
         # NOTE: Zinkevich et. al. multiple the immediate regret by the opponent reach probability,
         # and the strategy by the player reach probability.
-        strategies[active_plyr_idx].add_regret(infoset, reach_probabilities[active_plyr_idx] * action_probs)
+        strategies[active_plyr_idx].add_regret(infoset, reach_probabilities[inactive_plyr_idx] * action_probs)
         regrets[active_plyr_idx].add_regret(infoset, reach_probabilities[inactive_plyr_idx] * immediate_regrets_tp)
 
       return node_info
