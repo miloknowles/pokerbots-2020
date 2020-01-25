@@ -269,7 +269,12 @@ def traverse_cfr(round_state, traverse_plyr, sb_plyr_idx, regrets, strategies, t
     # Do regret matching to get action probabilities.
     action_probs = regrets[active_plyr_idx].get_strategy(infoset, mask)
     action_probs = apply_mask_and_uniform(action_probs, mask)
-    assert torch.allclose(action_probs.sum(), torch.ones(1), rtol=1e-3, atol=1e-3)
+
+    sum_to_one = torch.allclose(action_probs.sum(), torch.ones(1), rtol=1e-3, atol=1e-3)
+    if not sum_to_one:
+      print("WARNING: action_probs did not sum to 1.0 (sum={})".format(action_probs.sum()))
+      print("action_probs =", action_probs)
+      assert(False)
 
     action_values = torch.zeros(2, len(actions))     # Expected payoff if we take an action and play according to sigma.
     br_values = torch.zeros(2, len(actions))         # Expected payoff if we take an action and play according to BR.
