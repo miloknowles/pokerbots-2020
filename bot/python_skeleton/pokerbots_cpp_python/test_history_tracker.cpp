@@ -182,3 +182,45 @@ TEST(InfoSetTest, testBetHistoryWraps) {
   const EvInfoSet info3 = MakeInfoSet(tracker_, 1, false, 0.73, 4);
   info3.Print();  
 }
+
+
+TEST(HistoryTrackerTest, test01) {
+  // A posts the blind of 1
+  // B posts the blind of 2
+  // A dealt 9c 8c [Ac Jc]
+  // B dealt 2d 4c [2d 5c]
+  // A raises to 6
+  // B calls
+  // Flop 3d 3h 6s [4d 4h 9s], A (6), B (6)
+  // B checks
+  // A bets 12
+  // B raises to 24
+  // A calls
+  // Turn 3d 3h 6s Qh [4d 4h 9s Kh], A (30), B (30)
+  // B checks
+  // A checks
+  // River 3d 3h 6s Qh 4h [4d 4h 9s Kh 5h], A (30), B (30)
+  // B bets 2
+  // A folds
+  // A awarded -30
+  // B awarded 30
+
+  // TODO: fix this!!!
+  HistoryTracker tracker_(false);
+  tracker_.Update(1, 2, 0);
+
+  // A raises, B calls, B checks.
+  tracker_.Update(6, 6, 3);
+  EvInfoSet infoset = MakeInfoSet(tracker_, 0, true, 0.83, 3);
+  std::string bucket = BucketSmallJoin(BucketInfoSetSmall(infoset));
+  std::cout << "A raises, B calls, B checks on flop" << std::endl;
+  std::cout << bucket << std::endl;
+
+  // A raises, B raises.
+  tracker_.Update(12, 24, 3);
+  infoset = MakeInfoSet(tracker_, 0, true, 0.83, 3);
+  infoset.Print();
+  bucket = BucketSmallJoin(BucketInfoSetSmall(infoset));
+  std::cout << "A raises, B raises" << std::endl;
+  std::cout << bucket << std::endl;
+}

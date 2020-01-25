@@ -176,9 +176,12 @@ std::vector<std::string> BucketInfoSetSmall(const EvInfoSet& infoset) {
       const float raise_amt = static_cast<float>(infoset.bet_history_vec[i] - call_amt) / static_cast<float>(cumul[i-1] + call_amt);
       const int action_offset = (street == 0) ? (i - 2) : ((i - 2) % kMaxActionsPerStreet);
 
+      // printf("on our street, i=%d, check=%d, call=%d\n", i, action_is_check, action_is_call);
+
       if (action_is_check) {
         const bool bet_occurs_after = (i < (infoset.bet_history_vec.size() - 1)) && (infoset.bet_history_vec[i+1] > 0);
-        if (action_offset == 0 && !(is_player || bet_occurs_after)) {
+        // printf("offset=%d is_player=%d bet_occurs_after=%d\n", action_offset, is_player, bet_occurs_after);
+        if (action_offset == 0 && (!is_player || bet_occurs_after)) {
           h[street_actions_offset + action_offset] = "CK";
         } else {
           break;
