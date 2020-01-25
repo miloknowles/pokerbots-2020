@@ -120,7 +120,7 @@ void CfrPlayer::handle_new_round(GameState* game_state, RoundState* round_state,
   
   bool big_blind = static_cast<bool>(active);
   is_small_blind_ = !big_blind;
-  check_fold_mode_ = CanCheckFoldRemainder(my_bankroll, round_num);
+  // check_fold_mode_ = CanCheckFoldRemainder(my_bankroll, round_num);
 
   printf("\n================== NEW ROUND: %d ==================\n", round_num);
   std::cout << "*** TIME REMAINING: " << game_clock << std::endl;

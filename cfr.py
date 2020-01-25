@@ -172,7 +172,10 @@ class RegretMatchedStrategy(object):
     if bstring not in self._regrets:
       self._regrets[bstring] = torch.zeros(Constants.NUM_ACTIONS)
 
-    self._regrets[bstring] += r
+    # CFR+ regret matching.
+    # https://arxiv.org/pdf/1407.5042.pdf
+    self._regrets[bstring] = torch.max(torch.zeros(Constants.NUM_ACTIONS), self._regrets[bstring] + r)
+    # self._regrets[bstring] += r
 
   def get_strategy(self, infoset, valid_mask):
     """
@@ -282,6 +285,7 @@ def traverse_cfr(round_state, traverse_plyr, sb_plyr_idx, regrets, strategies, t
 
     if active_plyr_idx != traverse_plyr and do_external_sampling:
       # EXTERNAL SAMPLING: choose only ONE action for the non-traversal player.
+      # TODO: might need to fix this
       action_probs += 0.05 * mask # Small chance of choosing every action.
       action_probs /= action_probs.sum()
       action = actions[torch.multinomial(action_probs, 1).item()]
@@ -316,7 +320,7 @@ def traverse_cfr(round_state, traverse_plyr, sb_plyr_idx, regrets, strategies, t
       immediate_regrets_tp = mask * (action_values[active_plyr_idx] - node_info.strategy_ev[active_plyr_idx])
 
       # Best response strategy: the acting player chooses the BEST action with probability 1.
-      node_info.best_response_ev[active_plyr_idx] = torch.max(br_values[active_plyr_idx,:])
+      node_info.best_response_ev[active_plyr_idx] = torch.max(br_values[active_plyr_idx, mask.nonzero()])
       node_info.best_response_ev[inactive_plyr_idx] = torch.sum(action_probs * br_values[inactive_plyr_idx,:])
 
       # Exploitability is the difference in payoff between a local best response strategy and the full mixed strategy.

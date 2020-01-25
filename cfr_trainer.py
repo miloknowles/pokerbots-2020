@@ -38,7 +38,7 @@ def traverse_worker(worker_id, traverse_plyr, regret_filenames, strategy_filenam
     precomputed_ev = make_precomputed_ev(round_state)
     info = traverse_cfr(round_state, traverse_plyr, sb_plyr_idx, regrets, strategies,
                         t, torch.ones(2), precomputed_ev, rctr=ctr, allow_updates=True,
-                        do_external_sampling=True, skip_unreachable_actions=False)
+                        do_external_sampling=False, skip_unreachable_actions=True)
 
     if (k % opt.TRAVERSE_DEBUG_PRINT_HZ) == 0:
       elapsed = time.time() - t0
@@ -96,9 +96,10 @@ class Trainer(object):
         # is saved to disk and then lost from memory, so we should reload it.
         self.accumulate_regret(traverse_plyr, t)
         self.load()
-        # self.load(regrets_to_load=[traverse_plyr], strategies_to_load=[traverse_plyr])
-        self.evaluate(cfr_steps)
-        cfr_steps += 1
+
+      # Evaluate after each CFR iteration.
+      self.evaluate(cfr_steps)
+      cfr_steps += 1
 
   def load(self, regrets_to_load=[0, 1], strategies_to_load=[0, 1]):
     """
@@ -140,29 +141,35 @@ class Trainer(object):
     print("\nEvaluating average strategy after {} steps".format(step))
 
     t0 = time.time()
-    exploits = []
-
+    exploits = torch.zeros(self.opt.NUM_TRAVERSALS_EVAL)
+  
     for k in range(self.opt.NUM_TRAVERSALS_EVAL):
       sb_plyr_idx = k % 2
       round_state = create_new_round(sb_plyr_idx)
       precomputed_ev = make_precomputed_ev(round_state)
 
-      # NOTE: disable updates to memories.
       ctr = [0]
       info = traverse_cfr(round_state, 0, sb_plyr_idx, self.strategies, self.strategies,
                           1234, torch.ones(2), precomputed_ev, rctr=ctr, allow_updates=False,
                           do_external_sampling=False, skip_unreachable_actions=True)
-      exploits.append(info.exploitability.sum())
+      print("exploitability=", info.exploitability)
+      print("strategy_ev=", info.strategy_ev)
+      print("best_response_ev=", info.best_response_ev)
+
+      # The exploitability for this player is the best response EV of opponent.
+      # exploits[k, plyr_idx] = info.exploitability[plyr_idx]
+      exploits[k] = info.exploitability.sum()
+      # exploits.append(info.exploitability.sum())
 
       if (k % self.opt.TRAVERSE_DEBUG_PRINT_HZ) == 0:
         print("Finished {}/{} eval traversals | exploit={} | explored={}".format(
-            k, self.opt.NUM_TRAVERSALS_EVAL, info.exploitability.sum(), ctr[0]))
+            k, self.opt.NUM_TRAVERSALS_EVAL, info.exploitability[plyr_idx], ctr[0]))
 
 
     elapsed = time.time() - t0
-    print("Time for {} eval traversals {} sec".format(self.opt.NUM_TRAVERSALS_EVAL, elapsed))
+    print("Time for 2x{} eval traversals {} sec".format(self.opt.NUM_TRAVERSALS_EVAL, elapsed))
 
-    mbb_per_game = 1e3 * torch.Tensor(exploits) / (2.0 * Constants.SMALL_BLIND_AMOUNT)
+    mbb_per_game = 1e3 * exploits / (2.0 * Constants.SMALL_BLIND_AMOUNT)
     mean_mbb_per_game = mbb_per_game.mean().item()
     stdev_mbb_per_game = mbb_per_game.std().item()
     sterr_mbb_per_game = stdev_mbb_per_game / math.sqrt(self.opt.NUM_TRAVERSALS_EVAL)
