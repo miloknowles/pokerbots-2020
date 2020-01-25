@@ -7,6 +7,7 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../cpp_skeleton)
 link_directories(${CMAKE_CURRENT_SOURCE_DIR})
 link_directories(/usr/local/lib/)
 
+#=============== OMPEVAL LIBRARY =================
 add_library(omp SHARED
   OMPEval/omp/CardRange.cpp
   OMPEval/omp/CardRange.h
@@ -26,14 +27,17 @@ target_link_libraries(omp
   pthread)
 set_target_properties(omp PROPERTIES LINKER_LANGUAGE CXX)
 
+#================ CFR LIBRARY =====================
 add_library(${PROJECT_NAME}_cfr SHARED
+  infoset.cpp
+  infoset.hpp
   engine_modified.cpp
   engine_modified.hpp)
 target_link_libraries(${PROJECT_NAME}_cfr
   omp)
 set_target_properties(${PROJECT_NAME}_cfr PROPERTIES LINKER_LANGUAGE CXX)
 
-# Build the main c++ library.
+#================= PLAYER LIBRARY ==================
 add_library(${PROJECT_NAME} SHARED
   permutation_filter.cpp
   permutation_filter.hpp

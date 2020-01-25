@@ -42,7 +42,8 @@ if (NOT BUILD_PYTHON_WRAPPER)
   target_link_libraries(cpp_player
     # ${Boost_LIBRARIES}
     cpp_skeleton
-    pokerbots_cpp)
+    pokerbots_cpp
+    pokerbots_cpp_cfr)
 
   # Copy necessary files to final executable directory.
   add_custom_command(

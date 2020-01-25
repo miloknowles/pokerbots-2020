@@ -9,25 +9,6 @@ namespace pb {
 
 omp::HandEvaluator OMP_{};
 
-namespace utils {
-
-static std::map<char, uint8_t> RANK_STR_TO_VAL = {
-  {'2', 0}, {'3', 1}, {'4', 2}, {'5', 3}, {'6', 4}, {'7', 5}, {'8', 6},
-  {'9', 7}, {'T', 8}, {'J', 9}, {'Q', 10}, {'K', 11}, {'A', 12}
-};
-
-static std::map<uint8_t, char> RANK_VAL_TO_STR = {
-  {0, '2'}, {1, '3'}, {2, '4'}, {3, '5'}, {4, '6'}, {5, '7'}, {6, '8'},
-  {7, '9'}, {8, 'T'}, {9, 'J'}, {10, 'Q'}, {11, 'K'}, {12, 'A'}
-};
-
-// Defined by OMPEval.
-static std::map<char, uint8_t> SUIT_STR_TO_VAL = {
-  {'s', 0}, {'h', 1}, {'c', 2}, {'d', 3}
-};
-
-}
-
 /**
  * Compares the players' hands and computes payoffs.
  */
