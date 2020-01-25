@@ -97,8 +97,9 @@ def make_actions(round_state):
 
   # If we've exceeded the number of betting actions, or if doing this action would hit the limit,
   # disable raising, forcing the bot to either fold or call.
-  bet_actions_this_street = len(round_state.bet_history[get_street_0123(round_state.street)])
-  force_fold_call = bet_actions_this_street >= (Constants.BET_ACTIONS_PER_STREET - 1)
+  bet_actions_so_far = len(round_state.bet_history[get_street_0123(round_state.street)])
+  bet_actions_this_street = (Constants.BET_ACTIONS_PER_STREET) if round_state.street > 0 else (Constants.BET_ACTIONS_PER_STREET + 2)
+  force_fold_call = bet_actions_so_far >= (bet_actions_this_street - 1)
 
   actions_mask = torch.zeros(len(Constants.ALL_ACTIONS))
   actions_unscaled = deepcopy(Constants.ALL_ACTIONS)

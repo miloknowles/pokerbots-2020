@@ -42,8 +42,9 @@ std::pair<ActionVec, ActionMask> MakeActions(RoundState* round_state, int active
 
   const int pot_size = 2 * 200 - my_stack - opp_stack;
 
-  const int bet_actions_this_street = tracker.History().back().size();
-  const bool force_fold_call = bet_actions_this_street >= (kMaxActionsPerStreet - 1);
+  const int bet_actions_so_far = tracker.History().back().size();
+  const int bet_actions_this_street = (round_state->street > 0) ? kMaxActionsPerStreet : (kMaxActionsPerStreet + 2);
+  const bool force_fold_call = bet_actions_so_far >= (bet_actions_this_street - 1);
 
   ActionMask actions_mask;
   std::fill(actions_mask.begin(), actions_mask.end(), 0);

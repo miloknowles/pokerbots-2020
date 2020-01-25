@@ -4,7 +4,8 @@ import argparse
 import torch
 
 if __name__ == "__main__":
-  filename = "./avg_strategy_0.pkl"
+  filename = "./07/avg_strategy_0.pkl"
+  # filename = "./total_regrets_0.pkl"
 
   d = {}
   with open(filename, "rb") as f:
