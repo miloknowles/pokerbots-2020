@@ -182,8 +182,7 @@ class RegretMatchedStrategy(object):
 
     if bstring not in self._regrets:
       self._regrets[bstring] = torch.zeros(Constants.NUM_ACTIONS)
-
-    total_regret = self._regrets[bstring].clone()
+    total_regret = self._regrets[bstring]
 
     with torch.no_grad():
       r_plus = torch.clamp(total_regret, min=0)

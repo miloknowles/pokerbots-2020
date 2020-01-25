@@ -181,3 +181,7 @@ class Trainer(object):
       writer.add_scalar("num_infosets/regrets/{}".format(i), self.regrets[i].size(), step)
       writer.add_scalar("num_infosets/strategies/{}".format(i), self.strategies[i].size(), step)
     writer.close()
+
+    # Save the strategies because the eval traversals might have introduced some new keys.
+    for i in (0, 1):
+      self.strategies[i].save(self.opt.STRATEGIES_FMT.format(i))
