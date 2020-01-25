@@ -218,6 +218,12 @@ inline std::array<double, 6> Multiply(const std::array<double, 6>& v1, const dou
   return out;
 }
 
+inline void FillZeros(ActionValues& values) {
+  for (int i = 0; i < values.size(); ++i) {
+    std::fill(values[i].begin(), values[i].end(), 0);
+  }
+}
+
 
 NodeInfo TraverseCfr(State* state,
                      int traverse_plyr,
@@ -260,8 +266,8 @@ NodeInfo TraverseCfr(State* state,
 
   ActionValues action_values;
   ActionValues br_values;
-  std::fill(action_values.begin(), action_values.end(), 0);
-  std::fill(br_values.begin(), br_values.end(), 0);
+  FillZeros(action_values);
+  FillZeros(br_values);
 
   //========================= PLAYER ACTION =============================
   for (int i = 0; i < actions.size(); ++i) {

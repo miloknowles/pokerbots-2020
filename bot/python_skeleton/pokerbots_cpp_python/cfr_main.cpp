@@ -2,8 +2,10 @@
 
 #include "cfr.hpp"
 #include "engine_modified.hpp"
+#include "pbots_calc.h"
 
 namespace pb {
+
 
 static std::string ConvertCodeToCard(const int code) {
   std::string out = "xx";
@@ -43,30 +45,90 @@ RoundState CreateNewRound(int sb_plyr_idx) {
   return RoundState(sb_plyr_idx, 0, pips, stacks, hands, board, nullptr, {{1, 2}}, sb_plyr_idx);
 }
 
-void DoCfrIteration(int t) {
-  const int num_traversals = 10;
-  const int traverse_plyr = 0;
 
+static float PbotsCalcEquity(
+    const std::string& query,
+    const std::string& board,
+    const std::string& dead,
+    const size_t iters) {
+  Results* res = alloc_results();
+
+  // Need to convert board and dead to mutable char* type.
+  char* board_c = new char[board.size() + 1];
+  char* dead_c = new char[dead.size() + 1];
+  std::copy(board.begin(), board.end(), board_c);
+  std::copy(dead.begin(), dead.end(), dead_c);
+  board_c[board.size()] = '\0';
+  dead_c[dead.size()] = '\0';
+
+  char* query_c = new char[query.size() + 1];
+  std::copy(query.begin(), query.end(), query_c);
+  query_c[query.size()] = '\0';
+
+  // Query pbots_calc.
+  calc(query_c, board_c, dead_c, iters, res);
+  const float ev = res->ev[0];
+
+  // Free memory after allocating.
+  free_results(res);
+  delete[] board_c;
+  delete[] dead_c;
+  return ev;
+}
+
+
+PrecomputedEv MakePrecomputedEv(const RoundState& round_state) {
+  PrecomputedEv out; // 2x5
+
+  const std::string h1 = round_state.hands[0][0] + round_state.hands[0][1];
+  const std::string h2 = round_state.hands[1][0] + round_state.hands[1][1];
+
+  for (int s = 0; s < 4; ++s) {
+    int iters = 1;
+    if (s == 1) {
+      iters = 10000;
+    } else if (s == 2) {
+      iters = 10000;
+    } else if (s == 3) {
+      iters = 1326;
+    }
+
+    const std::string board = round_state.deck[0] + round_state.deck[1] + round_state.deck[2] + round_state.deck[3] + round_state.deck[4];
+
+    const float ev1 = PbotsCalcEquity(h1 + ":xx", board, "", iters);
+    const float ev2 = PbotsCalcEquity(h2 + ":xx", board, "", iters);
+    out[0][s] = ev1;
+    out[1][s] = ev2;
+  }
+}
+
+
+void DoCfrIterationForPlayer(int t, int num_traversals, int traverse_plyr) {
   std::array<RegretMatchedStrategy, 2> regrets;
   std::array<RegretMatchedStrategy, 2> strategies;
 
   for (int k = 0; k < num_traversals; ++k) {
-
     const int sb_plyr_idx = k % 2;
+    RoundState round_state = CreateNewRound(sb_plyr_idx);
 
-    RoundState* round_state = CreateNewRound(sb_plyr_idx);
+    std::array<double, 2> reach_probabilities = { 1.0, 1.0 };
+    PrecomputedEv precomputed_ev = MakePrecomputedEv(round_state);
+
+    int rctr = 0;
 
     const NodeInfo info = TraverseCfr(
-        round_state, traverse_plyr, sb_plyr_idx, regrets, strategies,
+        &round_state, traverse_plyr, sb_plyr_idx, regrets, strategies,
         t, reach_probabilities, precomputed_ev, &rctr, true, false, false);
 
   }
+
+  std::cout << "Done" << std::endl;
 }
 
 }
 
 int main(int argc, char const *argv[])
 {
-  /* code */
+  pb::DoCfrIterationForPlayer(0, 1, 0);
   return 0;
 }

@@ -3,6 +3,7 @@
 #include <array>
 #include <vector>
 #include <string>
+#include <map>
 #include "actions.hpp"
 
 using std::array;

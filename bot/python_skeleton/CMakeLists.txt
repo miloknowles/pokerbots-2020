@@ -26,13 +26,6 @@ if (NOT BUILD_PYTHON_WRAPPER)
   include_directories(${CMAKE_CURRENT_SOURCE_DIR})
   include_directories(${CMAKE_CURRENT_SOURCE_DIR}/pokerbots_cpp_python/)
   include_directories(${CMAKE_CURRENT_SOURCE_DIR}/pokerbots_cpp_python/OMPEval)
-  add_library(cpp_skeleton
-    cpp_skeleton/actions.cpp
-    cpp_skeleton/bot.hpp
-    cpp_skeleton/runner.cpp
-    cpp_skeleton/states.cpp)
-  target_link_libraries(cpp_skeleton
-    ${Boost_LIBRARIES})
   add_executable(cpp_player
     cfr_player.cpp
     cfr_player.hpp

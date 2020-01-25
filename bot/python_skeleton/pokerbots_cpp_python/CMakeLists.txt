@@ -27,13 +27,25 @@ target_link_libraries(omp
   pthread)
 set_target_properties(omp PROPERTIES LINKER_LANGUAGE CXX)
 
+add_library(cpp_skeleton
+  ../cpp_skeleton/actions.cpp
+  ../cpp_skeleton/bot.hpp
+  ../cpp_skeleton/runner.cpp
+  ../cpp_skeleton/states.cpp)
+target_link_libraries(cpp_skeleton
+  ${Boost_LIBRARIES})
+set_target_properties(cpp_skeleton PROPERTIES LINKER_LANGUAGE CXX)
+
 #================ CFR LIBRARY =====================
 add_library(${PROJECT_NAME}_cfr SHARED
   infoset.cpp
   infoset.hpp
   engine_modified.cpp
-  engine_modified.hpp)
+  engine_modified.hpp
+  cfr.hpp)
 target_link_libraries(${PROJECT_NAME}_cfr
+  pbots_calc
+  cpp_skeleton
   omp)
 set_target_properties(${PROJECT_NAME}_cfr PROPERTIES LINKER_LANGUAGE CXX)
 
@@ -47,6 +59,12 @@ target_link_libraries(${PROJECT_NAME}
   omp
   ${CMAKE_CURRENT_SOURCE_DIR}/libpbots_calc.so)
 set_target_properties(${PROJECT_NAME} PROPERTIES LINKER_LANGUAGE CXX)
+
+#================= CFR EXECUTABLE =================
+add_executable(run_cfr
+  cfr_main.cpp)
+target_link_libraries(run_cfr
+  ${PROJECT_NAME}_cfr)
 
 # Optionally build the python wrappers.
 if (BUILD_PYTHON_WRAPPER)
