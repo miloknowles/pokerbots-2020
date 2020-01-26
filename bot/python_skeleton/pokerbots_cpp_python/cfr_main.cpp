@@ -13,6 +13,7 @@ void DoCfrIterationForPlayer(int t, int num_traversals, int traverse_plyr) {
 
   for (int k = 0; k < num_traversals; ++k) {
     const int sb_plyr_idx = k % 2;
+    printf("SB player = %d\n", sb_plyr_idx);
     RoundState round_state = CreateNewRound(sb_plyr_idx);
 
     std::array<double, 2> reach_probabilities = { 1.0, 1.0 };

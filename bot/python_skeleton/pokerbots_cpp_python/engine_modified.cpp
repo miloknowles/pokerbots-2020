@@ -148,7 +148,7 @@ State* RoundState::proceed(Action action)
         case CHECK_ACTION_TYPE:
         {
             // if (self.street == 0 and self.button > 0) or self.button > 1:  # both players acted
-            if ((this->street == 0 && this->button > sb_player) || (this->button >= sb_player)) {
+            if ((this->street == 0 && this->button > sb_player) || (this->button % 2 == this->sb_player)) {
                 bet_history.back().emplace_back(0);
                 return this->proceed_street();
             }
