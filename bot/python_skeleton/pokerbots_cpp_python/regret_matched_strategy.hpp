@@ -19,7 +19,8 @@ class RegretMatchedStrategy {
 
   ActionRegrets GetStrategy(const EvInfoSet& infoset);
 
-  // TODO: save and load
+  void Save(const std::string& filename);
+  void Load(const std::string& filename);
 
  private:
   std::unordered_map<std::string, ActionRegrets> regrets_;

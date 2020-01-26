@@ -1,3 +1,8 @@
+#include <fstream>
+#include <iostream>
+#include <sstream>
+#include <boost/algorithm/string.hpp>
+
 #include "regret_matched_strategy.hpp"
 
 namespace pb {
@@ -48,6 +53,46 @@ ActionRegrets RegretMatchedStrategy::GetStrategy(const EvInfoSet& infoset) {
     }
     return rplus;
   }
+}
+
+void RegretMatchedStrategy::Save(const std::string& filename) {
+  std::ofstream out(filename);
+
+  for (const auto& it : regrets_) {
+    const std::string key = it.first;
+    const ActionRegrets& regrets = it.second;
+    out << key << " ";
+    for (const double r : regrets) {
+      out << r << " ";
+    }
+    out << std::endl;
+  }
+
+  printf("Saved regrets for %d buckets\n", regrets_.size());
+  out.close();
+}
+
+
+void RegretMatchedStrategy::Load(const std::string& filename) {
+  std::string line;
+  std::ifstream infile(filename);
+
+  while (std::getline(infile, line)) {
+    std::istringstream iss(line);
+
+    std::vector<std::string> strs;
+    boost::split(strs, line, boost::is_any_of(" "));
+
+    const std::string key = strs.at(0);
+    cfr::ActionRegrets regrets_this_key;
+    assert(strs.size() == (1 + regrets_this_key.size()));
+    for (int i = 0; i < regrets_this_key.size(); ++i) {
+      regrets_this_key.at(i) = std::stod(strs.at(i + 1));
+    }
+    regrets_.emplace(key, regrets_this_key);
+  }
+
+  printf("Read in regrets for %d buckets\n", regrets_.size());
 }
 
 }

@@ -39,6 +39,9 @@ void DoCfrIterationForPlayer(int t, int num_traversals, int traverse_plyr) {
     printf("exploit=[%f %f]\n", info.exploitability[0], info.exploitability[1]);
   }
 
+  regrets[0].Save("./total_regrets_0.txt");
+  regrets[1].Save("./total_regrets_1.txt");
+
   std::cout << "Done" << std::endl;
 }
 
