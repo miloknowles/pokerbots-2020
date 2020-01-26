@@ -1,6 +1,8 @@
 #include "./gtest/gtest.h"
 
 #include "history_tracker.hpp"
+#include "engine_modified.hpp"
+#include "cfr.hpp"
 
 using namespace pb;
 

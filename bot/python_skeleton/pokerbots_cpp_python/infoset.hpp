@@ -11,6 +11,18 @@ static constexpr int kMaxActionsPerStreet = 4;
 typedef std::vector<std::vector<int>> FlexHistory;
 typedef std::array<int, 2 + 4*kMaxActionsPerStreet> FixedHistory;
 
+
+inline void PrintFlexHistory(const FlexHistory& fh) {
+  for (const std::vector<int>& v : fh) {
+    for (const int vi : v) {
+      std::cout << vi << " ";
+    }
+    std::cout << "| ";
+  }
+  std::cout << std::endl;
+}
+
+
 inline int GetStreet0123(const int street_sz) {
   return street_sz == 0 ? 0 : (street_sz - 2);
 }
@@ -55,6 +67,7 @@ std::vector<std::string> BucketInfoSetSmall(const EvInfoSet& infoset);
 
 
 inline std::string BucketSmallJoin(const std::vector<std::string>& b) {
+  assert(b.size() == 15);
   const std::string meta = b[0] + "." + b[1] + "." + b[2];
   const std::string plyr = b[3] + "." + b[4] + "." + b[5] + "." + b[6];
   const std::string opp = b[7] + "." + b[8] + "." + b[9] + "." + b[10];

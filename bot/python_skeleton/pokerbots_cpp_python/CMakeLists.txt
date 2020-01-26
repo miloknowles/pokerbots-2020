@@ -97,6 +97,7 @@ endif()
 if(BUILD_TESTS)
   enable_testing()  
   set(TEST_SOURCES
+    test_cfr.cpp
     test_history_tracker.cpp
     test_permutation_filter.cpp)
 
@@ -105,6 +106,7 @@ if(BUILD_TESTS)
   add_executable(${PROJECT_NAME}_test ${TEST_SOURCES} ./gtest/gtest-all.cc)
   target_link_libraries(${PROJECT_NAME}_test
     ${PROJECT_NAME}
+    ${PROJECT_NAME}_cfr
     pthread)
   set_target_properties(${PROJECT_NAME}_test PROPERTIES COMPILE_FLAGS "-std=c++11")
   add_test(NAME ${PROJECT_NAME}_test COMMAND ${PROJECT_NAME}_test --gtest_color=yes)

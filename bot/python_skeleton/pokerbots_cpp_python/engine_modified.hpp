@@ -100,17 +100,17 @@ class RoundState : public State
         const array<int, 2> stacks;
         const array< array<string, 2>, 2 > hands;
         const array<string, 5> deck;
-        State* const previous_state;
+        const State* previous_state;
         BetHistory bet_history;
         const int sb_player;
 
         RoundState(int button,
                    int street,
-                   array<int, 2> pips,
-                   array<int, 2> stacks,
-                   array< array<string, 2>, 2 > hands,
-                   array<string, 5> deck,
-                   State* previous_state,
+                   const array<int, 2>& pips,
+                   const array<int, 2>& stacks,
+                   const array< array<string, 2>, 2 >& hands,
+                   const array<string, 5>& deck,
+                   const State* previous_state,
                    const BetHistory& bet_history,
                    const int sb_player):
             button(button),

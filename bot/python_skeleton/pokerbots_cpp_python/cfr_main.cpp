@@ -28,9 +28,9 @@ void DoCfrIterationForPlayer(int t, int num_traversals, int traverse_plyr) {
     }
     std::cout << std::endl;
 
-    // const NodeInfo info = TraverseCfr(
-    //     &round_state, traverse_plyr, sb_plyr_idx, regrets, strategies,
-    //     t, reach_probabilities, precomputed_ev, &rctr, true, false, false);
+    const NodeInfo info = TraverseCfr(
+        &round_state, traverse_plyr, sb_plyr_idx, regrets, strategies,
+        t, reach_probabilities, precomputed_ev, &rctr, true, false, false);
   }
 
   std::cout << "Done" << std::endl;

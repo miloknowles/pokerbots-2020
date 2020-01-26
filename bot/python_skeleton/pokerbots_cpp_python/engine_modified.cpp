@@ -4,6 +4,7 @@
 #include "engine_modified.hpp"
 #include <map>
 #include <omp/HandEvaluator.h>
+#include <iostream>
 
 namespace pb {
 
@@ -87,11 +88,13 @@ array<int, 2> RoundState::raise_bounds()
  */
 State* RoundState::proceed_street()
 {
+    printf("proceeding from %d to next\n", this->street);
     if (this->street == 5)
     {
         return this->showdown();
     }
-  
+    
+    printf("size is %d\n", bet_history.size());
     bet_history.emplace_back(std::vector<int>());
 
     int new_street;
@@ -103,7 +106,7 @@ State* RoundState::proceed_street()
     {
         new_street = this->street + 1;
     }
-    return new RoundState(1 - sb_player, new_street, (array<int, 2>) { 0, 0 }, this->stacks, this->hands, this->deck, this, bet_history, sb_player);
+    return new RoundState(1 - sb_player, new_street, (array<int, 2>) { 0, 0 }, this->stacks, this->hands, this->deck, this, this->bet_history, this->sb_player);
 }
 
 /**
@@ -129,12 +132,12 @@ State* RoundState::proceed(Action action)
         }
         case CALL_ACTION_TYPE:
         {
-            if (this->button == 0)  // sb calls bb
+            if (this->button == this->sb_player && this->street == 0)  // sb calls bb
             {
                 bet_history.back().emplace_back(1);
-                return new RoundState(button + 1, 0, (array<int, 2>) { BIG_BLIND, BIG_BLIND },
+                return new RoundState(this->button + 1, 0, (array<int, 2>) { BIG_BLIND, BIG_BLIND },
                                       (array<int, 2>) { STARTING_STACK - BIG_BLIND, STARTING_STACK - BIG_BLIND },
-                                      this->hands, this->deck, this, bet_history, sb_player);
+                                      this->hands, this->deck, this, this->bet_history, this->sb_player);
             }
             // both players acted
             array<int, 2> new_pips = this->pips;
@@ -144,19 +147,22 @@ State* RoundState::proceed(Action action)
             new_pips[active] += contribution;
             bet_history.back().emplace_back(contribution);
             RoundState* state = new RoundState(this->button + 1, this->street, new_pips, new_stacks,
-                                               this->hands, this->deck, this, bet_history, sb_player);
+                                               this->hands, this->deck, this, this->bet_history, this->sb_player);
+            std::cout << "proceed after call" << std::endl;
             return state->proceed_street();
         }
         case CHECK_ACTION_TYPE:
         {
-            if (((this->street == 0) & (this->button > 0)) | (this->button > 1))  // both players acted
+            // if (self.street == 0 and self.button > 0) or self.button > 1:  # both players acted
+            if ((this->street == 0 && this->button > sb_player) || (this->button >= sb_player))  // both players acted
             {
+                std::cout << "proceed after check" << std::endl;
                 bet_history.back().emplace_back(0);
                 return this->proceed_street();
             }
             // let opponent act
             bet_history.back().emplace_back(0);
-            return new RoundState(this->button + 1, this->street, this->pips, this->stacks, this->hands, this->deck, this, bet_history, sb_player);
+            return new RoundState(this->button + 1, this->street, this->pips, this->stacks, this->hands, this->deck, this, this->bet_history, this->sb_player);
         }
         default:  // RAISE_ACTION_TYPE
         {
