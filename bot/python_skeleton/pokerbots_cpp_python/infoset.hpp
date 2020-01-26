@@ -50,6 +50,8 @@ struct EvInfoSet {
       ev(ev), bet_history_vec(h), player_position(player_position), street(street) {
   }
 
+  EvInfoSet() = delete;
+
   void Print() const {
     printf("EvInfoSet | ev=%f | player_position=%d | street=%d\n", ev, player_position, street);
     for (const int add_amt : bet_history_vec) {

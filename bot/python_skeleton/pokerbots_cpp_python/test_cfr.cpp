@@ -339,3 +339,16 @@ TEST(CfrTest, testSbPlyrIdx0) {
   PrintFlexHistory(dynamic_cast<RoundState*>(end->previous_state)->bet_history);
   std::cout << end->deltas[0] << " " << end->deltas[1] << std::endl;
 }
+
+
+TEST(RegretMatchedStrategyTest, testSaveLoad) {\
+  RegretMatchedStrategy rm;
+
+  for (int i = 0; i < 123; ++i) {
+    const EvInfoSet infoset(0.123, FixedHistory(), i % 2, 5);
+    rm.AddRegret(infoset, ActionRegrets());
+  }
+
+  rm.Save("./tmp_test_cfr_regrets.txt");
+  rm.Load("./tmp_test_cfr_regrets.txt");
+}

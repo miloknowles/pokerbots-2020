@@ -61,9 +61,9 @@ void RegretMatchedStrategy::Save(const std::string& filename) {
   for (const auto& it : regrets_) {
     const std::string key = it.first;
     const ActionRegrets& regrets = it.second;
-    out << key << " ";
+    out << key;
     for (const double r : regrets) {
-      out << r << " ";
+      out << " " << r;
     }
     out << std::endl;
   }
