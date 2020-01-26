@@ -40,6 +40,8 @@ set_target_properties(cpp_skeleton PROPERTIES LINKER_LANGUAGE CXX)
 add_library(${PROJECT_NAME}_cfr SHARED
   infoset.cpp
   infoset.hpp
+  regret_matched_strategy.cpp
+  regret_matched_strategy.hpp
   engine_modified.cpp
   engine_modified.hpp
   cfr.cpp

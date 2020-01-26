@@ -4,7 +4,7 @@
 #include <chrono>
 
 namespace pb {
-
+namespace cfr {
 
 std::pair<ActionVec, ActionMask> MakeActions(RoundState* round_state, int active) {
   const int legal_actions = round_state->legal_actions();
@@ -41,7 +41,7 @@ std::pair<ActionVec, ActionMask> MakeActions(RoundState* round_state, int active
     const Action& a = actions_unscaled.at(i);
 
     const bool action_is_allowed = a.action_type & legal_actions;
-    if (action_is_allowed && !(a.action_type == RAISE_ACTION_TYPE && force_fold_call)) {
+    if (action_is_allowed && !((a.action_type == RAISE_ACTION_TYPE) && force_fold_call)) {
       actions_mask.at(i) = 1;
     }
 
@@ -159,6 +159,7 @@ ActionRegrets ApplyMaskAndUniform(const ActionRegrets& p, const ActionMask& mask
   double denom = 0;
   int valid = 0;
   ActionRegrets out;
+
   for (int i = 0; i < p.size(); ++i) {
     const double masked = p[i] * static_cast<double>(mask[i]);
     denom += masked;
@@ -166,17 +167,20 @@ ActionRegrets ApplyMaskAndUniform(const ActionRegrets& p, const ActionMask& mask
     valid += mask[i];
   }
 
+  // If the sum of regrets <= 0, return uniform dist over valid actions.
   if (denom <= 1e-3) {
     for (int i = 0; i < p.size(); ++i) {
       out[i] = static_cast<double>(mask[i]) / static_cast<double>(valid);
     }
+    return out;
+
+  // Otherwise normalize by sum.
   } else {
     for (int i = 0; i < p.size(); ++i) {
       out[i] /= denom;
     }
+    return out;
   }
-
-  return out;
 }
 
 
@@ -255,6 +259,8 @@ NodeInfo TraverseCfr(State* state,
   std::array<double, 6> action_probs = regrets[active_plyr_idx].GetStrategy(infoset);
   action_probs = ApplyMaskAndUniform(action_probs, mask);
 
+  // PrintRegrets(action_probs);
+
   ActionValues action_values;
   ActionValues br_values;
   FillZeros(action_values);
@@ -308,4 +314,5 @@ NodeInfo TraverseCfr(State* state,
   return node_info;
 }
 
+}
 }

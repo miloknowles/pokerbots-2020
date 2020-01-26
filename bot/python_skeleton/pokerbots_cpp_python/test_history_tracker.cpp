@@ -5,6 +5,7 @@
 #include "cfr.hpp"
 
 using namespace pb;
+using namespace cfr;
 
 TEST(HistoryTrackerTest, testUpdateSb) {
   // Small blind: we will only update the tracker on our actions.

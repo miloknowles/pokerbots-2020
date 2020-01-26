@@ -5,7 +5,7 @@
 #include "cfr.hpp"
 
 using namespace pb;
-
+using namespace cfr;
 
 // Make sure that random hands and board are generated.
 TEST(CfrTest, testCreateNewRound) {

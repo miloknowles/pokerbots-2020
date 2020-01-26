@@ -4,6 +4,7 @@
 #include <vector>
 #include <string>
 #include <map>
+
 #include "actions.hpp"
 
 using std::array;
@@ -12,6 +13,7 @@ using std::max;
 using std::min;
 
 namespace pb {
+namespace cfr {
 
 const int NUM_ROUNDS     = 1000;
 const int STARTING_STACK = 200;
@@ -19,7 +21,6 @@ const int BIG_BLIND      = 2;
 const int SMALL_BLIND    = 1;
 
 typedef std::vector<std::vector<int>> BetHistory;
-
 
 namespace utils {
 
@@ -149,4 +150,5 @@ class RoundState : public State
         State* proceed(Action action);
 };
 
+}
 }

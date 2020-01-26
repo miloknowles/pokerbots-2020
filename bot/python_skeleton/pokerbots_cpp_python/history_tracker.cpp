@@ -52,7 +52,7 @@ void HistoryTracker::Update(int my_contrib, int opp_contrib, int street) {
       }
 
       // The next action idx should be the first of the new street.
-      next_action_idx_ = kMaxActionsPerStreet * GetStreet0123(street);
+      next_action_idx_ = cfr::kMaxActionsPerStreet * cfr::GetStreet0123(street);
 
       contributions_[0] = std::min(my_contrib, opp_contrib);
       contributions_[1] = std::min(my_contrib, opp_contrib);

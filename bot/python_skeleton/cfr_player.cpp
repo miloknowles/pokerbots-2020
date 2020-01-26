@@ -28,7 +28,7 @@ static int MakeRelativeBet(const float frac, const int pot_size, const int min_r
 }
 
 
-std::pair<ActionVec, ActionMask> MakeActions(RoundState* round_state, int active, const HistoryTracker& tracker) {
+std::pair<cfr::ActionVec, cfr::ActionMask> MakeActions(RoundState* round_state, int active, const HistoryTracker& tracker) {
   const int legal_actions = round_state->legal_actions();
 
   const int my_pip = round_state->pips[active];
@@ -43,14 +43,14 @@ std::pair<ActionVec, ActionMask> MakeActions(RoundState* round_state, int active
   const int pot_size = 2 * 200 - my_stack - opp_stack;
 
   const int bet_actions_so_far = tracker.History().back().size();
-  const int bet_actions_this_street = (round_state->street > 0) ? kMaxActionsPerStreet : (kMaxActionsPerStreet + 2);
+  const int bet_actions_this_street = (round_state->street > 0) ? cfr::kMaxActionsPerStreet : (cfr::kMaxActionsPerStreet + 2);
   const bool force_fold_call = bet_actions_so_far >= (bet_actions_this_street - 1);
 
-  ActionMask actions_mask;
+  cfr::ActionMask actions_mask;
   std::fill(actions_mask.begin(), actions_mask.end(), 0);
 
   // NOTE: These are HALF POT multiples.
-  ActionVec actions_unscaled = {
+  cfr::ActionVec actions_unscaled = {
     FoldAction(),
     CallAction(),
     CheckAction(),
@@ -95,7 +95,7 @@ CfrPlayer::CfrPlayer() {
     boost::split(strs, line, boost::is_any_of(" "));
 
     const std::string key = strs.at(0);
-    ActionRegrets regrets_this_key;
+    cfr::ActionRegrets regrets_this_key;
     assert(strs.size() == (1 + regrets_this_key.size()));
     for (int i = 0; i < regrets_this_key.size(); ++i) {
       regrets_this_key.at(i) = std::stod(strs.at(i + 1));
@@ -267,9 +267,9 @@ Action CfrPlayer::get_action(GameState* game_state, RoundState* round_state, int
       round_num, street, EV, pot_size, continue_cost);
   
   // Do bucketing and regret matching to get an action.
-  const EvInfoSet infoset = MakeInfoSet(history_, 0, is_small_blind_, EV, street);
-  const std::vector<std::string> bucket = BucketInfoSetSmall(infoset);
-  const std::string key = BucketSmallJoin(bucket);
+  const cfr::EvInfoSet infoset = MakeInfoSet(history_, 0, is_small_blind_, EV, street);
+  const std::vector<std::string> bucket = cfr::BucketInfoSetSmall(infoset);
+  const std::string key = cfr::BucketSmallJoin(bucket);
 
   // If CFR never encountered this situation, revert to backup logic.
   if (regrets_.count(key) == 0) {
@@ -298,19 +298,19 @@ Action CfrPlayer::get_action(GameState* game_state, RoundState* round_state, int
 }
 
 
-Action CfrPlayer::RegretMatching(const std::string& key, const ActionVec& actions, const ActionMask& mask) {
+Action CfrPlayer::RegretMatching(const std::string& key, const cfr::ActionVec& actions, const cfr::ActionMask& mask) {
   if (regrets_.count(key) == 0) {
     std::cout << "[CFR] WARNING: Could not find key in regrets: " << key << std::endl;
     std::cout << "[CFR] This is probably a bug!" << std::endl;
-    ActionRegrets uniform;
+    cfr::ActionRegrets uniform;
     std::fill(uniform.begin(), uniform.end(), 1.0f);
     regrets_.emplace(key, uniform);
   }
 
   std::cout << "[CFR] Getting action for: " << key << std::endl;
 
-  const ActionRegrets& regrets = regrets_.at(key);
-  ActionRegrets masked_regrets;
+  const cfr::ActionRegrets& regrets = regrets_.at(key);
+  cfr::ActionRegrets masked_regrets;
 
   for (int i = 0; i < regrets.size(); ++i) {
     masked_regrets.at(i) = static_cast<double>(mask.at(i)) * std::fmax(0.0f, regrets.at(i));

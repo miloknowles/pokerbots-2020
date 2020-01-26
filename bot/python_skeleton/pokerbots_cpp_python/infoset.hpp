@@ -3,13 +3,31 @@
 #include <vector>
 #include <array>
 #include <iostream>
+#include <cassert>
+
+#include "engine_modified.hpp"
 
 namespace pb {
+namespace cfr {
 
 static constexpr int kMaxActionsPerStreet = 4;
 
 typedef std::vector<std::vector<int>> FlexHistory;
 typedef std::array<int, 2 + 4*kMaxActionsPerStreet> FixedHistory;
+
+typedef std::array<std::array<float, 4>, 2> PrecomputedEv;
+typedef std::array<Action, 6> ActionVec;
+typedef std::array<int, 6> ActionMask;
+typedef std::array<double, 6> ActionRegrets;
+typedef std::array<std::array<double, 2>, 6> ActionValues;
+
+
+inline void PrintRegrets(const ActionRegrets& r) {
+  for (int i = 0; i < r.size(); ++i) {
+    std::cout << r[i] << " ";
+  }
+  std::cout << std::endl;
+}
 
 
 inline void PrintFlexHistory(const FlexHistory& fh) {
@@ -77,4 +95,4 @@ inline std::string BucketSmallJoin(const std::vector<std::string>& b) {
 }
 
 }
-
+}

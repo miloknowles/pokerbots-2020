@@ -7,6 +7,7 @@
 #include <iostream>
 
 namespace pb {
+namespace cfr {
 
 omp::HandEvaluator OMP_{};
 
@@ -168,4 +169,5 @@ State* RoundState::proceed(Action action)
     }
 }
 
+}
 }

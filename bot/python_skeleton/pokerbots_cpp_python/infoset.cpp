@@ -3,7 +3,7 @@
 #include "infoset.hpp"
 
 namespace pb {
-
+namespace cfr {
 
 std::vector<std::string> BucketInfoSetSmall(const EvInfoSet& infoset) {
   std::vector<std::string> h(1 + 1 + 1 + 4 + 4 + 4);
@@ -115,4 +115,5 @@ std::vector<std::string> BucketInfoSetSmall(const EvInfoSet& infoset) {
   return h;
 }
 
+}
 }

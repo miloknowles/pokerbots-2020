@@ -5,7 +5,7 @@
 #include "engine_modified.hpp"
 
 namespace pb {
-
+namespace cfr {
 
 void DoCfrIterationForPlayer(int t, int num_traversals, int traverse_plyr) {
   std::array<RegretMatchedStrategy, 2> regrets;
@@ -32,17 +32,20 @@ void DoCfrIterationForPlayer(int t, int num_traversals, int traverse_plyr) {
         &round_state, traverse_plyr, sb_plyr_idx, regrets, strategies,
         t, reach_probabilities, precomputed_ev, &rctr, true, false, false);
 
-    printf("Tree size = %d\n", rctr);
+    printf("Tree size = %d | r0=%d r1=%d s0=%d s1=%d\n", rctr, regrets[0].Size(), regrets[1].Size(),
+      strategies[0].Size(), strategies[1].Size());
+
+    printf("exploit=[%f %f]\n", info.exploitability[0], info.exploitability[1]);
   }
 
   std::cout << "Done" << std::endl;
 }
 
 }
+}
 
-int main(int argc, char const *argv[])
-{
+int main(int argc, char const *argv[]) {
   std::srand(std::time(0));
-  pb::DoCfrIterationForPlayer(0, 1, 0);
+  pb::cfr::DoCfrIterationForPlayer(0, 10, 0);
   return 0;
 }

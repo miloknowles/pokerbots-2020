@@ -24,6 +24,7 @@ if (NOT BUILD_PYTHON_WRAPPER)
   message(STATUS "BUILD_PYTHON_WRAPPER is OFF, building pure C++ bot")
   find_package(Boost REQUIRED COMPONENTS system program_options)
   include_directories(${CMAKE_CURRENT_SOURCE_DIR})
+  include_directories(${CMAKE_CURRENT_SOURCE_DIR}/cpp_skeleton)
   include_directories(${CMAKE_CURRENT_SOURCE_DIR}/pokerbots_cpp_python/)
   include_directories(${CMAKE_CURRENT_SOURCE_DIR}/pokerbots_cpp_python/OMPEval)
   add_executable(cpp_player
