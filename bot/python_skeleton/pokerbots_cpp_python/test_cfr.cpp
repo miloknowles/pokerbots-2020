@@ -39,9 +39,17 @@ TEST(CfrTest, testEngine) {
   printf("Precomputed EV: TURN[0]=%f TURN[1]=%f\n", ev[0][2], ev[1][2]);
   printf("Precomputed EV: RIVER[0]=%f RIVER[1]=%f\n", ev[0][3], ev[1][3]);
 
+  std::cout << "Should see initial config for SB" << std::endl;
+  EvInfoSet infoset = MakeInfoSet(&round_state, 1, true, ev);
+  infoset.Print();
+
   // SB calls.
   RoundState* next = dynamic_cast<RoundState*>(round_state.proceed(CallAction()));
   assert(next != nullptr);
+
+  std::cout << "Should see SB call" << std::endl;
+  infoset = MakeInfoSet(next, 0, false, ev);
+  infoset.Print();
 
   EXPECT_EQ(0, next->street);
   EXPECT_EQ(2, next->button);
@@ -59,6 +67,11 @@ TEST(CfrTest, testEngine) {
 
   // BB raises.
   next = dynamic_cast<RoundState*>(next->proceed(RaiseAction(4)));
+
+  std::cout << "Should see SB call, BB raise" << std::endl;
+  infoset = MakeInfoSet(next, 0, false, ev);
+  std::string b = BucketSmallJoin(BucketInfoSetSmall(infoset));
+  std::cout << b << std::endl;
 
   EXPECT_EQ(0, next->street);
   EXPECT_EQ(3, next->button);
@@ -80,11 +93,21 @@ TEST(CfrTest, testEngine) {
   EXPECT_EQ(4, next->button);
   PrintFlexHistory(next->bet_history);
 
+  std::cout << "Should see SB call, BB raise, SB reraise" << std::endl;
+  infoset = MakeInfoSet(next, 1, true, ev);
+  b = BucketSmallJoin(BucketInfoSetSmall(infoset));
+  std::cout << b << std::endl;
+
   // BB calls.
   next = dynamic_cast<RoundState*>(next->proceed(CallAction()));
   EXPECT_EQ(3, next->street);
   EXPECT_EQ(0, next->button);
   PrintFlexHistory(next->bet_history);
+
+  std::cout << "Start of flop" << std::endl;
+  infoset = MakeInfoSet(next, 0, false, ev);
+  b = BucketSmallJoin(BucketInfoSetSmall(infoset));
+  std::cout << b << std::endl;
 
   // BB checks, SB checks.
   std::cout << "First check on FLOP" << std::endl;
@@ -92,11 +115,18 @@ TEST(CfrTest, testEngine) {
   EXPECT_EQ(3, next->street);
   EXPECT_EQ(1, next->button);
   PrintFlexHistory(next->bet_history);
+  infoset = MakeInfoSet(next, 1, true, ev);
+  b = BucketSmallJoin(BucketInfoSetSmall(infoset));
+  std::cout << b << std::endl;
+
   std::cout << "Second check on FLOP" << std::endl;
   next = dynamic_cast<RoundState*>(next->proceed(CheckAction()));
   EXPECT_EQ(4, next->street);
   EXPECT_EQ(0, next->button);
   PrintFlexHistory(next->bet_history);
+  infoset = MakeInfoSet(next, 0, false, ev);
+  b = BucketSmallJoin(BucketInfoSetSmall(infoset));
+  std::cout << b << std::endl;
 
   // BB checks, SB raises.
   std::cout << "First check on TURN" << std::endl;
@@ -104,11 +134,18 @@ TEST(CfrTest, testEngine) {
   EXPECT_EQ(4, next->street);
   EXPECT_EQ(1, next->button);
   PrintFlexHistory(next->bet_history);
+  infoset = MakeInfoSet(next, 1, true, ev);
+  b = BucketSmallJoin(BucketInfoSetSmall(infoset));
+  std::cout << b << std::endl;
+
   std::cout << "SB raises on TURN" << std::endl;
   next = dynamic_cast<RoundState*>(next->proceed(RaiseAction(20)));
   EXPECT_EQ(4, next->street);
   EXPECT_EQ(2, next->button);
   PrintFlexHistory(next->bet_history);
+  infoset = MakeInfoSet(next, 0, false, ev);
+  b = BucketSmallJoin(BucketInfoSetSmall(infoset));
+  std::cout << b << std::endl;
 
   // BB re-raises, SB calls.
   std::cout << "BB reraises on TURN" << std::endl;
@@ -116,11 +153,18 @@ TEST(CfrTest, testEngine) {
   EXPECT_EQ(4, next->street);
   EXPECT_EQ(3, next->button);
   PrintFlexHistory(next->bet_history);
+  infoset = MakeInfoSet(next, 1, true, ev);
+  b = BucketSmallJoin(BucketInfoSetSmall(infoset));
+  std::cout << b << std::endl;
+
   std::cout << "SB calls on TURN" << std::endl;
   next = dynamic_cast<RoundState*>(next->proceed(CallAction()));
   EXPECT_EQ(5, next->street);
   EXPECT_EQ(0, next->button);
   PrintFlexHistory(next->bet_history);
+  infoset = MakeInfoSet(next, 0, false, ev);
+  b = BucketSmallJoin(BucketInfoSetSmall(infoset));
+  std::cout << b << std::endl;
 
   // Double check on RIVER.
   std::cout << "First check on RIVER" << std::endl;
@@ -128,6 +172,10 @@ TEST(CfrTest, testEngine) {
   EXPECT_EQ(5, next->street);
   EXPECT_EQ(1, next->button);
   PrintFlexHistory(next->bet_history);
+  infoset = MakeInfoSet(next, 1, true, ev);
+  b = BucketSmallJoin(BucketInfoSetSmall(infoset));
+  std::cout << b << std::endl;
+
   std::cout << "Second check on RIVER" << std::endl;
   TerminalState* end = dynamic_cast<TerminalState*>(next->proceed(CheckAction()));
   EXPECT_TRUE(end != nullptr);
