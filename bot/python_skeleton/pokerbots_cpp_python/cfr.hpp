@@ -12,7 +12,7 @@
 namespace pb {
 
 
-typedef std::array<std::array<float, 5>, 2> PrecomputedEv;
+typedef std::array<std::array<float, 4>, 2> PrecomputedEv;
 typedef std::array<Action, 6> ActionVec;
 typedef std::array<int, 6> ActionMask;
 typedef std::array<double, 6> ActionRegrets;

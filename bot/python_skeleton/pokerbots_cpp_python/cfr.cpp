@@ -84,13 +84,16 @@ EvInfoSet MakeInfoSet(const RoundState* round_state, int active_plyr_idx, bool p
 
 
 PrecomputedEv MakePrecomputedEv(const RoundState& round_state) {
-  PrecomputedEv out; // 2x5
+  PrecomputedEv out; // 2x4
+  std::fill(out[0].begin(), out[0].end(), 0);
+  std::fill(out[1].begin(), out[1].end(), 0);
 
   const std::string h1 = round_state.hands[0][0] + round_state.hands[0][1];
   const std::string h2 = round_state.hands[1][0] + round_state.hands[1][1];
+  // std::cout << h1 << " " << h2 << std::endl;
 
   for (int s = 0; s < 4; ++s) {
-    int iters = 1;
+    int iters = 10000;
     if (s == 1) {
       iters = 10000;
     } else if (s == 2) {
@@ -99,13 +102,23 @@ PrecomputedEv MakePrecomputedEv(const RoundState& round_state) {
       iters = 1326;
     }
 
-    const std::string board = round_state.deck[0] + round_state.deck[1] + round_state.deck[2] + round_state.deck[3] + round_state.deck[4];
+    std::string board = "";
+    if (s == 1) {
+      board += round_state.deck[0] + round_state.deck[1] + round_state.deck[2];
+    } else if (s == 2) {
+      board += round_state.deck[0] + round_state.deck[1] + round_state.deck[2] + round_state.deck[3];
+    } else if (s == 3) {
+      board += round_state.deck[0] + round_state.deck[1] + round_state.deck[2] + round_state.deck[3] + round_state.deck[4];
+    }
+    // std::cout << board << std::endl;
 
     const float ev1 = PbotsCalcEquity(h1 + ":xx", board, "", iters);
     const float ev2 = PbotsCalcEquity(h2 + ":xx", board, "", iters);
     out[0][s] = ev1;
     out[1][s] = ev2;
   }
+
+  return out;
 }
 
 

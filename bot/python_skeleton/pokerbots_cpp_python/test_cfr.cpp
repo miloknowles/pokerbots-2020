@@ -33,6 +33,12 @@ TEST(CfrTest, testEngine) {
   const int sb_plyr_idx = 1;
   RoundState round_state = CreateNewRound(sb_plyr_idx);
 
+  PrecomputedEv ev = MakePrecomputedEv(round_state);
+  printf("Precomputed EV: PREFLOP[0]=%f PREFLOP[1]=%f\n", ev[0][0], ev[1][0]);
+  printf("Precomputed EV: FLOP[0]=%f FLOP[1]=%f\n", ev[0][1], ev[1][1]);
+  printf("Precomputed EV: TURN[0]=%f TURN[1]=%f\n", ev[0][2], ev[1][2]);
+  printf("Precomputed EV: RIVER[0]=%f RIVER[1]=%f\n", ev[0][3], ev[1][3]);
+
   // SB calls.
   RoundState* next = dynamic_cast<RoundState*>(round_state.proceed(CallAction()));
   assert(next != nullptr);

@@ -88,22 +88,16 @@ array<int, 2> RoundState::raise_bounds()
  */
 State* RoundState::proceed_street()
 {
-    printf("proceeding from %d to next\n", this->street);
-    if (this->street == 5)
-    {
+    if (this->street == 5) {
         return this->showdown();
     }
     
-    printf("size is %d\n", bet_history.size());
     bet_history.emplace_back(std::vector<int>());
 
     int new_street;
-    if (this->street == 0)
-    {
+    if (this->street == 0) {
         new_street = 3;
-    }
-    else
-    {
+    } else {
         new_street = this->street + 1;
     }
     return new RoundState(1 - sb_player, new_street, (array<int, 2>) { 0, 0 }, this->stacks, this->hands, this->deck, this, this->bet_history, this->sb_player);
@@ -148,15 +142,12 @@ State* RoundState::proceed(Action action)
             bet_history.back().emplace_back(contribution);
             RoundState* state = new RoundState(this->button + 1, this->street, new_pips, new_stacks,
                                                this->hands, this->deck, this, this->bet_history, this->sb_player);
-            std::cout << "proceed after call" << std::endl;
             return state->proceed_street();
         }
         case CHECK_ACTION_TYPE:
         {
             // if (self.street == 0 and self.button > 0) or self.button > 1:  # both players acted
-            if ((this->street == 0 && this->button > sb_player) || (this->button >= sb_player))  // both players acted
-            {
-                std::cout << "proceed after check" << std::endl;
+            if ((this->street == 0 && this->button > sb_player) || (this->button >= sb_player)) {
                 bet_history.back().emplace_back(0);
                 return this->proceed_street();
             }
