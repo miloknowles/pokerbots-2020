@@ -72,7 +72,8 @@ inline std::string BucketSmallJoin(const std::vector<std::string>& b) {
   const std::string plyr = b[3] + "." + b[4] + "." + b[5] + "." + b[6];
   const std::string opp = b[7] + "." + b[8] + "." + b[9] + "." + b[10];
   const std::string street = b[11] + "." + b[12] + "." + b[13] + "." + b[14];
-  return meta + "|" + plyr + "|" + opp + "|" + street;
+  const std::string out = meta + "|" + plyr + "|" + opp + "|" + street;
+  return out;
 }
 
 }

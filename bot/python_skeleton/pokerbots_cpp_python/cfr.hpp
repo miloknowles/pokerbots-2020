@@ -156,7 +156,7 @@ NodeInfo TraverseCfr(State* state,
                      const PrecomputedEv& precomputed_ev,
                      int* rctr,
                      bool allow_updates = true,
-                     bool do_external_sampling = true,
+                     bool do_external_sampling = false,
                      bool skip_unreachable_actions = false);
 
 }

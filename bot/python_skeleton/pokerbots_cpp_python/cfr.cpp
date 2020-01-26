@@ -226,14 +226,12 @@ NodeInfo TraverseCfr(State* state,
                      bool allow_updates,
                      bool do_external_sampling,
                      bool skip_unreachable_actions) {
-
   NodeInfo node_info;
-
+  (*rctr) += 1;
   const bool is_terminal_state = dynamic_cast<TerminalState*>(state) != nullptr;
 
   //========================== TERMINAL STATE =============================
   if (is_terminal_state) {
-    std::cout << "terminal state" << std::endl;
     TerminalState* terminal_state = dynamic_cast<TerminalState*>(state);
     node_info.strategy_ev = { static_cast<float>(terminal_state->deltas[0]),
                               static_cast<float>(terminal_state->deltas[1]) };
@@ -242,40 +240,26 @@ NodeInfo TraverseCfr(State* state,
   }
 
   RoundState* round_state = dynamic_cast<RoundState*>(state);
+  assert(round_state != nullptr);
 
-  std::cout << "cast state" << std::endl;
   const int active_plyr_idx = round_state->button % 2;
-  std::cout << "got button " << std::endl;
   const int inactive_plyr_idx = 1 - active_plyr_idx;
 
-  std::cout << active_plyr_idx << " " << inactive_plyr_idx << std::endl;
-
-  // printf("Active=%d inactive=%d\n", active_plyr_idx, inactive_plyr_idx);
-
   const auto& actions_and_mask = MakeActions(round_state, active_plyr_idx);
-  std::cout << "did made actions" << std::endl;
   const ActionVec actions = actions_and_mask.first;
   const ActionMask mask = actions_and_mask.second;
-
-  std::cout << "got actions and mask" << std::endl;
 
   const EvInfoSet& infoset = MakeInfoSet(
       round_state, active_plyr_idx, active_plyr_idx == sb_plyr_idx, precomputed_ev);
 
-  std::cout << "made infoset" << std::endl;
-
   std::array<double, 6> action_probs = regrets[active_plyr_idx].GetStrategy(infoset);
   action_probs = ApplyMaskAndUniform(action_probs, mask);
-
-  std::cout << "did strategy" << std::endl;
 
   ActionValues action_values;
   ActionValues br_values;
   FillZeros(action_values);
   FillZeros(br_values);
 
-
-  std::cout << "filled" << std::endl;
   //========================= PLAYER ACTION =============================
   for (int i = 0; i < actions.size(); ++i) {
     if (mask[i] <= 0 || (skip_unreachable_actions && action_probs[i] <= 0)) {
@@ -284,10 +268,8 @@ NodeInfo TraverseCfr(State* state,
 
     assert(mask[i] > 0);
 
-    std::cout << "doing action " << i << std::endl;
-    RoundState* next_round_state = new RoundState(*round_state);
-    next_round_state->proceed(actions[i]);
-    std::cout << "finished proceed OK " << std::endl;
+    RoundState* round_state_cp = new RoundState(*round_state);
+    State* next_round_state = round_state_cp->proceed(actions[i]);
     std::array<double, 2> next_reach_prob = reach_probabilities;
     next_reach_prob[active_plyr_idx] *= action_probs[i];
 
@@ -295,15 +277,10 @@ NodeInfo TraverseCfr(State* state,
       next_round_state, traverse_plyr, sb_plyr_idx, regrets, strategies, t,
       next_reach_prob, precomputed_ev, rctr, allow_updates,
       do_external_sampling, skip_unreachable_actions);
-
-    std::cout << "finished recurse" << std::endl;
     
     action_values[i] = child_node_info.strategy_ev;
     br_values[i] = child_node_info.best_response_ev;
-    std::cout << "filled in action and br" << std::endl;
   }
-
-  std::cout << "recursed on all actions" << std::endl;
 
   node_info.strategy_ev = ComputeEv(action_values, action_probs);
   ActionRegrets immediate_regrets = { 0, 0, 0, 0, 0, 0 };
@@ -312,8 +289,6 @@ NodeInfo TraverseCfr(State* state,
       immediate_regrets[i] = action_values[i][active_plyr_idx] - node_info.strategy_ev[active_plyr_idx];
     }
   }
-
-  std::cout << "did compute ev" << std::endl;
 
   double br_active = std::numeric_limits<double>::min();
   for (int i = 0; i < br_values.size(); ++i) {
@@ -329,8 +304,6 @@ NodeInfo TraverseCfr(State* state,
     strategies[active_plyr_idx].AddRegret(infoset, Multiply(action_probs, counterfactual));
     regrets[active_plyr_idx].AddRegret(infoset, Multiply(immediate_regrets, counterfactual));
   }
-
-  std::cout << "about to return " << std::endl;
 
   return node_info;
 }

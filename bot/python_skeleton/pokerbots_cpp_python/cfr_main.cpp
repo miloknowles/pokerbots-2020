@@ -31,6 +31,8 @@ void DoCfrIterationForPlayer(int t, int num_traversals, int traverse_plyr) {
     const NodeInfo info = TraverseCfr(
         &round_state, traverse_plyr, sb_plyr_idx, regrets, strategies,
         t, reach_probabilities, precomputed_ev, &rctr, true, false, false);
+
+    printf("Tree size = %d\n", rctr);
   }
 
   std::cout << "Done" << std::endl;
@@ -41,6 +43,6 @@ void DoCfrIterationForPlayer(int t, int num_traversals, int traverse_plyr) {
 int main(int argc, char const *argv[])
 {
   std::srand(std::time(0));
-  pb::DoCfrIterationForPlayer(0, 10, 0);
+  pb::DoCfrIterationForPlayer(0, 1, 0);
   return 0;
 }
