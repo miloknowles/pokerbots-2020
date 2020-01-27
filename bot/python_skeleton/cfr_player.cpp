@@ -85,25 +85,25 @@ std::pair<cfr::ActionVec, cfr::ActionMask> MakeActions(RoundState* round_state, 
  * Called when a new game starts. Called exactly once.
  */
 CfrPlayer::CfrPlayer() {
-  std::string line;
-  std::ifstream infile("./avg_strategy.txt");
+  // std::string line;
+  // std::ifstream infile("./avg_strategy.txt");
 
-  while (std::getline(infile, line)) {
-    std::istringstream iss(line);
+  // while (std::getline(infile, line)) {
+  //   std::istringstream iss(line);
 
-    std::vector<std::string> strs;
-    boost::split(strs, line, boost::is_any_of(" "));
+  //   std::vector<std::string> strs;
+  //   boost::split(strs, line, boost::is_any_of(" "));
 
-    const std::string key = strs.at(0);
-    cfr::ActionRegrets regrets_this_key;
-    assert(strs.size() == (1 + regrets_this_key.size()));
-    for (int i = 0; i < regrets_this_key.size(); ++i) {
-      regrets_this_key.at(i) = std::stod(strs.at(i + 1));
-    }
-    regrets_.emplace(key, regrets_this_key);
-  }
-
-  std::cout << "Read in regrets for " << regrets_.size() << " bucketed infosets" << std::endl;
+  //   const std::string key = strs.at(0);
+  //   cfr::ActionRegrets regrets_this_key;
+  //   assert(strs.size() == (1 + regrets_this_key.size()));
+  //   for (int i = 0; i < regrets_this_key.size(); ++i) {
+  //     regrets_this_key.at(i) = std::stod(strs.at(i + 1));
+  //   }
+  //   regrets_.emplace(key, regrets_this_key);
+  // }
+  strategy_.Load("./avg_strategy.txt");
+  std::cout << "Read in regrets for " << strategy_.Size() << " bucketed infosets" << std::endl;
 }
 
 /**
@@ -268,16 +268,13 @@ Action CfrPlayer::get_action(GameState* game_state, RoundState* round_state, int
   
   // Do bucketing and regret matching to get an action.
   const cfr::EvInfoSet infoset = MakeInfoSet(history_, 0, is_small_blind_, EV, street);
-  const std::vector<std::string> bucket = cfr::BucketInfoSetSmall(infoset);
-  const std::string key = cfr::BucketSmallJoin(bucket);
+  const std::string key = cfr::BucketMedium(infoset);
 
   // If CFR never encountered this situation, revert to backup logic.
-  if (regrets_.count(key) == 0) {
+  if (!strategy_.HasBucket(key)) {
     std::cout << "WARNING: Couldn't find CFR bucket: " << key << std::endl;
-
     const int min_raise = round_state->raise_bounds()[0];
     const int max_raise = round_state->raise_bounds()[1];
-
     const bool is_bb = static_cast<bool>(active);
     if (street == 0) {
       return HandleActionPreflop(EV, round_num, street, pot_size, continue_cost, legal_actions,
@@ -293,39 +290,22 @@ Action CfrPlayer::get_action(GameState* game_state, RoundState* round_state, int
   // Otherwise, do regret matching to choose an action.
   } else {
     const auto& actions_and_mask = MakeActions(round_state, active, history_);
-    return RegretMatching(key, actions_and_mask.first, actions_and_mask.second);
+
+    const cfr::ActionRegrets& action_probs = strategy_.GetStrategy(infoset);
+    const cfr::ActionRegrets& action_probs_masked = cfr::ApplyMaskAndUniform(action_probs, actions_and_mask.second);
+    std::discrete_distribution<int> distribution(action_probs_masked.begin(), action_probs_masked.end());
+    const int sampled_idx = distribution(gen_);
+
+    std::cout << "[CFR] Action probabilities=" << std::endl;
+    PrintVector(std::vector<double>(action_probs_masked.begin(), action_probs_masked.end()));
+
+    const cfr::ActionVec& actions = actions_and_mask.first;
+    const Action chosen_action = actions.at(sampled_idx);
+    printf("[CFR] Sampled action %d\n", sampled_idx);
+    return chosen_action;
   }
 }
 
-
-Action CfrPlayer::RegretMatching(const std::string& key, const cfr::ActionVec& actions, const cfr::ActionMask& mask) {
-  if (regrets_.count(key) == 0) {
-    std::cout << "[CFR] WARNING: Could not find key in regrets: " << key << std::endl;
-    std::cout << "[CFR] This is probably a bug!" << std::endl;
-    cfr::ActionRegrets uniform;
-    std::fill(uniform.begin(), uniform.end(), 1.0f);
-    regrets_.emplace(key, uniform);
-  }
-
-  std::cout << "[CFR] Getting action for: " << key << std::endl;
-
-  const cfr::ActionRegrets& regrets = regrets_.at(key);
-  cfr::ActionRegrets masked_regrets;
-
-  for (int i = 0; i < regrets.size(); ++i) {
-    masked_regrets.at(i) = static_cast<double>(mask.at(i)) * std::fmax(0.0f, regrets.at(i));
-  }
-
-  std::discrete_distribution<int> distribution(masked_regrets.begin(), masked_regrets.end());
-  const int sampled_idx = distribution(gen_);
-
-  std::cout << "Probability distribution over actions: " << std::endl;
-  PrintVector(std::vector<double>(masked_regrets.begin(), masked_regrets.end()));
-
-  const Action chosen_action = actions.at(sampled_idx);
-  printf("Sampled action %d\n", sampled_idx);
-  return chosen_action;
-}
 
 //================================= BACKUP STRATEGY =======================================
 

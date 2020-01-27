@@ -12,6 +12,8 @@
 #include "./history_tracker.hpp"
 #include "./pokerbots_cpp_python/infoset.hpp"
 #include "./pokerbots_cpp_python/cfr.hpp"
+#include "./pokerbots_cpp_python/regret_matched_strategy.hpp"
+
 
 namespace pb {
 
@@ -41,7 +43,8 @@ class CfrPlayer : public Bot {
     std::mt19937 gen_{rd_()};
     std::uniform_real_distribution<> real_{0, 1};
 
-    std::unordered_map<std::string, cfr::ActionRegrets> regrets_;
+    // std::unordered_map<std::string, cfr::ActionRegrets> regrets_;
+    cfr::RegretMatchedStrategy strategy_;
 
   public:
     /**
@@ -77,8 +80,6 @@ class CfrPlayer : public Bot {
      * @return Your action.
      */
     Action get_action(GameState* game_state, RoundState* round_state, int active);
-
-    Action RegretMatching(const std::string& key, const cfr::ActionVec& actions, const cfr::ActionMask& mask);
 
     void MaybePrintNewStreet(int street);
 

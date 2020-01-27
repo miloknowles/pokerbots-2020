@@ -25,6 +25,8 @@ class RegretMatchedStrategy {
   void Save(const std::string& filename);
   void Load(const std::string& filename);
 
+  bool HasBucket(const std::string& bucket) const { return regrets_.count(bucket) != 0; }
+
  private:
   std::unordered_map<std::string, ActionRegrets> regrets_;
   BucketFunction bucket_function_ = BucketMedium;
