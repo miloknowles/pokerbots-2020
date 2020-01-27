@@ -1,3 +1,5 @@
+#pragma once
+
 #include <random>
 #include <ctime>
 #include <fstream>
@@ -5,6 +7,7 @@
 #include <cmath>
 
 #include "cfr.hpp"
+#include "infoset.hpp"
 #include "engine_modified.hpp"
 
 namespace pb {
@@ -14,51 +17,22 @@ namespace fs = boost::filesystem;
 
 
 struct Options {
-  std::string EXPERIMENT_NAME = "MC_CFR_MEDIUM";
+  std::string EXPERIMENT_NAME = "DEFAULT_EXPERIMENT_NAME";
   std::string EXPERIMENT_PATH = "/home/milo/pokerbots-2020/cfr/" + EXPERIMENT_NAME + "/";
 
   int NUM_CFR_ITERS = 10000;
   int NUM_TRAVERSALS_PER_ITER = 100;
-  int NUM_TRAVERSALS_EVAL = 40;
+  int NUM_TRAVERSALS_EVAL = 50;
   int TRAVERSAL_PRINT_HZ = 5;
+
+  BucketFunction BUCKET_FUNCTION = BucketMedium;
 };
 
 
 NodeInfo DoCfrIterationForPlayer(std::array<RegretMatchedStrategy, 2>& regrets,
                              std::array<RegretMatchedStrategy, 2>& strategies,
                              int t, int traverse_plyr, const Options& opt,
-                             bool debug_print = false) {
-  NodeInfo info;
-
-  for (int k = 0; k < 2; ++k) {
-    const int sb_plyr_idx = k % 2;
-    RoundState round_state = CreateNewRound(sb_plyr_idx);
-
-    std::array<double, 2> reach_probabilities = { 1.0, 1.0 };
-    PrecomputedEv precomputed_ev = MakePrecomputedEv(round_state);
-
-    int rctr = 0;
-
-    info = TraverseCfr(
-        round_state, traverse_plyr, sb_plyr_idx, regrets, strategies,
-        t, reach_probabilities, precomputed_ev, &rctr, true, false, false);
-
-    if (debug_print) {
-      printf("[TRAVERSE] treesize=%d | exploit=[%f %f] | r0=%d r1=%d s0=%d s1=%d | \n",
-        rctr, info.exploitability[0], info.exploitability[1], regrets[0].Size(), regrets[1].Size(),
-        strategies[0].Size(), strategies[1].Size());
-
-      // std::cout << round_state.hands[0][0] << round_state.hands[0][1] << std::endl;
-      // std::cout << round_state.hands[1][0] << round_state.hands[1][1] << std::endl;
-      // for (int i = 0; i < 5; ++i) {
-      //   std::cout << round_state.deck[i] << " ";
-      // }
-      // std::cout << std::endl;
-    }
-  }
-
-  return info;
-}
+                             bool debug_print = false);
 
 
 class CfrTrainer {
@@ -71,6 +45,11 @@ class CfrTrainer {
     if (boost::filesystem::create_directory(dir)) {
       std::cout << "NOTE: EXPERIMENT_PATH didn't exist, created it" << std::endl;
     }
+
+    regrets_[0] = RegretMatchedStrategy(opt.BUCKET_FUNCTION);
+    regrets_[1] = RegretMatchedStrategy(opt.BUCKET_FUNCTION);
+    strategies_[0] = RegretMatchedStrategy(opt.BUCKET_FUNCTION);
+    strategies_[1] = RegretMatchedStrategy(opt.BUCKET_FUNCTION);
 
     // Save everything once to have empty files.
     const std::string test_path = opt.EXPERIMENT_PATH + "total_regrets_0.txt";
@@ -169,12 +148,4 @@ class CfrTrainer {
 };
 
 }
-}
-
-int main(int argc, char const *argv[]) {
-  pb::cfr::Options opt;
-  pb::cfr::CfrTrainer trainer(opt);
-  trainer.Run();
-  std::cout << "Finished running CFR" << std::endl;
-  return 0;
 }

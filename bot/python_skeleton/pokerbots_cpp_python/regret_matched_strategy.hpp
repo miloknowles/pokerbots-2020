@@ -2,14 +2,18 @@
 
 #include <unordered_map>
 #include <string>
+#include <functional>
 
 #include "infoset.hpp"
 
 namespace pb {
 namespace cfr {
 
+typedef std::function<std::string(const EvInfoSet&)> BucketFunction;
+
 class RegretMatchedStrategy {
  public:
+  RegretMatchedStrategy(const BucketFunction& bucket_function) : bucket_function_(bucket_function) {}
   RegretMatchedStrategy() = default;
 
   int Size() const { return regrets_.size(); }
@@ -23,6 +27,7 @@ class RegretMatchedStrategy {
 
  private:
   std::unordered_map<std::string, ActionRegrets> regrets_;
+  BucketFunction bucket_function_ = BucketMedium;
 };
 
 }

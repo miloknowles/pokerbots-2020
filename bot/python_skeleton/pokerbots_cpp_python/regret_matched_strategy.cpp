@@ -11,7 +11,8 @@ namespace pb {
 namespace cfr {
 
 void RegretMatchedStrategy::AddRegret(const EvInfoSet& infoset, const ActionRegrets& r) {
-  const std::string bucket = BucketMediumJoin(BucketInfoSetMedium(infoset));
+  // const std::string bucket = BucketMediumJoin(BucketInfoSetMedium(infoset));
+  const std::string bucket = bucket_function_(infoset);
   if (regrets_.count(bucket) == 0) {
     ActionRegrets zeros = { 0, 0, 0, 0, 0, 0 };
     regrets_.emplace(bucket, zeros);
@@ -27,7 +28,8 @@ void RegretMatchedStrategy::AddRegret(const EvInfoSet& infoset, const ActionRegr
 
 
 ActionRegrets RegretMatchedStrategy::GetStrategy(const EvInfoSet& infoset) {
-  const std::string bucket = BucketMediumJoin(BucketInfoSetMedium(infoset));
+  // const std::string bucket = BucketMediumJoin(BucketInfoSetMedium(infoset));
+  const std::string bucket = bucket_function_(infoset);
 
   if (regrets_.count(bucket) == 0) {
     ActionRegrets zeros = { 0, 0, 0, 0, 0, 0 };

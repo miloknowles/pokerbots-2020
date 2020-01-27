@@ -127,5 +127,9 @@ inline std::string BucketMediumJoin(const std::array<std::string, 19>& b) {
   return meta + betting;
 }
 
+std::string BucketMedium(const EvInfoSet& infoset);
+
+std::string BucketSmall(const EvInfoSet& infoset);
+
 }
 }

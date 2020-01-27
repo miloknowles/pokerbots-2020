@@ -213,5 +213,15 @@ std::array<std::string, 19> BucketInfoSetMedium(const EvInfoSet& infoset) {
   return h;
 }
 
+
+std::string BucketMedium(const EvInfoSet& infoset) {
+  return BucketMediumJoin(BucketInfoSetMedium(infoset));
+}
+
+std::string BucketSmall(const EvInfoSet& infoset) {
+  return BucketSmallJoin(BucketInfoSetSmall(infoset));
+}
+
+
 }
 }

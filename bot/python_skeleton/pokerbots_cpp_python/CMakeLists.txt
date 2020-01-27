@@ -48,10 +48,13 @@ add_library(${PROJECT_NAME}_cfr SHARED
   engine_modified.cpp
   engine_modified.hpp
   cfr.cpp
-  cfr.hpp)
+  cfr.hpp
+  cfr_trainer.cpp
+  cfr_trainer.hpp)
 target_link_libraries(${PROJECT_NAME}_cfr
   ${CMAKE_CURRENT_SOURCE_DIR}/libpbots_calc.so
   cpp_skeleton
+  ${Boost_LIBRARIES}
   omp)
 set_target_properties(${PROJECT_NAME}_cfr PROPERTIES LINKER_LANGUAGE CXX)
 
@@ -67,9 +70,15 @@ target_link_libraries(${PROJECT_NAME}
 set_target_properties(${PROJECT_NAME} PROPERTIES LINKER_LANGUAGE CXX)
 
 #================= CFR EXECUTABLE =================
-add_executable(run_cfr
-  cfr_main.cpp)
-target_link_libraries(run_cfr
+add_executable(cfr_small
+  cfr_main_small.cpp)
+target_link_libraries(cfr_small
+  ${Boost_LIBRARIES}
+  ${PROJECT_NAME}_cfr)
+
+add_executable(cfr_medium
+  cfr_main_medium.cpp)
+target_link_libraries(cfr_medium
   ${Boost_LIBRARIES}
   ${PROJECT_NAME}_cfr)
 
