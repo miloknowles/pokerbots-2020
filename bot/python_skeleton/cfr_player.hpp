@@ -27,6 +27,11 @@ class CfrPlayer : public Bot {
     int compute_ev_samples_ = 3;
     int compute_ev_iters_ = 2000;
 
+    // Use different number of iters for each street.
+    std::unordered_map<int, int> compute_ev_iters_ {
+      {0, 1}, {3, 5000}, {4, 5000}, {5, 1326}
+    };
+
     int num_showdowns_seen_ = 0;
     int num_showdowns_converge_ = 50;
 

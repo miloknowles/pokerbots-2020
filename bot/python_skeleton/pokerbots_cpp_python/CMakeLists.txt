@@ -70,17 +70,19 @@ target_link_libraries(${PROJECT_NAME}
 set_target_properties(${PROJECT_NAME} PROPERTIES LINKER_LANGUAGE CXX)
 
 #================= CFR EXECUTABLE =================
-add_executable(cfr_small
-  cfr_main_small.cpp)
-target_link_libraries(cfr_small
-  ${Boost_LIBRARIES}
-  ${PROJECT_NAME}_cfr)
+if(BUILD_CFR_EXECUTABLES)
+  add_executable(cfr_small
+    cfr_main_small.cpp)
+  target_link_libraries(cfr_small
+    ${Boost_LIBRARIES}
+    ${PROJECT_NAME}_cfr)
 
-add_executable(cfr_medium
-  cfr_main_medium.cpp)
-target_link_libraries(cfr_medium
-  ${Boost_LIBRARIES}
-  ${PROJECT_NAME}_cfr)
+  add_executable(cfr_medium
+    cfr_main_medium.cpp)
+  target_link_libraries(cfr_medium
+    ${Boost_LIBRARIES}
+    ${PROJECT_NAME}_cfr)
+endif()
 
 # Optionally build the python wrappers.
 # if (BUILD_PYTHON_WRAPPER)

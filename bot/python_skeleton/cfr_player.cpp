@@ -85,23 +85,6 @@ std::pair<cfr::ActionVec, cfr::ActionMask> MakeActions(RoundState* round_state, 
  * Called when a new game starts. Called exactly once.
  */
 CfrPlayer::CfrPlayer() {
-  // std::string line;
-  // std::ifstream infile("./avg_strategy.txt");
-
-  // while (std::getline(infile, line)) {
-  //   std::istringstream iss(line);
-
-  //   std::vector<std::string> strs;
-  //   boost::split(strs, line, boost::is_any_of(" "));
-
-  //   const std::string key = strs.at(0);
-  //   cfr::ActionRegrets regrets_this_key;
-  //   assert(strs.size() == (1 + regrets_this_key.size()));
-  //   for (int i = 0; i < regrets_this_key.size(); ++i) {
-  //     regrets_this_key.at(i) = std::stod(strs.at(i + 1));
-  //   }
-  //   regrets_.emplace(key, regrets_this_key);
-  // }
   strategy_.Load("./avg_strategy.txt");
   std::cout << "Read in regrets for " << strategy_.Size() << " bucketed infosets" << std::endl;
 }
@@ -257,7 +240,7 @@ Action CfrPlayer::get_action(GameState* game_state, RoundState* round_state, int
     // If converged, only sample ONE permutation.
     const int nsamples = did_converge ? 1 : compute_ev_samples_;
     const float ev_this_street = pf_.ComputeEvRandom(
-        my_cards[0] + my_cards[1], board_str, "", nsamples, compute_ev_iters_);
+        my_cards[0] + my_cards[1], board_str, "", nsamples, compute_ev_iters_.at(street));
     street_ev_[street] = ev_this_street;
   }
   const float EV = street_ev_.at(street);

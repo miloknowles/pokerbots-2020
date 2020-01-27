@@ -20,35 +20,31 @@ message(STATUS ${CMAKE_HOME_DIRECTORY})
 message(STATUS ${CMAKE_CACHEFILE_DIR})
 
 # Build the pure C++ bot.
-if (NOT BUILD_PYTHON_WRAPPER)
-  message(STATUS "BUILD_PYTHON_WRAPPER is OFF, building pure C++ bot")
-  find_package(Boost REQUIRED COMPONENTS system program_options)
-  include_directories(${CMAKE_CURRENT_SOURCE_DIR})
-  include_directories(${CMAKE_CURRENT_SOURCE_DIR}/cpp_skeleton)
-  include_directories(${CMAKE_CURRENT_SOURCE_DIR}/pokerbots_cpp_python/)
-  include_directories(${CMAKE_CURRENT_SOURCE_DIR}/pokerbots_cpp_python/OMPEval)
-  add_executable(cpp_player
-    cfr_player.cpp
-    cfr_player.hpp
-    # player.hpp
-    # player.cpp
-    main.cpp)
-  target_link_libraries(cpp_player
-    # ${Boost_LIBRARIES}
-    cpp_skeleton
-    pokerbots_cpp
-    pokerbots_cpp_cfr)
+# if (NOT BUILD_PYTHON_WRAPPER)
+message(STATUS "Building the pure C++ bot")
+find_package(Boost REQUIRED COMPONENTS system program_options)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR})
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/cpp_skeleton)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/pokerbots_cpp_python/)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/pokerbots_cpp_python/OMPEval)
+add_executable(cpp_player
+  cfr_player.cpp
+  cfr_player.hpp
+  main.cpp)
+target_link_libraries(cpp_player
+  cpp_skeleton
+  pokerbots_cpp
+  pokerbots_cpp_cfr)
 
-  # Copy necessary files to final executable directory.
-  add_custom_command(
-    TARGET cpp_player POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy
-            ${CMAKE_SOURCE_DIR}/pokerbots_cpp_python/preflop_equity.txt
-            ${CMAKE_CURRENT_BINARY_DIR}/preflop_equity.txt)
+# Copy necessary files to final executable directory.
+add_custom_command(
+  TARGET cpp_player POST_BUILD
+  COMMAND ${CMAKE_COMMAND} -E copy
+          ${CMAKE_SOURCE_DIR}/pokerbots_cpp_python/preflop_equity.txt
+          ${CMAKE_CURRENT_BINARY_DIR}/preflop_equity.txt)
 
-  add_custom_command(
-    TARGET cpp_player POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy
-            ${CMAKE_SOURCE_DIR}/avg_strategy.txt
-            ${CMAKE_CURRENT_BINARY_DIR}/avg_strategy.txt)
-endif()
+add_custom_command(
+  TARGET cpp_player POST_BUILD
+  COMMAND ${CMAKE_COMMAND} -E copy
+          ${CMAKE_SOURCE_DIR}/avg_strategy.txt
+          ${CMAKE_CURRENT_BINARY_DIR}/avg_strategy.txt)

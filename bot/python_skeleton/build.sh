@@ -12,7 +12,9 @@ fi
 
 # Do the cmake build.
 cd build
-cmake .. -DBUILD_PYTHON_WRAPPER=OFF -DBUILD_TESTS=OFF
+
+# Turn off everything we don't need to build.
+cmake .. -DBUILD_PYTHON_WRAPPER=OFF -DBUILD_TESTS=OFF -DBUILD_CFR_EXECUTABLES=OFF
 make -j2
 
 cd ..
