@@ -1,7 +1,7 @@
 # Needed to find pyconfig.h
 add_compile_options(-std=c++11)
 
-find_package(Boost REQUIRED COMPONENTS python system program_options filesystem)
+find_package(Boost REQUIRED COMPONENTS system program_options filesystem)
 # include_directories(/usr/include/python2.7/)
 include_directories(/usr/include/python3.5/)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/OMPEval/)
@@ -50,7 +50,7 @@ add_library(${PROJECT_NAME}_cfr SHARED
   cfr.cpp
   cfr.hpp)
 target_link_libraries(${PROJECT_NAME}_cfr
-  pbots_calc
+  ${CMAKE_CURRENT_SOURCE_DIR}/libpbots_calc.so
   cpp_skeleton
   omp)
 set_target_properties(${PROJECT_NAME}_cfr PROPERTIES LINKER_LANGUAGE CXX)
@@ -63,8 +63,7 @@ add_library(${PROJECT_NAME} SHARED
   history_tracker.hpp)
 target_link_libraries(${PROJECT_NAME}
   omp
-  pbots_calc)
-  # ${CMAKE_CURRENT_SOURCE_DIR}/libpbots_calc.so)
+  ${CMAKE_CURRENT_SOURCE_DIR}/libpbots_calc.so)
 set_target_properties(${PROJECT_NAME} PROPERTIES LINKER_LANGUAGE CXX)
 
 #================= CFR EXECUTABLE =================
@@ -75,31 +74,31 @@ target_link_libraries(run_cfr
   ${PROJECT_NAME}_cfr)
 
 # Optionally build the python wrappers.
-if (BUILD_PYTHON_WRAPPER)
-  message(STATUS "BUILD_PYTHON_WRAPPER is ON, building the wrappers")
-  add_library(${PROJECT_NAME}_python SHARED
-    bindings.cpp)
-  target_link_libraries(${PROJECT_NAME}_python
-    ${PROJECT_NAME}
-    ${Boost_LIBRARIES})
-  set_target_properties(${PROJECT_NAME}_python PROPERTIES LINKER_LANGUAGE CXX)
+# if (BUILD_PYTHON_WRAPPER)
+#   message(STATUS "BUILD_PYTHON_WRAPPER is ON, building the wrappers")
+#   add_library(${PROJECT_NAME}_python SHARED
+#     bindings.cpp)
+#   target_link_libraries(${PROJECT_NAME}_python
+#     ${PROJECT_NAME}
+#     ${Boost_LIBRARIES})
+#   set_target_properties(${PROJECT_NAME}_python PROPERTIES LINKER_LANGUAGE CXX)
 
-  # Suppress prefix "lib" because Python does not allow this prefix
-  set_target_properties(${PROJECT_NAME}_python PROPERTIES PREFIX "")
+#   # Suppress prefix "lib" because Python does not allow this prefix
+#   set_target_properties(${PROJECT_NAME}_python PROPERTIES PREFIX "")
 
-  # Copy libraries to directory above.
-  add_custom_command(
-    TARGET ${PROJECT_NAME}_python POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy
-            ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}_python.so
-            ${CMAKE_SOURCE_DIR}/${PROJECT_NAME}_python.so)
+#   # Copy libraries to directory above.
+#   add_custom_command(
+#     TARGET ${PROJECT_NAME}_python POST_BUILD
+#     COMMAND ${CMAKE_COMMAND} -E copy
+#             ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}_python.so
+#             ${CMAKE_SOURCE_DIR}/${PROJECT_NAME}_python.so)
 
-  add_custom_command(
-    TARGET ${PROJECT_NAME}_python POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy
-            ${CMAKE_CURRENT_BINARY_DIR}/lib${PROJECT_NAME}.so
-            ${CMAKE_SOURCE_DIR}/lib${PROJECT_NAME}.so)
-endif()
+#   add_custom_command(
+#     TARGET ${PROJECT_NAME}_python POST_BUILD
+#     COMMAND ${CMAKE_COMMAND} -E copy
+#             ${CMAKE_CURRENT_BINARY_DIR}/lib${PROJECT_NAME}.so
+#             ${CMAKE_SOURCE_DIR}/lib${PROJECT_NAME}.so)
+# endif()
 
 if(BUILD_TESTS)
   enable_testing()  
