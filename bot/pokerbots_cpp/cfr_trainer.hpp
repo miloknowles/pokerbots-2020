@@ -21,7 +21,7 @@ struct Options {
   std::string EXPERIMENT_PATH = "/home/milo/pokerbots-2020/cfr/" + EXPERIMENT_NAME + "/";
 
   int NUM_CFR_ITERS = 10000;
-  int NUM_TRAVERSALS_PER_ITER = 100;
+  int NUM_TRAVERSALS_PER_ITER = 400;
   int NUM_TRAVERSALS_EVAL = 50;
   int TRAVERSAL_PRINT_HZ = 5;
 

@@ -112,6 +112,7 @@ A larger abstraction with perfect recall.
 ]
 */
 std::array<std::string, 19> BucketInfoSetMedium(const EvInfoSet& infoset);
+std::array<std::string, 19> BucketInfoSetLarge(const EvInfoSet& infoset);
 
 inline std::string BucketMediumJoin(const std::array<std::string, 19>& b) {
   const std::string meta = b[0] + "." + b[1] + "." + b[2];
@@ -127,8 +128,8 @@ inline std::string BucketMediumJoin(const std::array<std::string, 19>& b) {
   return meta + betting;
 }
 
+std::string BucketLarge(const EvInfoSet& infoset);
 std::string BucketMedium(const EvInfoSet& infoset);
-
 std::string BucketSmall(const EvInfoSet& infoset);
 
 }
