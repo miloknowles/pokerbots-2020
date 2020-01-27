@@ -43,13 +43,14 @@ void DoCfrIterationForPlayer(std::array<RegretMatchedStrategy, 2>& regrets,
       printf("[TRAVERSE] treesize=%d | exploit=[%f %f] | r0=%d r1=%d s0=%d s1=%d | \n",
           rctr, info.exploitability[0], info.exploitability[1], regrets[0].Size(), regrets[1].Size(),
           strategies[0].Size(), strategies[1].Size());
-      // std::cout << round_state.hands[0][0] << round_state.hands[0][1] << std::endl;
-      // std::cout << round_state.hands[1][0] << round_state.hands[1][1] << std::endl;
 
-      // for (int i = 0; i < 5; ++i) {
-        // std::cout << round_state.deck[i] << " ";
-      // }
-      // std::cout << std::endl;
+      // Print hands and deck.
+      std::cout << round_state.hands[0][0] << round_state.hands[0][1] << std::endl;
+      std::cout << round_state.hands[1][0] << round_state.hands[1][1] << std::endl;
+      for (int i = 0; i < 5; ++i) {
+        std::cout << round_state.deck[i] << " ";
+      }
+      std::cout << std::endl;
     }
   }
 
@@ -86,6 +87,9 @@ class CfrTrainer {
   }
 
   void Run() {
+    std::srand(rand() % 100);
+    // std::time:
+  
     for (int t = 0; t < opt_.NUM_CFR_ITERS; ++t) {
       // Do some traversals for each player.
       for (int tp = 0; tp < 2; ++tp) {
@@ -150,7 +154,6 @@ class CfrTrainer {
 }
 
 int main(int argc, char const *argv[]) {
-  std::srand(std::time(0));
   pb::cfr::Options opt;
   pb::cfr::CfrTrainer trainer(opt);
   trainer.Run();

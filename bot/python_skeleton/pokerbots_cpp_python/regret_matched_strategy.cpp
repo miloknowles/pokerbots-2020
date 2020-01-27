@@ -17,7 +17,7 @@ void RegretMatchedStrategy::AddRegret(const EvInfoSet& infoset, const ActionRegr
 
   // CFR+ regret matching.
   // https://arxiv.org/pdf/1407.5042.pdf
-  ActionRegrets rplus = regrets_.at(bucket);
+  ActionRegrets& rplus = regrets_.at(bucket);
   for (int i = 0; i < rplus.size(); ++i) {
     rplus.at(i) = std::fmax(0.0f, rplus.at(i) + r.at(i));
   }
