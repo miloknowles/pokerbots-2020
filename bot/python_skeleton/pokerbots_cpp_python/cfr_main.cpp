@@ -2,6 +2,7 @@
 #include <ctime>
 #include <fstream>
 #include <boost/filesystem.hpp>
+#include <cmath>
 
 #include "cfr.hpp"
 #include "engine_modified.hpp"
@@ -17,16 +18,19 @@ struct Options {
   std::string EXPERIMENT_PATH = "/home/milo/pokerbots-2020/cfr/" + EXPERIMENT_NAME + "/";
 
   int NUM_CFR_ITERS = 1000;
-  int NUM_TRAVERSALS_PER_ITER = 10;
-  int NUM_TRAVERSALS_EVAL =  10;
+  int NUM_TRAVERSALS_PER_ITER = 20;
+  int NUM_TRAVERSALS_EVAL = 40;
   int TRAVERSAL_PRINT_HZ = 5; 
 };
 
 
-void DoCfrIterationForPlayer(std::array<RegretMatchedStrategy, 2>& regrets,
+NodeInfo DoCfrIterationForPlayer(std::array<RegretMatchedStrategy, 2>& regrets,
                              std::array<RegretMatchedStrategy, 2>& strategies,
-                             int t, int traverse_plyr, const Options& opt) {
-  for (int k = 0; k < opt.NUM_TRAVERSALS_PER_ITER; ++k) {
+                             int t, int traverse_plyr, const Options& opt,
+                             bool debug_print = false) {
+  NodeInfo info;
+
+  for (int k = 0; k < 2; ++k) {
     const int sb_plyr_idx = k % 2;
     RoundState round_state = CreateNewRound(sb_plyr_idx);
 
@@ -35,26 +39,40 @@ void DoCfrIterationForPlayer(std::array<RegretMatchedStrategy, 2>& regrets,
 
     int rctr = 0;
 
-    const NodeInfo info = TraverseCfr(
+    info = TraverseCfr(
         round_state, traverse_plyr, sb_plyr_idx, regrets, strategies,
         t, reach_probabilities, precomputed_ev, &rctr, true, false, false);
 
-    if (k % opt.TRAVERSAL_PRINT_HZ == 0) {
+    if (debug_print) {
       printf("[TRAVERSE] treesize=%d | exploit=[%f %f] | r0=%d r1=%d s0=%d s1=%d | \n",
-          rctr, info.exploitability[0], info.exploitability[1], regrets[0].Size(), regrets[1].Size(),
-          strategies[0].Size(), strategies[1].Size());
+        rctr, info.exploitability[0], info.exploitability[1], regrets[0].Size(), regrets[1].Size(),
+        strategies[0].Size(), strategies[1].Size());
 
-      // Print hands and deck.
-      std::cout << round_state.hands[0][0] << round_state.hands[0][1] << std::endl;
-      std::cout << round_state.hands[1][0] << round_state.hands[1][1] << std::endl;
-      for (int i = 0; i < 5; ++i) {
-        std::cout << round_state.deck[i] << " ";
-      }
-      std::cout << std::endl;
+      // std::cout << round_state.hands[0][0] << round_state.hands[0][1] << std::endl;
+      // std::cout << round_state.hands[1][0] << round_state.hands[1][1] << std::endl;
+      // for (int i = 0; i < 5; ++i) {
+      //   std::cout << round_state.deck[i] << " ";
+      // }
+      // std::cout << std::endl;
     }
   }
 
-  printf("Done with %d traversals\n", opt.NUM_TRAVERSALS_PER_ITER);
+  return info;
+  // if (k % opt.TRAVERSAL_PRINT_HZ == 0) {
+  //   printf("[TRAVERSE] treesize=%d | exploit=[%f %f] | r0=%d r1=%d s0=%d s1=%d | \n",
+  //       rctr, info.exploitability[0], info.exploitability[1], regrets[0].Size(), regrets[1].Size(),
+  //       strategies[0].Size(), strategies[1].Size());
+
+      // Print hands and deck.
+      // std::cout << round_state.hands[0][0] << round_state.hands[0][1] << std::endl;
+      // std::cout << round_state.hands[1][0] << round_state.hands[1][1] << std::endl;
+      // for (int i = 0; i < 5; ++i) {
+      //   std::cout << round_state.deck[i] << " ";
+      // }
+      // std::cout << std::endl;
+    // }
+  // }
+  // printf("Done with %d traversals\n", opt.NUM_TRAVERSALS_PER_ITER);
 }
 
 
@@ -88,12 +106,15 @@ class CfrTrainer {
 
   void Run() {
     std::srand(rand() % 100);
-    // std::time:
   
     for (int t = 0; t < opt_.NUM_CFR_ITERS; ++t) {
       // Do some traversals for each player.
-      for (int tp = 0; tp < 2; ++tp) {
-        DoCfrIterationForPlayer(regrets_, strategies_, t, tp, opt_);
+      printf("Doing CFR iteration %d\n", t);
+      for (int iter = 0; iter < opt_.NUM_TRAVERSALS_PER_ITER; ++iter) {
+        for (int tp = 0; tp < 2; ++tp) {
+          const NodeInfo& info = DoCfrIterationForPlayer(regrets_, strategies_, t, tp, opt_,
+                                                        (iter % opt_.TRAVERSAL_PRINT_HZ) == 0);
+        }
       }
 
       // Save everything for this iteration.
@@ -107,40 +128,52 @@ class CfrTrainer {
     }
   }
 
-  void EvalAndLog(int t) {
+  void AppendToLog(const std::string& line) {
     std::ofstream fout;
     fout.open(opt_.EXPERIMENT_PATH + "./logs.txt", std::ios::app);
     assert(fout.is_open());
-    fout << "*** EVALUATING t=" << t << std::endl;
+    fout << line << std::endl;
     fout.close();
+  }
+
+  void EvalAndLog(int t) {
+    AppendToLog("*** EVALUATING t=" + std::to_string(t));
+
+    std::vector<float> exploit_sums;
 
     // Run evaluation on the average strategy.
-  //   for (int k = 0; k < opt.NUM_TRAVERSALS_PER_ITER; ++k) {
-  //   const int sb_plyr_idx = k % 2;
-  //   RoundState round_state = CreateNewRound(sb_plyr_idx);
+    for (int k = 0; k < opt_.NUM_TRAVERSALS_EVAL; ++k) {
+      const int sb_plyr_idx = k % 2;
+      RoundState round_state = CreateNewRound(sb_plyr_idx);
+      std::array<double, 2> reach_probabilities = { 1.0, 1.0 };
+      PrecomputedEv precomputed_ev = MakePrecomputedEv(round_state);
+      int rctr = 0;
 
-  //   std::array<double, 2> reach_probabilities = { 1.0, 1.0 };
-  //   PrecomputedEv precomputed_ev = MakePrecomputedEv(round_state);
+      // Don't allow updates, no external sampling, skip unreachable actions.
+      const NodeInfo info = TraverseCfr(
+          round_state, 0, sb_plyr_idx, strategies_, strategies_,
+          t, reach_probabilities, precomputed_ev, &rctr, false, false, true);
+      
+      printf("[EVALUATE] treesize=%d | exploit=[%f %f] | r0=%d r1=%d s0=%d s1=%d | \n",
+          rctr, info.exploitability[0], info.exploitability[1], regrets_[0].Size(), regrets_[1].Size(),
+          strategies_[0].Size(), strategies_[1].Size());
+      
+      exploit_sums.emplace_back(info.exploitability[0] + info.exploitability[1]);
+    }
 
-  //   int rctr = 0;
+    // Compute mean, stdev, stderr.
+    float mean = 0;
+    float stdev = 0;
+    
+    for (const float exp : exploit_sums) { mean += exp; }
+    mean /= static_cast<float>(opt_.NUM_TRAVERSALS_EVAL);
+    for (const float exp : exploit_sums) { stdev += std::pow(exp - mean, 2); }
+    stdev = std::pow(stdev, 0.5);
+    const float stderr = stdev / std::pow(static_cast<float>(opt_.NUM_TRAVERSALS_EVAL), 0.5);
 
-  //   const NodeInfo info = TraverseCfr(
-  //       &round_state, traverse_plyr, sb_plyr_idx, regrets, strategies,
-  //       t, reach_probabilities, precomputed_ev, &rctr, true, false, false);
-
-  //   if (k % opt.TRAVERSAL_PRINT_HZ == 0) {
-  //     printf("[TRAVERSE] treesize=%d | exploit=[%f %f] | r0=%d r1=%d s0=%d s1=%d | \n",
-  //         rctr, info.exploitability[0], info.exploitability[1], regrets[0].Size(), regrets[1].Size(),
-  //         strategies[0].Size(), strategies[1].Size());
-  //     // std::cout << round_state.hands[0][0] << round_state.hands[0][1] << std::endl;
-  //     // std::cout << round_state.hands[1][0] << round_state.hands[1][1] << std::endl;
-
-  //     // for (int i = 0; i < 5; ++i) {
-  //       // std::cout << round_state.deck[i] << " ";
-  //     // }
-  //     // std::cout << std::endl;
-  //   }
-  // }
+    const std::string line = "t=" + std::to_string(t) + " | mean=" + std::to_string(mean) + \
+                             " stdev=" + std::to_string(stdev) + " stderr=" + std::to_string(stderr);
+    AppendToLog(line);
   }
 
  private:

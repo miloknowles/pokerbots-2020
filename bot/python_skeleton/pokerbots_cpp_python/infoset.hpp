@@ -96,5 +96,36 @@ inline std::string BucketSmallJoin(const std::vector<std::string>& b) {
   return out;
 }
 
+/*
+A larger abstraction with perfect recall.
+- SB or BB
+- Hand strengths bucketed into quintiles.
+- Each street has 5 betting actions of { 0, C, P/2, P, 2P }
+
+[ SB/BB,
+  CURRENT STREET
+  CURRENT_HS,
+  PREFLOP_ACTIONS x 4
+  FLOP ACTIONS x 4
+  TURN ACTIONS x 4
+  RIVER ACTIONS x 4
+]
+*/
+std::array<std::string, 19> BucketInfoSetMedium(const EvInfoSet& infoset);
+
+inline std::string BucketMediumJoin(const std::array<std::string, 19>& b) {
+  const std::string meta = b[0] + "." + b[1] + "." + b[2];
+  std::string betting = "";
+  for (int i = 0; i < 16; ++i) {
+    if (i % 4 == 0) {
+      betting += "|";
+    } else {
+      betting += ".";
+    }
+    betting += b[3 + i];
+  }
+  return meta + betting;
+}
+
 }
 }

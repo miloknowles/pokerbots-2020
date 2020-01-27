@@ -234,19 +234,14 @@ NodeInfo TraverseCfr(const RoundState& round_state,
   NodeInfo node_info;
   (*rctr) += 1;
 
-  // const TerminalState* maybe_terminal_state = dynamic_cast<TerminalState*>(state);
-
   //========================== TERMINAL STATE =============================
   if (round_state.is_terminal) {
-    // const TerminalState terminal_state = *dynamic_cast<TerminalState*>(state);
     node_info.strategy_ev = { static_cast<float>(round_state.deltas[0]),
                               static_cast<float>(round_state.deltas[1]) };
     assert((node_info.strategy_ev[0] + node_info.strategy_ev[1]) == 0);
     node_info.best_response_ev = node_info.strategy_ev;
     return node_info;
   }
-
-  // RoundState round_state = *dynamic_cast<RoundState*>(state);
 
   const int active_plyr_idx = round_state.button % 2;
   const int inactive_plyr_idx = 1 - active_plyr_idx;
@@ -276,8 +271,6 @@ NodeInfo TraverseCfr(const RoundState& round_state,
 
     assert(mask[i] > 0);
 
-    // RoundState* round_state_cp = new RoundState(*round_state);
-    // RoundState round_state_cp(round_state);
     const RoundState& next_round_state = round_state.proceed(actions[i]);
     std::array<double, 2> next_reach_prob = reach_probabilities;
     next_reach_prob[active_plyr_idx] *= action_probs[i];
@@ -286,8 +279,6 @@ NodeInfo TraverseCfr(const RoundState& round_state,
       next_round_state, traverse_plyr, sb_plyr_idx, regrets, strategies, t,
       next_reach_prob, precomputed_ev, rctr, allow_updates,
       do_external_sampling, skip_unreachable_actions);
-
-    // delete next_round_state;
     
     action_values[i] = child_node_info.strategy_ev;
     br_values[i] = child_node_info.best_response_ev;
@@ -312,7 +303,10 @@ NodeInfo TraverseCfr(const RoundState& round_state,
 
   if (allow_updates && active_plyr_idx == traverse_plyr) {
     const double counterfactual = reach_probabilities[inactive_plyr_idx];
-    strategies[active_plyr_idx].AddRegret(infoset, Multiply(action_probs, counterfactual));
+    const double opp_counterfactual = reach_probabilities[active_plyr_idx];
+    const double total_reach = reach_probabilities[0] * reach_probabilities[1];
+    strategies[active_plyr_idx].AddRegret(infoset, Multiply(action_probs, total_reach));
+    // strategies[active_plyr_idx].AddRegret(infoset, action_probs);
     regrets[active_plyr_idx].AddRegret(infoset, Multiply(immediate_regrets, counterfactual));
   }
 
