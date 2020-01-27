@@ -6,7 +6,7 @@ from skeleton.states import NUM_ROUNDS, STARTING_STACK, BIG_BLIND, SMALL_BLIND
 from skeleton.bot import Bot
 from skeleton.runner import parse_args, run_bot
 
-from pokerbots_cpp_python import pokerbots_cpp_python as cpp
+from pokerbots_cpp import pokerbots_cpp as cpp
 
 
 class Player(Bot):

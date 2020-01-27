@@ -7,7 +7,7 @@
 #include "./cpp_skeleton/states.hpp"
 #include "./cpp_skeleton/bot.hpp"
 
-#include "./pokerbots_cpp_python/permutation_filter.hpp"
+#include "./pokerbots_cpp/permutation_filter.hpp"
 #include "./history_tracker.hpp"
 
 namespace pb {

@@ -8,11 +8,11 @@
 #include "./cpp_skeleton/states.hpp"
 #include "./cpp_skeleton/bot.hpp"
 
-#include "./pokerbots_cpp_python/permutation_filter.hpp"
+#include "./pokerbots_cpp/permutation_filter.hpp"
 #include "./history_tracker.hpp"
-#include "./pokerbots_cpp_python/infoset.hpp"
-#include "./pokerbots_cpp_python/cfr.hpp"
-#include "./pokerbots_cpp_python/regret_matched_strategy.hpp"
+#include "./pokerbots_cpp/infoset.hpp"
+#include "./pokerbots_cpp/cfr.hpp"
+#include "./pokerbots_cpp/regret_matched_strategy.hpp"
 
 
 namespace pb {

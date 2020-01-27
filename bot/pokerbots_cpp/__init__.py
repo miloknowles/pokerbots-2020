@@ -1,4 +1,4 @@
-from .pokerbots_cpp_python import (
+from .pokerbots_cpp import (
   ShowdownResult,
   PermutationFilter
 )

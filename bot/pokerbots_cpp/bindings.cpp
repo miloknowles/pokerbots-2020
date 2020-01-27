@@ -28,7 +28,7 @@ class PyPermutationFilter : public PermutationFilter {
   }
 };
 
-BOOST_PYTHON_MODULE(pokerbots_cpp_python)
+BOOST_PYTHON_MODULE(pokerbots_cpp)
 {
   Py_Initialize();
 

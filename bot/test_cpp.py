@@ -1,5 +1,5 @@
 from __future__ import print_function
-from pokerbots_cpp_python import pokerbots_cpp_python as cpp
+from pokerbots_cpp import pokerbots_cpp as cpp
 
 # https://github.com/tensorflow/tensorflow/issues/6968
 def test_converge_cpp():
