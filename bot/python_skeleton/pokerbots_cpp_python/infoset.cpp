@@ -181,7 +181,7 @@ std::array<std::string, 19> BucketInfoSetMedium(const EvInfoSet& infoset) {
     if (street <= infoset.street && (i >= 2)) {
       const int call_amt = std::abs(pips[0] - pips[1]);
       const float raise_amt = static_cast<float>(infoset.bet_history_vec[i] - call_amt) / static_cast<float>(cumul[i-1] + call_amt);
-      const int action_offset = i - 2; // (street == 0) ? (i - 2) : ((i - 2) % kMaxActionsPerStreet);
+      const int action_offset = i - 2;
 
       if (action_is_check) {
         const bool bet_occurs_after = (i < (infoset.bet_history_vec.size() - 1)) && (infoset.bet_history_vec[i+1] > 0);
