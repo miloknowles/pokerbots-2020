@@ -13,10 +13,10 @@ namespace pb {
 namespace cfr {
 
 
-std::pair<ActionVec, ActionMask> MakeActions(RoundState* round_state, int active);
+std::pair<ActionVec, ActionMask> MakeActions(const RoundState& round_state, int active);
 
 
-EvInfoSet MakeInfoSet(const RoundState* round_state, int active_plyr_idx, bool player_is_sb,
+EvInfoSet MakeInfoSet(const RoundState& round_state, int active_plyr_idx, bool player_is_sb,
                       PrecomputedEv precomputed_ev);
 
 
@@ -26,7 +26,6 @@ inline std::string ConvertCodeToCard(const int code) {
   out[1] = utils::SUIT_VAL_TO_STR[code % 4];
   return out;
 }
-
 
 RoundState CreateNewRound(int sb_plyr_idx);
 
@@ -64,6 +63,7 @@ inline float PbotsCalcEquity(
   free_results(res);
   delete[] board_c;
   delete[] dead_c;
+  delete[] query_c;
   return ev;
 }
 
@@ -81,7 +81,7 @@ struct NodeInfo {
 };
 
 
-NodeInfo TraverseCfr(State* state,
+NodeInfo TraverseCfr(const RoundState& state,
                      int traverse_plyr,
                      int sb_plyr_idx,
                      std::array<RegretMatchedStrategy, 2>& regrets,

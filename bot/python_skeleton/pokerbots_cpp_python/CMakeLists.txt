@@ -1,5 +1,5 @@
 # Needed to find pyconfig.h
-find_package(Boost REQUIRED COMPONENTS python system program_options)
+find_package(Boost REQUIRED COMPONENTS python system program_options filesystem)
 # include_directories(/usr/include/python2.7/)
 include_directories(/usr/include/python3.5/)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/OMPEval/)
@@ -67,6 +67,7 @@ set_target_properties(${PROJECT_NAME} PROPERTIES LINKER_LANGUAGE CXX)
 add_executable(run_cfr
   cfr_main.cpp)
 target_link_libraries(run_cfr
+  ${Boost_LIBRARIES}
   ${PROJECT_NAME}_cfr)
 
 # Optionally build the python wrappers.

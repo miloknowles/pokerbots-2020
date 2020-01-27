@@ -14,8 +14,7 @@ omp::HandEvaluator OMP_{};
 /**
  * Compares the players' hands and computes payoffs.
  */
-State* RoundState::showdown()
-{
+RoundState RoundState::showdown() const {
     omp::Hand h0 = omp::Hand::empty();
     const std::string h0_and_board = hands[0][0] + hands[0][1] + deck[0] + deck[1] + deck[2] + deck[3] + deck[4];
     for (int i = 0; i < 7; ++i) {
@@ -42,22 +41,21 @@ State* RoundState::showdown()
         delta = (stacks[0] - stacks[1]) / 2;
     }
 
-    return new TerminalState(std::array<int, 2>({delta, -delta}), this);
+    return RoundState(this->button, this->street, this->pips, this->stacks, this->hands,
+                    this->deck, this->bet_history, this->sb_player, true,
+                    std::array<int, 2>({delta, -delta}));
 }
 
 /**
  * Returns a mask which corresponds to the active player's legal moves.
  */
-int RoundState::legal_actions()
-{
+int RoundState::legal_actions() const {
     int active = this->button % 2;
     int continue_cost = this->pips[1-active] - this->pips[active];
-    if (continue_cost == 0)
-    {
+    if (continue_cost == 0) {
         // we can only raise the stakes if both players can afford it
         bool bets_forbidden = ((this->stacks[0] == 0) | (this->stacks[1] == 0));
-        if (bets_forbidden)
-        {
+        if (bets_forbidden) {
             return CHECK_ACTION_TYPE;
         }
         return CHECK_ACTION_TYPE | RAISE_ACTION_TYPE;
@@ -65,8 +63,7 @@ int RoundState::legal_actions()
     // continue_cost > 0
     // similarly, re-raising is only allowed if both players can afford it
     bool raises_forbidden = ((continue_cost == this->stacks[active]) | (this->stacks[1-active] == 0));
-    if (raises_forbidden)
-    {
+    if (raises_forbidden) {
         return FOLD_ACTION_TYPE | CALL_ACTION_TYPE;
     }
     return FOLD_ACTION_TYPE | CALL_ACTION_TYPE | RAISE_ACTION_TYPE;
@@ -75,8 +72,7 @@ int RoundState::legal_actions()
 /**
  * Returns an array of the minimum and maximum legal raises.
  */
-array<int, 2> RoundState::raise_bounds()
-{
+array<int, 2> RoundState::raise_bounds() const {
     int active = this->button % 2;
     int continue_cost = this->pips[1-active] - this->pips[active];
     int max_contribution = min(this->stacks[active], this->stacks[1-active] + continue_cost);
@@ -87,13 +83,13 @@ array<int, 2> RoundState::raise_bounds()
 /**
  * Resets the players' pips and advances the game tree to the next round of betting.
  */
-State* RoundState::proceed_street()
-{
+RoundState RoundState::proceed_street() const {
     if (this->street == 5) {
         return this->showdown();
     }
     
-    bet_history.emplace_back(std::vector<int>());
+    BetHistory new_bet_history = this->bet_history;
+    new_bet_history.emplace_back(std::vector<int>());
 
     int new_street;
     if (this->street == 0) {
@@ -101,70 +97,82 @@ State* RoundState::proceed_street()
     } else {
         new_street = this->street + 1;
     }
-    return new RoundState(1 - sb_player, new_street, (array<int, 2>) { 0, 0 }, this->stacks, this->hands, this->deck, this, this->bet_history, this->sb_player);
+    return RoundState(1 - sb_player, new_street, (array<int, 2>) { 0, 0 }, this->stacks,
+                    this->hands, this->deck, new_bet_history, this->sb_player, false,
+                    std::array<int, 2>({-1, -1}));
 }
 
 /**
  * Advances the game tree by one action performed by the active player.
  */
-State* RoundState::proceed(Action action)
-{
+RoundState RoundState::proceed(Action action) const {
     int active = this->button % 2;
-    switch (action.action_type)
-    {
-        case FOLD_ACTION_TYPE:
-        {
+    switch (action.action_type) {
+        case FOLD_ACTION_TYPE: {
             int delta;
-            if (active == 0)
-            {
+            if (active == 0) {
                 delta = this->stacks[0] - STARTING_STACK;
             }
-            else
-            {
+            else {
                 delta = STARTING_STACK - this->stacks[1];
             }
-            return new TerminalState((array<int, 2>) { delta, -1 * delta }, this);
+            return RoundState(this->button, this->street, this->pips, this->stacks, this->hands,
+                              this->deck, this->bet_history, this->sb_player, true,
+                              (array<int, 2>) { delta, -1 * delta });
         }
-        case CALL_ACTION_TYPE:
-        {
-            if (this->button == this->sb_player && this->street == 0)  // sb calls bb
-            {
-                bet_history.back().emplace_back(1);
-                return new RoundState(this->button + 1, 0, (array<int, 2>) { BIG_BLIND, BIG_BLIND },
-                                      (array<int, 2>) { STARTING_STACK - BIG_BLIND, STARTING_STACK - BIG_BLIND },
-                                      this->hands, this->deck, this, this->bet_history, this->sb_player);
+        case CALL_ACTION_TYPE: {
+            // SB calls BB.
+            if (this->button == this->sb_player && this->street == 0) {
+                BetHistory new_bet_history = this->bet_history;
+                new_bet_history.back().emplace_back(1);
+                return RoundState(this->button + 1, 0, (array<int, 2>) { BIG_BLIND, BIG_BLIND },
+                                 (array<int, 2>) { STARTING_STACK - BIG_BLIND, STARTING_STACK - BIG_BLIND },
+                                 this->hands, this->deck, new_bet_history, this->sb_player, false,
+                                 std::array<int, 2>({-1, -1}));
             }
             // both players acted
             array<int, 2> new_pips = this->pips;
             array<int, 2> new_stacks = this->stacks;
-            int contribution = new_pips[1-active] - new_pips[active];
+            const int contribution = new_pips[1-active] - new_pips[active];
             new_stacks[active] -= contribution;
             new_pips[active] += contribution;
-            bet_history.back().emplace_back(contribution);
-            RoundState* state = new RoundState(this->button + 1, this->street, new_pips, new_stacks,
-                                               this->hands, this->deck, this, this->bet_history, this->sb_player);
-            return state->proceed_street();
+
+            BetHistory new_bet_history = bet_history;
+            new_bet_history.back().emplace_back(contribution);
+
+            return RoundState(this->button + 1, this->street, new_pips, new_stacks,
+                            this->hands, this->deck, new_bet_history, this->sb_player,
+                            false, std::array<int, 2>({-1, -1})).proceed_street();
+            // return state.proceed_street();
         }
-        case CHECK_ACTION_TYPE:
-        {
+        case CHECK_ACTION_TYPE: {
             // if (self.street == 0 and self.button > 0) or self.button > 1:  # both players acted
             if ((this->street == 0 && this->button > sb_player) || (this->button % 2 == this->sb_player)) {
-                bet_history.back().emplace_back(0);
-                return this->proceed_street();
+                BetHistory new_bet_history = this->bet_history;
+                new_bet_history.back().emplace_back(0);
+                return RoundState(this->button, this->street, this->pips, this->stacks, this->hands,
+                                 this->deck, new_bet_history, this->sb_player, false, std::array<int, 2>({-1, -1})).proceed_street();
+                // return this->proceed_street();
             }
+
             // let opponent act
-            bet_history.back().emplace_back(0);
-            return new RoundState(this->button + 1, this->street, this->pips, this->stacks, this->hands, this->deck, this, this->bet_history, this->sb_player);
+            BetHistory new_bet_history = this->bet_history;
+            new_bet_history.back().emplace_back(0);
+            return RoundState(this->button + 1, this->street, this->pips, this->stacks, this->hands,
+                            this->deck, new_bet_history, this->sb_player, false, std::array<int, 2>({-1, -1}));
         }
-        default:  // RAISE_ACTION_TYPE
-        {
+    
+        // RAISE ACTION TYPE
+        default: {
             array<int, 2> new_pips = this->pips;
             array<int, 2> new_stacks = this->stacks;
             int contribution = action.amount - new_pips[active];
             new_stacks[active] -= contribution;
             new_pips[active] += contribution;
-            bet_history.back().emplace_back(contribution);
-            return new RoundState(this->button + 1, this->street, new_pips, new_stacks, this->hands, this->deck, this, bet_history, sb_player);
+            BetHistory new_bet_history = this->bet_history;
+            new_bet_history.back().emplace_back(contribution);
+            return RoundState(this->button + 1, this->street, new_pips, new_stacks, this->hands,
+                              this->deck, new_bet_history, this->sb_player, false, std::array<int, 2>({-1, -1}));
         }
     }
 }

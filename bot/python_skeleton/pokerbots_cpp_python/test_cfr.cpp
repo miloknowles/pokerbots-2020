@@ -40,25 +40,24 @@ TEST(CfrTest, testEngine) {
   printf("Precomputed EV: RIVER[0]=%f RIVER[1]=%f\n", ev[0][3], ev[1][3]);
 
   std::cout << "Should see initial config for SB" << std::endl;
-  EvInfoSet infoset = MakeInfoSet(&round_state, 1, true, ev);
+  EvInfoSet infoset = MakeInfoSet(round_state, 1, true, ev);
   infoset.Print();
 
   // SB calls.
-  RoundState* next = dynamic_cast<RoundState*>(round_state.proceed(CallAction()));
-  assert(next != nullptr);
+  RoundState next = round_state.proceed(CallAction());
 
   std::cout << "Should see SB call" << std::endl;
   infoset = MakeInfoSet(next, 0, false, ev);
   infoset.Print();
 
-  EXPECT_EQ(0, next->street);
-  EXPECT_EQ(2, next->button);
-  PrintFlexHistory(next->bet_history);
+  EXPECT_EQ(0, next.street);
+  EXPECT_EQ(2, next.button);
+  PrintFlexHistory(next.bet_history);
 
-  bool can_check = CHECK_ACTION_TYPE & next->legal_actions();
-  bool can_call = CALL_ACTION_TYPE & next->legal_actions();
-  bool can_fold = FOLD_ACTION_TYPE & next->legal_actions();
-  bool can_raise = RAISE_ACTION_TYPE & next->legal_actions();
+  bool can_check = CHECK_ACTION_TYPE & next.legal_actions();
+  bool can_call = CALL_ACTION_TYPE & next.legal_actions();
+  bool can_fold = FOLD_ACTION_TYPE & next.legal_actions();
+  bool can_raise = RAISE_ACTION_TYPE & next.legal_actions();
 
   EXPECT_TRUE(can_check);
   EXPECT_TRUE(can_raise);
@@ -66,21 +65,21 @@ TEST(CfrTest, testEngine) {
   EXPECT_FALSE(can_call);
 
   // BB raises.
-  next = dynamic_cast<RoundState*>(next->proceed(RaiseAction(4)));
+  next = next.proceed(RaiseAction(4));
 
   std::cout << "Should see SB call, BB raise" << std::endl;
   infoset = MakeInfoSet(next, 0, false, ev);
   std::string b = BucketSmallJoin(BucketInfoSetSmall(infoset));
   std::cout << b << std::endl;
 
-  EXPECT_EQ(0, next->street);
-  EXPECT_EQ(3, next->button);
-  PrintFlexHistory(next->bet_history);
+  EXPECT_EQ(0, next.street);
+  EXPECT_EQ(3, next.button);
+  PrintFlexHistory(next.bet_history);
 
-  can_check = CHECK_ACTION_TYPE & next->legal_actions();
-  can_call = CALL_ACTION_TYPE & next->legal_actions();
-  can_fold = FOLD_ACTION_TYPE & next->legal_actions();
-  can_raise = RAISE_ACTION_TYPE & next->legal_actions();
+  can_check = CHECK_ACTION_TYPE & next.legal_actions();
+  can_call = CALL_ACTION_TYPE & next.legal_actions();
+  can_fold = FOLD_ACTION_TYPE & next.legal_actions();
+  can_raise = RAISE_ACTION_TYPE & next.legal_actions();
 
   EXPECT_FALSE(can_check);
   EXPECT_TRUE(can_raise);
@@ -88,10 +87,10 @@ TEST(CfrTest, testEngine) {
   EXPECT_TRUE(can_call);
 
   // SB re-raises to 8.
-  next = dynamic_cast<RoundState*>(next->proceed(RaiseAction(8)));
-  EXPECT_EQ(0, next->street);
-  EXPECT_EQ(4, next->button);
-  PrintFlexHistory(next->bet_history);
+  next = next.proceed(RaiseAction(8));
+  EXPECT_EQ(0, next.street);
+  EXPECT_EQ(4, next.button);
+  PrintFlexHistory(next.bet_history);
 
   std::cout << "Should see SB call, BB raise, SB reraise" << std::endl;
   infoset = MakeInfoSet(next, 1, true, ev);
@@ -99,10 +98,10 @@ TEST(CfrTest, testEngine) {
   std::cout << b << std::endl;
 
   // BB calls.
-  next = dynamic_cast<RoundState*>(next->proceed(CallAction()));
-  EXPECT_EQ(3, next->street);
-  EXPECT_EQ(0, next->button);
-  PrintFlexHistory(next->bet_history);
+  next = next.proceed(CallAction());
+  EXPECT_EQ(3, next.street);
+  EXPECT_EQ(0, next.button);
+  PrintFlexHistory(next.bet_history);
 
   std::cout << "Start of flop" << std::endl;
   infoset = MakeInfoSet(next, 0, false, ev);
@@ -111,77 +110,76 @@ TEST(CfrTest, testEngine) {
 
   // BB checks, SB checks.
   std::cout << "First check on FLOP" << std::endl;
-  next = dynamic_cast<RoundState*>(next->proceed(CheckAction()));
-  EXPECT_EQ(3, next->street);
-  EXPECT_EQ(1, next->button);
-  PrintFlexHistory(next->bet_history);
+  next = next.proceed(CheckAction());
+  EXPECT_EQ(3, next.street);
+  EXPECT_EQ(1, next.button);
+  PrintFlexHistory(next.bet_history);
   infoset = MakeInfoSet(next, 1, true, ev);
   b = BucketSmallJoin(BucketInfoSetSmall(infoset));
   std::cout << b << std::endl;
 
   std::cout << "Second check on FLOP" << std::endl;
-  next = dynamic_cast<RoundState*>(next->proceed(CheckAction()));
-  EXPECT_EQ(4, next->street);
-  EXPECT_EQ(0, next->button);
-  PrintFlexHistory(next->bet_history);
+  next = next.proceed(CheckAction());
+  EXPECT_EQ(4, next.street);
+  EXPECT_EQ(0, next.button);
+  PrintFlexHistory(next.bet_history);
   infoset = MakeInfoSet(next, 0, false, ev);
   b = BucketSmallJoin(BucketInfoSetSmall(infoset));
   std::cout << b << std::endl;
 
   // BB checks, SB raises.
   std::cout << "First check on TURN" << std::endl;
-  next = dynamic_cast<RoundState*>(next->proceed(CheckAction()));
-  EXPECT_EQ(4, next->street);
-  EXPECT_EQ(1, next->button);
-  PrintFlexHistory(next->bet_history);
+  next = next.proceed(CheckAction());
+  EXPECT_EQ(4, next.street);
+  EXPECT_EQ(1, next.button);
+  PrintFlexHistory(next.bet_history);
   infoset = MakeInfoSet(next, 1, true, ev);
   b = BucketSmallJoin(BucketInfoSetSmall(infoset));
   std::cout << b << std::endl;
 
   std::cout << "SB raises on TURN" << std::endl;
-  next = dynamic_cast<RoundState*>(next->proceed(RaiseAction(20)));
-  EXPECT_EQ(4, next->street);
-  EXPECT_EQ(2, next->button);
-  PrintFlexHistory(next->bet_history);
+  next = next.proceed(RaiseAction(20));
+  EXPECT_EQ(4, next.street);
+  EXPECT_EQ(2, next.button);
+  PrintFlexHistory(next.bet_history);
   infoset = MakeInfoSet(next, 0, false, ev);
   b = BucketSmallJoin(BucketInfoSetSmall(infoset));
   std::cout << b << std::endl;
 
   // BB re-raises, SB calls.
   std::cout << "BB reraises on TURN" << std::endl;
-  next = dynamic_cast<RoundState*>(next->proceed(RaiseAction(40)));
-  EXPECT_EQ(4, next->street);
-  EXPECT_EQ(3, next->button);
-  PrintFlexHistory(next->bet_history);
+  next = next.proceed(RaiseAction(40));
+  EXPECT_EQ(4, next.street);
+  EXPECT_EQ(3, next.button);
+  PrintFlexHistory(next.bet_history);
   infoset = MakeInfoSet(next, 1, true, ev);
   b = BucketSmallJoin(BucketInfoSetSmall(infoset));
   std::cout << b << std::endl;
 
   std::cout << "SB calls on TURN" << std::endl;
-  next = dynamic_cast<RoundState*>(next->proceed(CallAction()));
-  EXPECT_EQ(5, next->street);
-  EXPECT_EQ(0, next->button);
-  PrintFlexHistory(next->bet_history);
+  next = next.proceed(CallAction());
+  EXPECT_EQ(5, next.street);
+  EXPECT_EQ(0, next.button);
+  PrintFlexHistory(next.bet_history);
   infoset = MakeInfoSet(next, 0, false, ev);
   b = BucketSmallJoin(BucketInfoSetSmall(infoset));
   std::cout << b << std::endl;
 
   // Double check on RIVER.
   std::cout << "First check on RIVER" << std::endl;
-  next = dynamic_cast<RoundState*>(next->proceed(CheckAction()));
-  EXPECT_EQ(5, next->street);
-  EXPECT_EQ(1, next->button);
-  PrintFlexHistory(next->bet_history);
+  next = next.proceed(CheckAction());
+  EXPECT_EQ(5, next.street);
+  EXPECT_EQ(1, next.button);
+  PrintFlexHistory(next.bet_history);
   infoset = MakeInfoSet(next, 1, true, ev);
   b = BucketSmallJoin(BucketInfoSetSmall(infoset));
   std::cout << b << std::endl;
 
   std::cout << "Second check on RIVER" << std::endl;
-  TerminalState* end = dynamic_cast<TerminalState*>(next->proceed(CheckAction()));
-  EXPECT_TRUE(end != nullptr);
+  const RoundState& end = next.proceed(CheckAction());
 
-  PrintFlexHistory(dynamic_cast<RoundState*>(end->previous_state)->bet_history);
-  std::cout << end->deltas[0] << " " << end->deltas[1] << std::endl;
+  PrintFlexHistory(end.bet_history);
+  std::cout << end.deltas[0] << " " << end.deltas[1] << std::endl;
 }
 
 
@@ -196,25 +194,24 @@ TEST(CfrTest, testSbPlyrIdx0) {
   printf("Precomputed EV: RIVER[0]=%f RIVER[1]=%f\n", ev[0][3], ev[1][3]);
 
   std::cout << "Should see initial config for SB" << std::endl;
-  EvInfoSet infoset = MakeInfoSet(&round_state, 0, true, ev);
+  EvInfoSet infoset = MakeInfoSet(round_state, 0, true, ev);
   infoset.Print();
 
   // SB calls.
-  RoundState* next = dynamic_cast<RoundState*>(round_state.proceed(CallAction()));
-  assert(next != nullptr);
+  RoundState next = round_state.proceed(CallAction());
 
   std::cout << "Should see SB call" << std::endl;
   infoset = MakeInfoSet(next, 1, false, ev);
   infoset.Print();
 
-  EXPECT_EQ(0, next->street);
-  EXPECT_EQ(1, next->button);
-  PrintFlexHistory(next->bet_history);
+  EXPECT_EQ(0, next.street);
+  EXPECT_EQ(1, next.button);
+  PrintFlexHistory(next.bet_history);
 
-  bool can_check = CHECK_ACTION_TYPE & next->legal_actions();
-  bool can_call = CALL_ACTION_TYPE & next->legal_actions();
-  bool can_fold = FOLD_ACTION_TYPE & next->legal_actions();
-  bool can_raise = RAISE_ACTION_TYPE & next->legal_actions();
+  bool can_check = CHECK_ACTION_TYPE & next.legal_actions();
+  bool can_call = CALL_ACTION_TYPE & next.legal_actions();
+  bool can_fold = FOLD_ACTION_TYPE & next.legal_actions();
+  bool can_raise = RAISE_ACTION_TYPE & next.legal_actions();
 
   EXPECT_TRUE(can_check);
   EXPECT_TRUE(can_raise);
@@ -222,21 +219,21 @@ TEST(CfrTest, testSbPlyrIdx0) {
   EXPECT_FALSE(can_call);
 
   // BB raises.
-  next = dynamic_cast<RoundState*>(next->proceed(RaiseAction(4)));
+  next = next.proceed(RaiseAction(4));
 
   std::cout << "Should see SB call, BB raise" << std::endl;
   infoset = MakeInfoSet(next, 1, false, ev);
   std::string b = BucketSmallJoin(BucketInfoSetSmall(infoset));
   std::cout << b << std::endl;
 
-  EXPECT_EQ(0, next->street);
-  EXPECT_EQ(2, next->button);
-  PrintFlexHistory(next->bet_history);
+  EXPECT_EQ(0, next.street);
+  EXPECT_EQ(2, next.button);
+  PrintFlexHistory(next.bet_history);
 
-  can_check = CHECK_ACTION_TYPE & next->legal_actions();
-  can_call = CALL_ACTION_TYPE & next->legal_actions();
-  can_fold = FOLD_ACTION_TYPE & next->legal_actions();
-  can_raise = RAISE_ACTION_TYPE & next->legal_actions();
+  can_check = CHECK_ACTION_TYPE & next.legal_actions();
+  can_call = CALL_ACTION_TYPE & next.legal_actions();
+  can_fold = FOLD_ACTION_TYPE & next.legal_actions();
+  can_raise = RAISE_ACTION_TYPE & next.legal_actions();
 
   EXPECT_FALSE(can_check);
   EXPECT_TRUE(can_raise);
@@ -244,10 +241,10 @@ TEST(CfrTest, testSbPlyrIdx0) {
   EXPECT_TRUE(can_call);
 
   // SB re-raises to 8.
-  next = dynamic_cast<RoundState*>(next->proceed(RaiseAction(8)));
-  EXPECT_EQ(0, next->street);
-  EXPECT_EQ(3, next->button);
-  PrintFlexHistory(next->bet_history);
+  next = next.proceed(RaiseAction(8));
+  EXPECT_EQ(0, next.street);
+  EXPECT_EQ(3, next.button);
+  PrintFlexHistory(next.bet_history);
 
   std::cout << "Should see SB call, BB raise, SB reraise" << std::endl;
   infoset = MakeInfoSet(next, 0, true, ev);
@@ -255,10 +252,10 @@ TEST(CfrTest, testSbPlyrIdx0) {
   std::cout << b << std::endl;
 
   // BB calls.
-  next = dynamic_cast<RoundState*>(next->proceed(CallAction()));
-  EXPECT_EQ(3, next->street);
-  EXPECT_EQ(1, next->button);
-  PrintFlexHistory(next->bet_history);
+  next = next.proceed(CallAction());
+  EXPECT_EQ(3, next.street);
+  EXPECT_EQ(1, next.button);
+  PrintFlexHistory(next.bet_history);
 
   std::cout << "Start of flop" << std::endl;
   infoset = MakeInfoSet(next, 1, false, ev);
@@ -267,77 +264,76 @@ TEST(CfrTest, testSbPlyrIdx0) {
 
   // BB checks, SB checks.
   std::cout << "First check on FLOP" << std::endl;
-  next = dynamic_cast<RoundState*>(next->proceed(CheckAction()));
-  EXPECT_EQ(3, next->street);
-  EXPECT_EQ(2, next->button);
-  PrintFlexHistory(next->bet_history);
+  next = next.proceed(CheckAction());
+  EXPECT_EQ(3, next.street);
+  EXPECT_EQ(2, next.button);
+  PrintFlexHistory(next.bet_history);
   infoset = MakeInfoSet(next, 0, true, ev);
   b = BucketSmallJoin(BucketInfoSetSmall(infoset));
   std::cout << b << std::endl;
 
   std::cout << "Second check on FLOP" << std::endl;
-  next = dynamic_cast<RoundState*>(next->proceed(CheckAction()));
-  EXPECT_EQ(4, next->street);
-  EXPECT_EQ(1, next->button);
-  PrintFlexHistory(next->bet_history);
+  next = next.proceed(CheckAction());
+  EXPECT_EQ(4, next.street);
+  EXPECT_EQ(1, next.button);
+  PrintFlexHistory(next.bet_history);
   infoset = MakeInfoSet(next, 1, false, ev);
   b = BucketSmallJoin(BucketInfoSetSmall(infoset));
   std::cout << b << std::endl;
 
   // BB checks, SB raises.
   std::cout << "First check on TURN" << std::endl;
-  next = dynamic_cast<RoundState*>(next->proceed(CheckAction()));
-  EXPECT_EQ(4, next->street);
-  EXPECT_EQ(2, next->button);
-  PrintFlexHistory(next->bet_history);
+  next = next.proceed(CheckAction());
+  EXPECT_EQ(4, next.street);
+  EXPECT_EQ(2, next.button);
+  PrintFlexHistory(next.bet_history);
   infoset = MakeInfoSet(next, 0, true, ev);
   b = BucketSmallJoin(BucketInfoSetSmall(infoset));
   std::cout << b << std::endl;
 
   std::cout << "SB raises on TURN" << std::endl;
-  next = dynamic_cast<RoundState*>(next->proceed(RaiseAction(20)));
-  EXPECT_EQ(4, next->street);
-  EXPECT_EQ(3, next->button);
-  PrintFlexHistory(next->bet_history);
+  next = next.proceed(RaiseAction(20));
+  EXPECT_EQ(4, next.street);
+  EXPECT_EQ(3, next.button);
+  PrintFlexHistory(next.bet_history);
   infoset = MakeInfoSet(next, 1, false, ev);
   b = BucketSmallJoin(BucketInfoSetSmall(infoset));
   std::cout << b << std::endl;
 
   // BB re-raises, SB calls.
   std::cout << "BB reraises on TURN" << std::endl;
-  next = dynamic_cast<RoundState*>(next->proceed(RaiseAction(40)));
-  EXPECT_EQ(4, next->street);
-  EXPECT_EQ(4, next->button);
-  PrintFlexHistory(next->bet_history);
+  next = next.proceed(RaiseAction(40));
+  EXPECT_EQ(4, next.street);
+  EXPECT_EQ(4, next.button);
+  PrintFlexHistory(next.bet_history);
   infoset = MakeInfoSet(next, 0, true, ev);
   b = BucketSmallJoin(BucketInfoSetSmall(infoset));
   std::cout << b << std::endl;
 
   std::cout << "SB calls on TURN" << std::endl;
-  next = dynamic_cast<RoundState*>(next->proceed(CallAction()));
-  EXPECT_EQ(5, next->street);
-  EXPECT_EQ(1, next->button);
-  PrintFlexHistory(next->bet_history);
+  next = next.proceed(CallAction());
+  EXPECT_EQ(5, next.street);
+  EXPECT_EQ(1, next.button);
+  PrintFlexHistory(next.bet_history);
   infoset = MakeInfoSet(next, 1, false, ev);
   b = BucketSmallJoin(BucketInfoSetSmall(infoset));
   std::cout << b << std::endl;
 
   // Double check on RIVER.
   std::cout << "First check on RIVER" << std::endl;
-  next = dynamic_cast<RoundState*>(next->proceed(CheckAction()));
-  EXPECT_EQ(5, next->street);
-  EXPECT_EQ(2, next->button);
-  PrintFlexHistory(next->bet_history);
+  next = next.proceed(CheckAction());
+  EXPECT_EQ(5, next.street);
+  EXPECT_EQ(2, next.button);
+  PrintFlexHistory(next.bet_history);
   infoset = MakeInfoSet(next, 0, true, ev);
   b = BucketSmallJoin(BucketInfoSetSmall(infoset));
   std::cout << b << std::endl;
 
   std::cout << "Second check on RIVER" << std::endl;
-  TerminalState* end = dynamic_cast<TerminalState*>(next->proceed(CheckAction()));
-  EXPECT_TRUE(end != nullptr);
+  const RoundState& end = next.proceed(CheckAction());
 
-  PrintFlexHistory(dynamic_cast<RoundState*>(end->previous_state)->bet_history);
-  std::cout << end->deltas[0] << " " << end->deltas[1] << std::endl;
+  PrintFlexHistory(end.bet_history);
+  std::cout << end.deltas[0] << " " << end.deltas[1] << std::endl;
 }
 
 

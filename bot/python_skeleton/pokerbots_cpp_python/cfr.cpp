@@ -6,22 +6,22 @@
 namespace pb {
 namespace cfr {
 
-std::pair<ActionVec, ActionMask> MakeActions(RoundState* round_state, int active) {
-  const int legal_actions = round_state->legal_actions();
+std::pair<ActionVec, ActionMask> MakeActions(const RoundState& round_state, int active) {
+  const int legal_actions = round_state.legal_actions();
 
-  const int my_pip = round_state->pips[active];
-  const int opp_pip = round_state->pips[1-active];
+  const int my_pip = round_state.pips[active];
+  const int opp_pip = round_state.pips[1-active];
 
-  const int min_raise = round_state->raise_bounds()[0];
-  const int max_raise = round_state->raise_bounds()[1];
+  const int min_raise = round_state.raise_bounds()[0];
+  const int max_raise = round_state.raise_bounds()[1];
 
-  const int my_stack = round_state->stacks[active];  // the number of chips you have remaining
-  const int opp_stack = round_state->stacks[1-active];  // the number of chips your opponent has remaining
+  const int my_stack = round_state.stacks[active];  // the number of chips you have remaining
+  const int opp_stack = round_state.stacks[1-active];  // the number of chips your opponent has remaining
 
   const int pot_size = 2 * 200 - my_stack - opp_stack;
 
-  const int bet_actions_so_far = round_state->bet_history.back().size();
-  const int bet_actions_this_street = (round_state->street > 0) ? kMaxActionsPerStreet : (kMaxActionsPerStreet + 2);
+  const int bet_actions_so_far = round_state.bet_history.back().size();
+  const int bet_actions_this_street = (round_state.street > 0) ? kMaxActionsPerStreet : (kMaxActionsPerStreet + 2);
   const bool force_fold_call = bet_actions_so_far >= (bet_actions_this_street - 1);
 
   ActionMask actions_mask;
@@ -59,12 +59,12 @@ std::pair<ActionVec, ActionMask> MakeActions(RoundState* round_state, int active
 }
 
 
-EvInfoSet MakeInfoSet(const RoundState* round_state, int active_plyr_idx, bool player_is_sb,
+EvInfoSet MakeInfoSet(const RoundState& round_state, int active_plyr_idx, bool player_is_sb,
                       PrecomputedEv precomputed_ev) {
   FixedHistory fh;
   std::fill(fh.begin(), fh.end(), 0);
 
-  FlexHistory history = round_state->bet_history;
+  FlexHistory history = round_state.bet_history;
   assert(history.size() <= 4);
   for (int street = 0; street < history.size(); ++street) {
     const std::vector<int>& actions_this_street = history.at(street);
@@ -76,7 +76,7 @@ EvInfoSet MakeInfoSet(const RoundState* round_state, int active_plyr_idx, bool p
       fh.at(offset + wrap) += actions_this_street.at(i);
     }
   }
-  const int street_0123 = GetStreet0123(round_state->street);
+  const int street_0123 = GetStreet0123(round_state.street);
   const float ev = precomputed_ev.at(active_plyr_idx).at(street_0123);
 
   return EvInfoSet(ev, fh, player_is_sb ? 0 : 1, street_0123);
@@ -151,7 +151,8 @@ RoundState CreateNewRound(int sb_plyr_idx) {
     stacks = { stacks[1], stacks[0] };
   }
 
-  return RoundState(sb_plyr_idx, 0, pips, stacks, hands, board, nullptr, {{1, 2}}, sb_plyr_idx);
+  return RoundState(sb_plyr_idx, 0, pips, stacks, hands, board, {{1, 2}}, sb_plyr_idx,
+                    false, std::array<int, 2>({-1, -1}));
 }
 
 
@@ -218,7 +219,7 @@ static void FillZeros(ActionValues& values) {
 }
 
 
-NodeInfo TraverseCfr(State* state,
+NodeInfo TraverseCfr(const RoundState& round_state,
                      int traverse_plyr,
                      int sb_plyr_idx,
                      std::array<RegretMatchedStrategy, 2>& regrets,
@@ -232,21 +233,22 @@ NodeInfo TraverseCfr(State* state,
                      bool skip_unreachable_actions) {
   NodeInfo node_info;
   (*rctr) += 1;
-  const bool is_terminal_state = dynamic_cast<TerminalState*>(state) != nullptr;
+
+  // const TerminalState* maybe_terminal_state = dynamic_cast<TerminalState*>(state);
 
   //========================== TERMINAL STATE =============================
-  if (is_terminal_state) {
-    TerminalState* terminal_state = dynamic_cast<TerminalState*>(state);
-    node_info.strategy_ev = { static_cast<float>(terminal_state->deltas[0]),
-                              static_cast<float>(terminal_state->deltas[1]) };
+  if (round_state.is_terminal) {
+    // const TerminalState terminal_state = *dynamic_cast<TerminalState*>(state);
+    node_info.strategy_ev = { static_cast<float>(round_state.deltas[0]),
+                              static_cast<float>(round_state.deltas[1]) };
+    assert((node_info.strategy_ev[0] + node_info.strategy_ev[1]) == 0);
     node_info.best_response_ev = node_info.strategy_ev;
     return node_info;
   }
 
-  RoundState* round_state = dynamic_cast<RoundState*>(state);
-  assert(round_state != nullptr);
+  // RoundState round_state = *dynamic_cast<RoundState*>(state);
 
-  const int active_plyr_idx = round_state->button % 2;
+  const int active_plyr_idx = round_state.button % 2;
   const int inactive_plyr_idx = 1 - active_plyr_idx;
 
   const auto& actions_and_mask = MakeActions(round_state, active_plyr_idx);
@@ -274,8 +276,9 @@ NodeInfo TraverseCfr(State* state,
 
     assert(mask[i] > 0);
 
-    RoundState* round_state_cp = new RoundState(*round_state);
-    State* next_round_state = round_state_cp->proceed(actions[i]);
+    // RoundState* round_state_cp = new RoundState(*round_state);
+    // RoundState round_state_cp(round_state);
+    const RoundState& next_round_state = round_state.proceed(actions[i]);
     std::array<double, 2> next_reach_prob = reach_probabilities;
     next_reach_prob[active_plyr_idx] *= action_probs[i];
 
@@ -283,6 +286,8 @@ NodeInfo TraverseCfr(State* state,
       next_round_state, traverse_plyr, sb_plyr_idx, regrets, strategies, t,
       next_reach_prob, precomputed_ev, rctr, allow_updates,
       do_external_sampling, skip_unreachable_actions);
+
+    // delete next_round_state;
     
     action_values[i] = child_node_info.strategy_ev;
     br_values[i] = child_node_info.best_response_ev;

@@ -45,109 +45,70 @@ static std::map<uint8_t, char> SUIT_VAL_TO_STR = {
 
 }
 
-
-/**
- * Stores higher state information across many rounds of poker.
- */
-class GameState
-{
-    public:
-        const int bankroll;
-        const float game_clock;
-        const int round_num;
-
-        GameState(int bankroll, float game_clock, int round_num):
-            bankroll(bankroll),
-            game_clock(game_clock),
-            round_num(round_num)
-        {}
-};
-
-
-/**
- * The base class for the current state of one round of poker.
- */
-class State
-{
-    virtual void foo() {}
-};
-
-
-/**
- * Final state of a poker round corresponding to payoffs.
- */
-class TerminalState : public State
-{
-    public:
-        const array<int, 2> deltas;
-        State* const previous_state;
-
-        TerminalState(array<int, 2> deltas, State* previous_state):
-            deltas(deltas),
-            previous_state(previous_state)
-        {}
-};
-
-
 /**
  * Encodes the game tree for one round of poker.
  */
-class RoundState : public State
-{
-    public:
-        const int button;
-        const int street;
-        const array<int, 2> pips;
-        const array<int, 2> stacks;
-        const array< array<string, 2>, 2 > hands;
-        const array<string, 5> deck;
-        const State* previous_state;
-        BetHistory bet_history;
-        const int sb_player;
+class RoundState {
+ public:
+  RoundState(int button,
+              int street,
+              const array<int, 2>& pips,
+              const array<int, 2>& stacks,
+              const array< array<string, 2>, 2 >& hands,
+              const array<string, 5>& deck,
+              const BetHistory& bet_history,
+              const int sb_player,
+              const bool is_terminal,
+              const array<int, 2>& deltas):
+      button(button),
+      street(street),
+      pips(pips),
+      stacks(stacks),
+      hands(hands),
+      deck(deck),
+      bet_history(bet_history),
+      sb_player(sb_player),
+      is_terminal(is_terminal),
+      deltas(deltas) {}
 
-        RoundState(int button,
-                   int street,
-                   const array<int, 2>& pips,
-                   const array<int, 2>& stacks,
-                   const array< array<string, 2>, 2 >& hands,
-                   const array<string, 5>& deck,
-                   const State* previous_state,
-                   const BetHistory& bet_history,
-                   const int sb_player):
-            button(button),
-            street(street),
-            pips(pips),
-            stacks(stacks),
-            hands(hands),
-            deck(deck),
-            previous_state(previous_state),
-            bet_history(bet_history),
-            sb_player(sb_player) {}
+  /**
+   * Compares the players' hands and computes payoffs.
+   */
+  RoundState showdown() const;
 
-        /**
-         * Compares the players' hands and computes payoffs.
-         */
-        State* showdown();
+  /**
+   * Returns a mask which corresponds to the active player's legal moves.
+   */
+  int legal_actions() const;
 
-        /**
-         * Returns a mask which corresponds to the active player's legal moves.
-         */
-        int legal_actions();
+  /**
+   * Returns an array of the minimum and maximum legal raises.
+   */
+  array<int, 2> raise_bounds() const;
 
-        /**
-         * Returns an array of the minimum and maximum legal raises.
-         */
-        array<int, 2> raise_bounds();
+  /**
+   * Resets the players' pips and advances the game tree to the next round of betting.
+   */
+  RoundState proceed_street() const;
 
-        /**
-         * Resets the players' pips and advances the game tree to the next round of betting.
-         */
-        State* proceed_street();
+  /**
+   * Advances the game tree by one action performed by the active player.
+   */
+  RoundState proceed(Action action) const;
 
-        /**
-         * Advances the game tree by one action performed by the active player.
-         */
-        State* proceed(Action action);
+ public:
+  int button;
+  int street;
+  array<int, 2> pips;
+  array<int, 2> stacks;
+  array< array<string, 2>, 2 > hands;
+  array<string, 5> deck;
+  BetHistory bet_history;
+  int sb_player;
+
+  // TERMINAL STATE STUFF
+  bool is_terminal;
+  array<int, 2> deltas;
 };
 
 }
