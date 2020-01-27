@@ -2,6 +2,8 @@
 
 #include <iostream>
 #include <chrono>
+#include <cmath>
+#include <random>
 
 namespace pb {
 namespace cfr {
@@ -303,10 +305,8 @@ NodeInfo TraverseCfr(const RoundState& round_state,
 
   if (allow_updates && active_plyr_idx == traverse_plyr) {
     const double counterfactual = reach_probabilities[inactive_plyr_idx];
-    const double opp_counterfactual = reach_probabilities[active_plyr_idx];
     const double total_reach = reach_probabilities[0] * reach_probabilities[1];
     strategies[active_plyr_idx].AddRegret(infoset, Multiply(action_probs, total_reach));
-    // strategies[active_plyr_idx].AddRegret(infoset, action_probs);
     regrets[active_plyr_idx].AddRegret(infoset, Multiply(immediate_regrets, counterfactual));
   }
 

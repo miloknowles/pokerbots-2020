@@ -14,13 +14,13 @@ namespace fs = boost::filesystem;
 
 
 struct Options {
-  std::string EXPERIMENT_NAME = "MC_CFR_01";
+  std::string EXPERIMENT_NAME = "MC_CFR_MEDIUM";
   std::string EXPERIMENT_PATH = "/home/milo/pokerbots-2020/cfr/" + EXPERIMENT_NAME + "/";
 
-  int NUM_CFR_ITERS = 1000;
-  int NUM_TRAVERSALS_PER_ITER = 20;
+  int NUM_CFR_ITERS = 10000;
+  int NUM_TRAVERSALS_PER_ITER = 100;
   int NUM_TRAVERSALS_EVAL = 40;
-  int TRAVERSAL_PRINT_HZ = 5; 
+  int TRAVERSAL_PRINT_HZ = 5;
 };
 
 
@@ -58,21 +58,6 @@ NodeInfo DoCfrIterationForPlayer(std::array<RegretMatchedStrategy, 2>& regrets,
   }
 
   return info;
-  // if (k % opt.TRAVERSAL_PRINT_HZ == 0) {
-  //   printf("[TRAVERSE] treesize=%d | exploit=[%f %f] | r0=%d r1=%d s0=%d s1=%d | \n",
-  //       rctr, info.exploitability[0], info.exploitability[1], regrets[0].Size(), regrets[1].Size(),
-  //       strategies[0].Size(), strategies[1].Size());
-
-      // Print hands and deck.
-      // std::cout << round_state.hands[0][0] << round_state.hands[0][1] << std::endl;
-      // std::cout << round_state.hands[1][0] << round_state.hands[1][1] << std::endl;
-      // for (int i = 0; i < 5; ++i) {
-      //   std::cout << round_state.deck[i] << " ";
-      // }
-      // std::cout << std::endl;
-    // }
-  // }
-  // printf("Done with %d traversals\n", opt.NUM_TRAVERSALS_PER_ITER);
 }
 
 

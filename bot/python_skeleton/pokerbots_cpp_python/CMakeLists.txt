@@ -1,10 +1,13 @@
 # Needed to find pyconfig.h
+add_compile_options(-std=c++11)
+
 find_package(Boost REQUIRED COMPONENTS python system program_options filesystem)
 # include_directories(/usr/include/python2.7/)
 include_directories(/usr/include/python3.5/)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/OMPEval/)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../cpp_skeleton)
 link_directories(${CMAKE_CURRENT_SOURCE_DIR})
+link_directories(${CMAKE_CURRENT_SOURCE_DIR}/../../../)
 link_directories(/usr/local/lib/)
 
 #=============== OMPEVAL LIBRARY =================
@@ -18,7 +21,7 @@ add_library(omp SHARED
   # OMPEval/omp/EquityCalculator.h
   OMPEval/omp/Hand.h
   OMPEval/omp/HandEvaluator.cpp
-  # OMPEval/omp/HandEvaluator.h
+  OMPEval/omp/HandEvaluator.h
   # OMPEval/omp/Random.h
   # OMPEval/omp/Util.h
   OMPEval/libdivide/libdivide.h
@@ -60,7 +63,8 @@ add_library(${PROJECT_NAME} SHARED
   history_tracker.hpp)
 target_link_libraries(${PROJECT_NAME}
   omp
-  ${CMAKE_CURRENT_SOURCE_DIR}/libpbots_calc.so)
+  pbots_calc)
+  # ${CMAKE_CURRENT_SOURCE_DIR}/libpbots_calc.so)
 set_target_properties(${PROJECT_NAME} PROPERTIES LINKER_LANGUAGE CXX)
 
 #================= CFR EXECUTABLE =================
