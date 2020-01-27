@@ -103,7 +103,7 @@ void CfrPlayer::handle_new_round(GameState* game_state, RoundState* round_state,
   
   bool big_blind = static_cast<bool>(active);
   is_small_blind_ = !big_blind;
-  // check_fold_mode_ = CanCheckFoldRemainder(my_bankroll, round_num);
+  check_fold_mode_ = CanCheckFoldRemainder(my_bankroll, round_num);
 
   printf("\n================== NEW ROUND: %d ==================\n", round_num);
   std::cout << "*** TIME REMAINING: " << game_clock << std::endl;
@@ -229,7 +229,7 @@ Action CfrPlayer::get_action(GameState* game_state, RoundState* round_state, int
   }
 
   const bool did_converge = (num_showdowns_seen_ > num_showdowns_converge_) && pf_.Unique() < 10;
-  printf("[GETACTION] Particle filter status = %d (unique=%d)\n", did_converge, pf_.Unique());
+  printf("[GETACTION] CONVERGED=%d (unique=%d)\n", did_converge, pf_.Unique());
 
   // If EV hasn't been computed for this street, do it here.
   if (street_ev_.count(street) == 0) {

@@ -24,11 +24,11 @@ std::pair<cfr::ActionVec, cfr::ActionMask> MakeActions(RoundState* round_state, 
 class CfrPlayer : public Bot {
   private:
     PermutationFilter pf_{25000};
-    int compute_ev_samples_ = 2;
+    int compute_ev_samples_ = 3;
 
     // Use different number of iters for each street.
     std::unordered_map<int, int> compute_ev_iters_ {
-      {0, 1}, {3, 5000}, {4, 5000}, {5, 1326}
+      {0, 1}, {3, 2000}, {4, 2000}, {5, 1326}
     };
 
     int num_showdowns_seen_ = 0;
