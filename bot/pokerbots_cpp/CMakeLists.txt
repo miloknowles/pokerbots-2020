@@ -40,15 +40,15 @@ set_target_properties(cpp_skeleton PROPERTIES LINKER_LANGUAGE CXX)
 #================ CFR LIBRARY =====================
 add_library(${PROJECT_NAME}_cfr SHARED
   infoset.cpp
-  infoset.hpp
+  # infoset.hpp
   regret_matched_strategy.cpp
-  regret_matched_strategy.hpp
+  # regret_matched_strategy.hpp
   engine_modified.cpp
-  engine_modified.hpp
-  cfr.cpp
-  cfr.hpp
-  cfr_trainer.cpp
-  cfr_trainer.hpp)
+  # engine_modified.hpp
+  cfr.cpp)
+  # cfr.hpp)
+  # cfr_trainer.cpp
+  # cfr_trainer.hpp)
 target_link_libraries(${PROJECT_NAME}_cfr
   ${CMAKE_CURRENT_SOURCE_DIR}/libpbots_calc.so
   cpp_skeleton
@@ -59,35 +59,44 @@ set_target_properties(${PROJECT_NAME}_cfr PROPERTIES LINKER_LANGUAGE CXX)
 #================= PLAYER LIBRARY ==================
 add_library(${PROJECT_NAME}_player SHARED
   permutation_filter.cpp
-  permutation_filter.hpp
-  history_tracker.cpp
-  history_tracker.hpp)
+  # permutation_filter.hpp
+  history_tracker.cpp)
+  # history_tracker.hpp)
 target_link_libraries(${PROJECT_NAME}_player
   omp
+  ${Boost_LIBRARIES}
   ${CMAKE_CURRENT_SOURCE_DIR}/libpbots_calc.so)
 set_target_properties(${PROJECT_NAME}_player PROPERTIES LINKER_LANGUAGE CXX)
 
 #================= CFR EXECUTABLE =================
 if(BUILD_CFR_EXECUTABLES)
   add_executable(cfr_small
+    cfr_trainer.cpp
+    cfr_trainer.hpp
     cfr_main_small.cpp)
   target_link_libraries(cfr_small
     ${Boost_LIBRARIES}
     ${PROJECT_NAME}_cfr)
 
   add_executable(cfr_medium
+    cfr_trainer.cpp
+    cfr_trainer.hpp
     cfr_main_medium.cpp)
   target_link_libraries(cfr_medium
     ${Boost_LIBRARIES}
     ${PROJECT_NAME}_cfr)
 
   add_executable(cfr_large
+    cfr_trainer.cpp
+    cfr_trainer.hpp
     cfr_main_large.cpp)
   target_link_libraries(cfr_large
     ${Boost_LIBRARIES}
     ${PROJECT_NAME}_cfr)
 
   add_executable(cfr_10_16
+    cfr_trainer.cpp
+    cfr_trainer.hpp
     cfr_main_10_16.cpp)
   target_link_libraries(cfr_10_16
     ${Boost_LIBRARIES}
