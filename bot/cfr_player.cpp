@@ -401,12 +401,6 @@ Action CfrPlayer::HandleActionPreflop(float EV, int round_num, int street, int p
     // CASE 4: Not our first action, don't need to pay to continue.
     } else {
       std::cout << "PREFLOP_4: not our first action, call NOT required." << std::endl;
-
-      // If we've already increased the pot 4 times, just check.
-      // if (num_betting_rounds >= 4) {
-      //   std::cout << "already done 4 betting actions on preflop, just checking" << std::endl;
-      //   return CheckAction();
-      // } else {
       // Try to make the other player fold.
       if (EV >= 0.80 && raise_is_allowed) {
         std::cout << "4A: great EV, doing 8BB bet" << std::endl;
