@@ -390,7 +390,7 @@ TEST(CfrTest, testMedium) {
 
   std::cout << "Should see SB call, BB raise" << std::endl;
   infoset = MakeInfoSet(next, 1, false, ev);
-  std::string b = BucketMediumJoin(BucketInfoSetMedium(infoset));
+  std::string b = BucketJoin19(BucketInfoSetMedium(infoset));
   std::cout << b << std::endl;
 
   EXPECT_EQ(0, next.street);
@@ -415,7 +415,7 @@ TEST(CfrTest, testMedium) {
 
   std::cout << "Should see SB call, BB raise, SB reraise" << std::endl;
   infoset = MakeInfoSet(next, 0, true, ev);
-  b = BucketMediumJoin(BucketInfoSetMedium(infoset));
+  b = BucketJoin19(BucketInfoSetMedium(infoset));
   std::cout << b << std::endl;
 
   // BB calls.
@@ -426,7 +426,7 @@ TEST(CfrTest, testMedium) {
 
   std::cout << "Start of flop" << std::endl;
   infoset = MakeInfoSet(next, 1, false, ev);
-  b = BucketMediumJoin(BucketInfoSetMedium(infoset));
+  b = BucketJoin19(BucketInfoSetMedium(infoset));
   std::cout << b << std::endl;
 
   // BB checks, SB checks.
@@ -436,7 +436,7 @@ TEST(CfrTest, testMedium) {
   EXPECT_EQ(2, next.button);
   PrintFlexHistory(next.bet_history);
   infoset = MakeInfoSet(next, 0, true, ev);
-  b = BucketMediumJoin(BucketInfoSetMedium(infoset));
+  b = BucketJoin19(BucketInfoSetMedium(infoset));
   std::cout << b << std::endl;
 
   std::cout << "Second check on FLOP" << std::endl;
@@ -445,7 +445,7 @@ TEST(CfrTest, testMedium) {
   EXPECT_EQ(1, next.button);
   PrintFlexHistory(next.bet_history);
   infoset = MakeInfoSet(next, 1, false, ev);
-  b = BucketMediumJoin(BucketInfoSetMedium(infoset));
+  b = BucketJoin19(BucketInfoSetMedium(infoset));
   std::cout << b << std::endl;
 
   // BB checks, SB raises.
@@ -455,7 +455,7 @@ TEST(CfrTest, testMedium) {
   EXPECT_EQ(2, next.button);
   PrintFlexHistory(next.bet_history);
   infoset = MakeInfoSet(next, 0, true, ev);
-  b = BucketMediumJoin(BucketInfoSetMedium(infoset));
+  b = BucketJoin19(BucketInfoSetMedium(infoset));
   std::cout << b << std::endl;
 
   std::cout << "SB raises on TURN" << std::endl;
@@ -464,7 +464,7 @@ TEST(CfrTest, testMedium) {
   EXPECT_EQ(3, next.button);
   PrintFlexHistory(next.bet_history);
   infoset = MakeInfoSet(next, 1, false, ev);
-  b = BucketMediumJoin(BucketInfoSetMedium(infoset));
+  b = BucketJoin19(BucketInfoSetMedium(infoset));
   std::cout << b << std::endl;
 
   // BB re-raises, SB calls.
@@ -474,7 +474,7 @@ TEST(CfrTest, testMedium) {
   EXPECT_EQ(4, next.button);
   PrintFlexHistory(next.bet_history);
   infoset = MakeInfoSet(next, 0, true, ev);
-  b = BucketMediumJoin(BucketInfoSetMedium(infoset));
+  b = BucketJoin19(BucketInfoSetMedium(infoset));
   std::cout << b << std::endl;
 
   std::cout << "SB calls on TURN" << std::endl;
@@ -483,7 +483,7 @@ TEST(CfrTest, testMedium) {
   EXPECT_EQ(1, next.button);
   PrintFlexHistory(next.bet_history);
   infoset = MakeInfoSet(next, 1, false, ev);
-  b = BucketMediumJoin(BucketInfoSetMedium(infoset));
+  b = BucketJoin19(BucketInfoSetMedium(infoset));
   std::cout << b << std::endl;
 
   // Double check on RIVER.
@@ -493,7 +493,7 @@ TEST(CfrTest, testMedium) {
   EXPECT_EQ(2, next.button);
   PrintFlexHistory(next.bet_history);
   infoset = MakeInfoSet(next, 0, true, ev);
-  b = BucketMediumJoin(BucketInfoSetMedium(infoset));
+  b = BucketJoin19(BucketInfoSetMedium(infoset));
   std::cout << b << std::endl;
 
   std::cout << "Second check on RIVER" << std::endl;
@@ -544,7 +544,7 @@ TEST(CfrTest, testMedium2) {
 
   std::cout << "Should see SB call, BB raise" << std::endl;
   infoset = MakeInfoSet(next, 0, false, ev);
-  std::string b = BucketMediumJoin(BucketInfoSetMedium(infoset));
+  std::string b = BucketJoin19(BucketInfoSetMedium(infoset));
   std::cout << b << std::endl;
 
   EXPECT_EQ(0, next.street);
@@ -569,7 +569,7 @@ TEST(CfrTest, testMedium2) {
 
   std::cout << "Should see SB call, BB raise, SB reraise" << std::endl;
   infoset = MakeInfoSet(next, 1, true, ev);
-  b = BucketMediumJoin(BucketInfoSetMedium(infoset));
+  b = BucketJoin19(BucketInfoSetMedium(infoset));
   std::cout << b << std::endl;
 
   // BB calls.
@@ -580,7 +580,7 @@ TEST(CfrTest, testMedium2) {
 
   std::cout << "Start of flop" << std::endl;
   infoset = MakeInfoSet(next, 0, false, ev);
-  b = BucketMediumJoin(BucketInfoSetMedium(infoset));
+  b = BucketJoin19(BucketInfoSetMedium(infoset));
   std::cout << b << std::endl;
 
   // BB checks, SB checks.
@@ -590,7 +590,7 @@ TEST(CfrTest, testMedium2) {
   EXPECT_EQ(1, next.button);
   PrintFlexHistory(next.bet_history);
   infoset = MakeInfoSet(next, 1, true, ev);
-  b = BucketMediumJoin(BucketInfoSetMedium(infoset));
+  b = BucketJoin19(BucketInfoSetMedium(infoset));
   std::cout << b << std::endl;
 
   std::cout << "Second check on FLOP" << std::endl;
@@ -599,7 +599,7 @@ TEST(CfrTest, testMedium2) {
   EXPECT_EQ(0, next.button);
   PrintFlexHistory(next.bet_history);
   infoset = MakeInfoSet(next, 0, false, ev);
-  b = BucketMediumJoin(BucketInfoSetMedium(infoset));
+  b = BucketJoin19(BucketInfoSetMedium(infoset));
   std::cout << b << std::endl;
 
   // BB checks, SB raises.
@@ -609,7 +609,7 @@ TEST(CfrTest, testMedium2) {
   EXPECT_EQ(1, next.button);
   PrintFlexHistory(next.bet_history);
   infoset = MakeInfoSet(next, 1, true, ev);
-  b = BucketMediumJoin(BucketInfoSetMedium(infoset));
+  b = BucketJoin19(BucketInfoSetMedium(infoset));
   std::cout << b << std::endl;
 
   std::cout << "SB raises on TURN" << std::endl;
@@ -618,7 +618,7 @@ TEST(CfrTest, testMedium2) {
   EXPECT_EQ(2, next.button);
   PrintFlexHistory(next.bet_history);
   infoset = MakeInfoSet(next, 0, false, ev);
-  b = BucketMediumJoin(BucketInfoSetMedium(infoset));
+  b = BucketJoin19(BucketInfoSetMedium(infoset));
   std::cout << b << std::endl;
 
   // BB re-raises, SB calls.
@@ -628,7 +628,7 @@ TEST(CfrTest, testMedium2) {
   EXPECT_EQ(3, next.button);
   PrintFlexHistory(next.bet_history);
   infoset = MakeInfoSet(next, 1, true, ev);
-  b = BucketMediumJoin(BucketInfoSetMedium(infoset));
+  b = BucketJoin19(BucketInfoSetMedium(infoset));
   std::cout << b << std::endl;
 
   std::cout << "SB calls on TURN" << std::endl;
@@ -637,7 +637,7 @@ TEST(CfrTest, testMedium2) {
   EXPECT_EQ(0, next.button);
   PrintFlexHistory(next.bet_history);
   infoset = MakeInfoSet(next, 0, false, ev);
-  b = BucketMediumJoin(BucketInfoSetMedium(infoset));
+  b = BucketJoin19(BucketInfoSetMedium(infoset));
   std::cout << b << std::endl;
 
   // Double check on RIVER.
@@ -647,7 +647,7 @@ TEST(CfrTest, testMedium2) {
   EXPECT_EQ(1, next.button);
   PrintFlexHistory(next.bet_history);
   infoset = MakeInfoSet(next, 1, true, ev);
-  b = BucketMediumJoin(BucketInfoSetMedium(infoset));
+  b = BucketJoin19(BucketInfoSetMedium(infoset));
   std::cout << b << std::endl;
 
   std::cout << "Second check on RIVER" << std::endl;
@@ -687,7 +687,7 @@ TEST(CfrTest, testMedium3) {
 
   std::cout << "Start of flop" << std::endl;
   infoset = MakeInfoSet(next, 0, false, ev);
-  std::string b = BucketMediumJoin(BucketInfoSetMedium(infoset));
+  std::string b = BucketJoin19(BucketInfoSetMedium(infoset));
   std::cout << b << std::endl;
 
   // BB checks, SB checks.
@@ -697,7 +697,7 @@ TEST(CfrTest, testMedium3) {
   EXPECT_EQ(1, next.button);
   PrintFlexHistory(next.bet_history);
   infoset = MakeInfoSet(next, 1, true, ev);
-  b = BucketMediumJoin(BucketInfoSetMedium(infoset));
+  b = BucketJoin19(BucketInfoSetMedium(infoset));
   std::cout << b << std::endl;
 
   next = next.proceed(RaiseAction(2));
@@ -708,20 +708,20 @@ TEST(CfrTest, testMedium3) {
   std::cout << "BB check, SB raise, BB raise, SB raise, BB raise" << std::endl;
   PrintFlexHistory(next.bet_history);
   infoset = MakeInfoSet(next, 1, true, ev);
-  b = BucketMediumJoin(BucketInfoSetMedium(infoset));
+  b = BucketJoin19(BucketInfoSetMedium(infoset));
   std::cout << b << std::endl;
 
   std::cout << "BB check, SB raise, BB raise, SB raise, BB raise, SB raise" << std::endl;
   next = next.proceed(RaiseAction(10));
   PrintFlexHistory(next.bet_history);
   infoset = MakeInfoSet(next, 0, false, ev);
-  b = BucketMediumJoin(BucketInfoSetMedium(infoset));
+  b = BucketJoin19(BucketInfoSetMedium(infoset));
   std::cout << b << std::endl;
 
   std::cout << "BB check, SB raise, BB raise, SB raise, BB raise, SB raise, BB raise" << std::endl;
   next = next.proceed(RaiseAction(12));
   PrintFlexHistory(next.bet_history);
   infoset = MakeInfoSet(next, 0, false, ev);
-  b = BucketMediumJoin(BucketInfoSetMedium(infoset));
+  b = BucketJoin19(BucketInfoSetMedium(infoset));
   std::cout << b << std::endl;
 }

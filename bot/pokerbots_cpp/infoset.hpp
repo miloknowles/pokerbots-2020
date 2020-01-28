@@ -111,10 +111,35 @@ A larger abstraction with perfect recall.
   RIVER ACTIONS x 4
 ]
 */
-std::array<std::string, 19> BucketInfoSetMedium(const EvInfoSet& infoset);
-std::array<std::string, 19> BucketInfoSetLarge(const EvInfoSet& infoset);
+std::array<std::string, 19> BucketBetting16(const EvInfoSet& infoset);
 
-inline std::string BucketMediumJoin(const std::array<std::string, 19>& b) {
+std::string BucketEv5(const EvInfoSet& infoset);
+std::string BucketEv7(const EvInfoSet& infoset);
+std::string BucketEv10(const EvInfoSet& infoset);
+
+// 5 EV buckets and 16 betting action slots.
+inline std::array<std::string, 19> BucketInfoSetMedium(const EvInfoSet& infoset) {
+  std::array<std::string, 19> b = BucketBetting16(infoset);
+  b[2] = BucketEv5(infoset);
+  return b;
+}
+
+// 7 EV buckets and 16 betting action slots.
+inline std::array<std::string, 19> BucketInfoSetLarge(const EvInfoSet& infoset) {
+  std::array<std::string, 19> b = BucketBetting16(infoset);
+  b[2] = BucketEv7(infoset);
+  return b; 
+}
+
+// 10 EV buckets and 16 betting action slots.
+inline std::array<std::string, 19> BucketInfoSet_10_16(const EvInfoSet& infoset) {
+  std::array<std::string, 19> b = BucketBetting16(infoset);
+  b[2] = BucketEv10(infoset);
+  return b; 
+}
+
+
+inline std::string BucketJoin19(const std::array<std::string, 19>& b) {
   const std::string meta = b[0] + "." + b[1] + "." + b[2];
   std::string betting = "";
   for (int i = 0; i < 16; ++i) {
@@ -128,9 +153,22 @@ inline std::string BucketMediumJoin(const std::array<std::string, 19>& b) {
   return meta + betting;
 }
 
-std::string BucketLarge(const EvInfoSet& infoset);
-std::string BucketMedium(const EvInfoSet& infoset);
-std::string BucketSmall(const EvInfoSet& infoset);
+
+inline std::string BucketMedium(const EvInfoSet& infoset) {
+  return BucketJoin19(BucketInfoSetMedium(infoset));
+}
+
+inline std::string BucketSmall(const EvInfoSet& infoset) {
+  return BucketSmallJoin(BucketInfoSetSmall(infoset));
+}
+
+inline std::string BucketLarge(const EvInfoSet& infoset) {
+  return BucketJoin19(BucketInfoSetLarge(infoset));
+}
+
+inline std::string Bucket_10_16(const EvInfoSet& infoset) {
+  return BucketJoin19(BucketInfoSet_10_16(infoset));
+}
 
 }
 }

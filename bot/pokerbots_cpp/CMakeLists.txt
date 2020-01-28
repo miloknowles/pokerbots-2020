@@ -86,6 +86,12 @@ if(BUILD_CFR_EXECUTABLES)
   target_link_libraries(cfr_large
     ${Boost_LIBRARIES}
     ${PROJECT_NAME}_cfr)
+
+  add_executable(cfr_10_16
+    cfr_main_10_16.cpp)
+  target_link_libraries(cfr_10_16
+    ${Boost_LIBRARIES}
+    ${PROJECT_NAME}_cfr)
 endif()
 
 # Optionally build the python wrappers.
