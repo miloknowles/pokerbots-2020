@@ -2,6 +2,7 @@
 #include <utility>
 #include <iostream>
 #include <sstream>
+#include <cmath>
 #include <boost/algorithm/string.hpp>
 
 #include "cfr.hpp"
