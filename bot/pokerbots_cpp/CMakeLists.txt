@@ -71,27 +71,33 @@ set_target_properties(${PROJECT_NAME}_player PROPERTIES LINKER_LANGUAGE CXX)
 
 #================= CFR EXECUTABLE =================
 if(BUILD_CFR_EXECUTABLES)
-  add_executable(cfr_small
-    cfr_main_small.cpp)
-  target_link_libraries(cfr_small
-    ${Boost_LIBRARIES}
-    ${PROJECT_NAME}_cfr)
+  # add_executable(cfr_small
+  #   cfr_main_small.cpp)
+  # target_link_libraries(cfr_small
+  #   ${Boost_LIBRARIES}
+  #   ${PROJECT_NAME}_cfr)
 
-  add_executable(cfr_medium
-    cfr_main_medium.cpp)
-  target_link_libraries(cfr_medium
-    ${Boost_LIBRARIES}
-    ${PROJECT_NAME}_cfr)
+  # add_executable(cfr_medium
+  #   cfr_main_medium.cpp)
+  # target_link_libraries(cfr_medium
+  #   ${Boost_LIBRARIES}
+  #   ${PROJECT_NAME}_cfr)
 
-  add_executable(cfr_large
-    cfr_main_large.cpp)
-  target_link_libraries(cfr_large
-    ${Boost_LIBRARIES}
-    ${PROJECT_NAME}_cfr)
+  # add_executable(cfr_large
+  #   cfr_main_large.cpp)
+  # target_link_libraries(cfr_large
+  #   ${Boost_LIBRARIES}
+  #   ${PROJECT_NAME}_cfr)
 
-  add_executable(cfr_10_16
-    cfr_main_10_16.cpp)
-  target_link_libraries(cfr_10_16
+  # add_executable(cfr_10_16
+  #   cfr_main_10_16.cpp)
+  # target_link_libraries(cfr_10_16
+  #   ${Boost_LIBRARIES}
+  #   ${PROJECT_NAME}_cfr)
+
+  add_executable(cfr_kmeans
+    cfr_main_kmeans.cpp)
+  target_link_libraries(cfr_kmeans
     ${Boost_LIBRARIES}
     ${PROJECT_NAME}_cfr)
 endif()

@@ -84,6 +84,34 @@ EvInfoSet MakeInfoSet(const RoundState& round_state, int active_plyr_idx, bool p
   return EvInfoSet(ev, fh, player_is_sb ? 0 : 1, street_0123);
 }
 
+EvInfoSet MakeInfosetKmeans(const RoundState& round_state, int active_plyr_idx, bool player_is_sb) {
+  FixedHistory fh;
+  std::fill(fh.begin(), fh.end(), 0);
+
+  FlexHistory history = round_state.bet_history;
+  assert(history.size() <= 4);
+  for (int street = 0; street < history.size(); ++street) {
+    const std::vector<int>& actions_this_street = history.at(street);
+    const int offset = street * kMaxActionsPerStreet + (street > 0 ? 2 : 0);
+
+    for (int i = 0; i < actions_this_street.size(); ++i) {
+      const int max_this_street = (street > 0) ? kMaxActionsPerStreet : (kMaxActionsPerStreet + 2);
+      const int wrap = std::min(i, max_this_street - 2 + (i % 2));
+      fh.at(offset + wrap) += actions_this_street.at(i);
+    }
+  }
+  const int street_0123 = GetStreet0123(round_state.street);
+  EvInfoSet out(-1.0f, fh, player_is_sb ? 0 : 1, street_0123);
+
+  out.hand = round_state.hands[active_plyr_idx][0] + round_state.hands[active_plyr_idx][1];
+  out.board = "";
+  for (int i = 0; i < round_state.street; ++i) {
+    out.board += round_state.deck[i];
+  }
+
+  return out;
+}
+
 
 PrecomputedEv MakePrecomputedEv(const RoundState& round_state) {
   PrecomputedEv out; // 2x4
@@ -224,8 +252,8 @@ static void FillZeros(ActionValues& values) {
 NodeInfo TraverseCfr(const RoundState& round_state,
                      int traverse_plyr,
                      int sb_plyr_idx,
-                     std::array<RegretMatchedStrategy, 2>& regrets,
-                     std::array<RegretMatchedStrategy, 2>& strategies,
+                     std::array<RegretMatchedStrategyKmeans, 2>& regrets,
+                     std::array<RegretMatchedStrategyKmeans, 2>& strategies,
                      int t,
                      const std::array<double, 2>& reach_probabilities,
                      const PrecomputedEv& precomputed_ev,
@@ -252,8 +280,11 @@ NodeInfo TraverseCfr(const RoundState& round_state,
   const ActionVec actions = actions_and_mask.first;
   const ActionMask mask = actions_and_mask.second;
 
-  const EvInfoSet& infoset = MakeInfoSet(
-      round_state, active_plyr_idx, active_plyr_idx == sb_plyr_idx, precomputed_ev);
+  const EvInfoSet& infoset = MakeInfosetKmeans(
+      round_state, active_plyr_idx, active_plyr_idx == sb_plyr_idx);
+
+  // const EvInfoSet& infoset = MakeInfoSet(
+      // round_state, active_plyr_idx, active_plyr_idx == sb_plyr_idx, precomputed_ev);
 
   std::array<double, 6> action_probs = regrets[active_plyr_idx].GetStrategy(infoset);
   action_probs = ApplyMaskAndUniform(action_probs, mask);

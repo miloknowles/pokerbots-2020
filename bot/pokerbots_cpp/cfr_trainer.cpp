@@ -3,8 +3,8 @@
 namespace pb {
 namespace cfr {
 
-NodeInfo DoCfrIterationForPlayer(std::array<RegretMatchedStrategy, 2>& regrets,
-                             std::array<RegretMatchedStrategy, 2>& strategies,
+NodeInfo DoCfrIterationForPlayer(std::array<RegretMatchedStrategyKmeans, 2>& regrets,
+                             std::array<RegretMatchedStrategyKmeans, 2>& strategies,
                              int t, int traverse_plyr, const Options& opt,
                              bool debug_print) {
   NodeInfo info;

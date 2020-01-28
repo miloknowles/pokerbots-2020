@@ -18,9 +18,13 @@ class RegretMatchedStrategy {
 
   int Size() const { return regrets_.size(); }
 
+  // Pass in an infoset.
   void AddRegret(const EvInfoSet& infoset, const ActionRegrets& r);
-
   ActionRegrets GetStrategy(const EvInfoSet& infoset);
+
+  // Pass in a bucket string.
+  void AddRegret(const std::string& bucket, const ActionRegrets& r);
+  ActionRegrets GetStrategy(const std::string& bucket);
 
   void Save(const std::string& filename);
   void Load(const std::string& filename);
@@ -30,6 +34,24 @@ class RegretMatchedStrategy {
  private:
   std::unordered_map<std::string, ActionRegrets> regrets_;
   BucketFunction bucket_function_ = BucketMedium;
+};
+
+
+class RegretMatchedStrategyKmeans : public RegretMatchedStrategy {
+ public:
+  RegretMatchedStrategyKmeans() : RegretMatchedStrategy(BucketMedium) {
+    centroids_ = LoadOpponentCentroids();
+    buckets_ = LoadOpponentBuckets();
+  }
+
+  RegretMatchedStrategyKmeans(const BucketFunction&) : RegretMatchedStrategy(BucketMedium) {}
+
+  void AddRegret(const EvInfoSet& infoset, const ActionRegrets& r);
+  ActionRegrets GetStrategy(const EvInfoSet& infoset);
+
+ private:
+  Centroids centroids_;
+  OpponentBuckets buckets_;
 };
 
 }

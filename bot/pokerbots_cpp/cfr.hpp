@@ -18,6 +18,7 @@ std::pair<ActionVec, ActionMask> MakeActions(const RoundState& round_state, int 
 EvInfoSet MakeInfoSet(const RoundState& round_state, int active_plyr_idx, bool player_is_sb,
                       PrecomputedEv precomputed_ev);
 
+EvInfoSet MakeInfosetKmeans(const RoundState& round_state, int active_plyr_idx, bool player_is_sb);
 
 inline std::string ConvertCodeToCard(const int code) {
   std::string out = "xx";
@@ -83,8 +84,8 @@ struct NodeInfo {
 NodeInfo TraverseCfr(const RoundState& state,
                      int traverse_plyr,
                      int sb_plyr_idx,
-                     std::array<RegretMatchedStrategy, 2>& regrets,
-                     std::array<RegretMatchedStrategy, 2>& strategies,
+                     std::array<RegretMatchedStrategyKmeans, 2>& regrets,
+                     std::array<RegretMatchedStrategyKmeans, 2>& strategies,
                      int t,
                      const std::array<double, 2>& reach_probabilities,
                      const PrecomputedEv& precomputed_ev,

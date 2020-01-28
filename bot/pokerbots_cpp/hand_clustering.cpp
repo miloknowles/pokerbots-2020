@@ -289,5 +289,47 @@ void Print(const StrengthVector& strength) {
 }
 
 
+std::string BucketHandKmeans(const Centroids& centroids, const OpponentBuckets& buckets,
+                             const std::string& hand, const std::string& board) {
+  const StrengthVector& strength = ComputeStrengthVector(buckets, hand, board);
+
+  float min_dist = std::numeric_limits<float>::max();
+  int min_dist_idx = 0;
+  for (const auto& it : centroids) {
+    const float dist = Distance(strength, centroids.at(it.first));
+    if (dist < min_dist) {
+      min_dist = dist;
+      min_dist_idx = it.first;
+    }
+  }
+
+  return "C" + std::to_string(min_dist_idx);
+}
+
+Centroids LoadOpponentCentroids() {
+  Centroids out;
+
+  std::string line;
+  std::ifstream infile("./cluster_centroids_10.txt");
+
+  while (std::getline(infile, line)) {
+    std::istringstream iss(line);
+    std::vector<std::string> strs;
+    boost::split(strs, line, boost::is_any_of(" "));
+    assert(strs.size() == 9);
+
+    StrengthVector v;
+    for (int i = 1; i < 9; ++i) {
+      v.at(i) = std::stof(strs.at(i));
+    }
+
+    const int id = std::stoi(strs.at(0));
+    out.emplace(id, v);
+  }
+
+  printf("Read in %zu cluster centroids\n", out.size());
+  return out;
+}
+
 }
 }

@@ -14,6 +14,8 @@ typedef std::unordered_map<int, std::vector<int>> Clusters;
 
 OpponentBuckets LoadOpponentBuckets();
 
+Centroids LoadOpponentCentroids();
+
 bool IsPossible(const std::string& hand, const std::string& board, const std::string& key);
 
 StrengthVector ComputeStrengthVector(const OpponentBuckets& buckets, const std::string& hand, const std::string& board);
@@ -30,6 +32,9 @@ std::pair<Centroids, Clusters> kmeans(const std::vector<StrengthVector>& samples
 void WriteCentroids(const Centroids& centroids);
 
 void Print(const StrengthVector& strength);
+
+std::string BucketHandKmeans(const Centroids& centroids, const OpponentBuckets& buckets,
+                             const std::string& hand, const std::string& board);
 
 }
 }

@@ -6,6 +6,7 @@
 #include <cassert>
 
 #include "engine_modified.hpp"
+#include "hand_clustering.hpp"
 
 namespace pb {
 namespace cfr {
@@ -64,6 +65,9 @@ struct EvInfoSet {
   int player_position;          // 0 if player is SB, 1 if BB.
   FixedHistory bet_history_vec;
   int street;                   // 0, 1, 2, 3.
+
+  std::string hand;
+  std::string board;
 };
 
 /*
@@ -116,6 +120,7 @@ std::array<std::string, 19> BucketBetting16(const EvInfoSet& infoset);
 std::string BucketEv5(const EvInfoSet& infoset);
 std::string BucketEv7(const EvInfoSet& infoset);
 std::string BucketEv10(const EvInfoSet& infoset);
+
 
 // 5 EV buckets and 16 betting action slots.
 inline std::array<std::string, 19> BucketInfoSetMedium(const EvInfoSet& infoset) {

@@ -29,8 +29,8 @@ struct Options {
 };
 
 
-NodeInfo DoCfrIterationForPlayer(std::array<RegretMatchedStrategy, 2>& regrets,
-                             std::array<RegretMatchedStrategy, 2>& strategies,
+NodeInfo DoCfrIterationForPlayer(std::array<RegretMatchedStrategyKmeans, 2>& regrets,
+                             std::array<RegretMatchedStrategyKmeans, 2>& strategies,
                              int t, int traverse_plyr, const Options& opt,
                              bool debug_print = false);
 
@@ -46,10 +46,10 @@ class CfrTrainer {
       std::cout << "NOTE: EXPERIMENT_PATH didn't exist, created it" << std::endl;
     }
 
-    regrets_[0] = RegretMatchedStrategy(opt.BUCKET_FUNCTION);
-    regrets_[1] = RegretMatchedStrategy(opt.BUCKET_FUNCTION);
-    strategies_[0] = RegretMatchedStrategy(opt.BUCKET_FUNCTION);
-    strategies_[1] = RegretMatchedStrategy(opt.BUCKET_FUNCTION);
+    regrets_[0] = RegretMatchedStrategyKmeans(opt.BUCKET_FUNCTION);
+    regrets_[1] = RegretMatchedStrategyKmeans(opt.BUCKET_FUNCTION);
+    strategies_[0] = RegretMatchedStrategyKmeans(opt.BUCKET_FUNCTION);
+    strategies_[1] = RegretMatchedStrategyKmeans(opt.BUCKET_FUNCTION);
 
     // Save everything once to have empty files.
     const std::string test_path = opt.EXPERIMENT_PATH + "total_regrets_0.txt";
@@ -143,8 +143,8 @@ class CfrTrainer {
  private:
   Options opt_;
 
-  std::array<RegretMatchedStrategy, 2> regrets_;
-  std::array<RegretMatchedStrategy, 2> strategies_;
+  std::array<RegretMatchedStrategyKmeans, 2> regrets_;
+  std::array<RegretMatchedStrategyKmeans, 2> strategies_;
 };
 
 }

@@ -12,6 +12,16 @@ namespace cfr {
 
 void RegretMatchedStrategy::AddRegret(const EvInfoSet& infoset, const ActionRegrets& r) {
   const std::string bucket = bucket_function_(infoset);
+  AddRegret(bucket, r);
+}
+
+
+ActionRegrets RegretMatchedStrategy::GetStrategy(const EvInfoSet& infoset) {
+  const std::string bucket = bucket_function_(infoset);
+  return GetStrategy(bucket);
+}
+
+void RegretMatchedStrategy::AddRegret(const std::string& bucket, const ActionRegrets& r) {
   if (regrets_.count(bucket) == 0) {
     ActionRegrets zeros = { 0, 0, 0, 0, 0, 0 };
     regrets_.emplace(bucket, zeros);
@@ -26,9 +36,7 @@ void RegretMatchedStrategy::AddRegret(const EvInfoSet& infoset, const ActionRegr
 }
 
 
-ActionRegrets RegretMatchedStrategy::GetStrategy(const EvInfoSet& infoset) {
-  const std::string bucket = bucket_function_(infoset);
-
+ActionRegrets RegretMatchedStrategy::GetStrategy(const std::string& bucket) {
   if (regrets_.count(bucket) == 0) {
     ActionRegrets zeros = { 0, 0, 0, 0, 0, 0 };
     regrets_.emplace(bucket, zeros);
@@ -95,6 +103,23 @@ void RegretMatchedStrategy::Load(const std::string& filename) {
   }
 
   printf("Read in regrets for %zu buckets\n", regrets_.size());
+}
+
+void RegretMatchedStrategyKmeans::AddRegret(const EvInfoSet& infoset, const ActionRegrets& r) {
+  assert(infoset.hand.size() == 2);
+  std::array<std::string, 19> b = BucketBetting16(infoset);
+  b[2] = BucketHandKmeans(centroids_, buckets_, infoset.hand, infoset.board);
+  const std::string bucket = BucketJoin19(b);
+  RegretMatchedStrategy::AddRegret(bucket, r);
+}
+
+
+ActionRegrets RegretMatchedStrategyKmeans::GetStrategy(const EvInfoSet& infoset) {
+  assert(infoset.hand.size() == 2);
+  std::array<std::string, 19> b = BucketBetting16(infoset);
+  b[2] = BucketHandKmeans(centroids_, buckets_, infoset.hand, infoset.board);
+  const std::string bucket = BucketJoin19(b);
+  return RegretMatchedStrategy::GetStrategy(bucket);
 }
 
 }
