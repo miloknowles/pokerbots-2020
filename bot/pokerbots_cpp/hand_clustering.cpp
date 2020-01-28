@@ -3,6 +3,7 @@
 #include <unordered_set>
 #include <array>
 #include <fstream>
+#include <utility>
 #include <iostream>
 #include <sstream>
 #include <boost/algorithm/string.hpp>
@@ -15,6 +16,8 @@ namespace cfr {
 
 typedef std::array<float, 8> StrengthVector;
 typedef std::unordered_map<std::string, int> OpponentBuckets;
+typedef std::unordered_map<int, StrengthVector> Centroids;
+typedef std::unordered_map<int, std::vector<int>> Clusters;
 
 // Load in a map that converts 169 hands to one of 8 clusters.
 OpponentBuckets LoadOpponentBuckets() {
@@ -166,13 +169,159 @@ void Print(const StrengthVector& strength) {
 }
 
 
+// Compute euclidean distance.
+float Distance(const StrengthVector& v1, const StrengthVector& v2) {
+  float total = 0;
+  for (int i = 0; i < v1.size(); ++i) {
+    total += std::pow(v1.at(i) - v2.at(i), 2);
+  }
+  return std::pow(total, 0.5);
+}
+
+StrengthVector Mean(const std::vector<StrengthVector>& samples, const std::vector<int>& indices) {
+  StrengthVector mean;
+  std::fill(mean.begin(), mean.end(), 0);
+
+  for (const int idx : indices) {
+    const StrengthVector to_add = samples.at(idx);
+    for (int i = 0; i < to_add.size(); ++i) {
+      mean.at(i) += to_add.at(i);
+    }
+  }
+
+  for (int i = 0; i < mean.size(); ++i) {
+    mean.at(i) /= static_cast<float>(indices.size());
+  }
+
+  return mean;
+}
+
+
+std::vector<StrengthVector> ReadSamples() {
+  std::vector<StrengthVector> out;
+
+  std::string line;
+  std::ifstream infile("./strength_vector_samples.txt");
+
+  while (std::getline(infile, line)) {
+    std::istringstream iss(line);
+    std::vector<std::string> strs;
+    boost::split(strs, line, boost::is_any_of(" "));
+    assert(strs.size() == 8);
+
+    StrengthVector v;
+    for (int i = 0; i < 8; ++i) {
+      v.at(i) = std::stof(strs.at(i));
+    }
+
+    out.emplace_back(v);
+  }
+
+  printf("Read in %zu samples\n", out.size());
+  return out;
+}
+
+std::pair<Centroids, Clusters> kmeans(const std::vector<StrengthVector>& samples, int num_iters, int num_clusters) {
+  std::unordered_map<int, StrengthVector> mediods;
+  std::unordered_map<int, std::vector<int>> clusters;
+
+  // Make initial centroids.
+  for (int ci = 0; ci < num_clusters; ++ci) {
+    const int random_idx = rand() % samples.size();
+    mediods.emplace(ci, samples.at(random_idx));
+  }
+
+  std::cout << "Made initial centroids" << std::endl;
+
+  bool something_did_move = false;
+
+  for (int iter = 0; iter < num_iters; ++iter) {
+    printf("Doing kmeans iter %d/%d\n", iter, num_iters);
+    something_did_move = false;
+
+    clusters.clear();
+    for (int ci = 0; ci < num_clusters; ++ci) { clusters.emplace(ci, std::vector<int>()); }
+
+    // Assign samples to clusters.
+    for (int si = 0; si < samples.size(); ++si) {
+      const StrengthVector& sv = samples.at(si);
+      float min_dist = std::numeric_limits<float>::max();
+      int min_dist_cluster = 0;
+      for (int ci = 0; ci < mediods.size(); ++ci) {
+        const float dist = Distance(mediods.at(ci), sv);
+        if (dist < min_dist) {
+          min_dist = dist;
+          min_dist_cluster = ci;
+        }
+      }
+
+      clusters.at(min_dist_cluster).emplace_back(si);
+    }
+
+    // Recompute cluster centroids.
+    for (int ci = 0; ci < mediods.size(); ++ci) {
+      const StrengthVector new_mean = Mean(samples, clusters.at(ci));
+
+      // Check if cluster mean changed.
+      if (Distance(new_mean, mediods.at(ci)) > 1e-5) {
+        something_did_move = true;
+      }
+      mediods.at(ci) = new_mean;
+    }
+
+    if (!something_did_move) {
+      std::cout << "Cluster means didn't move, done" << std::endl;
+      break;
+    }
+  }
+
+  return std::make_pair(mediods, clusters);
+}
+
+
+void WriteCentroids(const Centroids& centroids) {
+  std::ofstream out("./cluster_centroids_" + std::to_string(centroids.size()) + ".txt");
+
+  for (const auto& it : centroids) {
+    const int id = it.first;
+    const StrengthVector c = it.second;
+
+    out << id << " ";
+
+    for (int i = 0; i < c.size(); ++i) {
+      out << c[i];
+      if (i < (c.size() - 1)) {
+        out << " ";
+      }
+    }
+    out << std::endl;
+  }
+
+  out.close();
+  std::cout << "Write centroids to disk" << std::endl;
+}
+
+
 }
 }
 
 int main(int argc, char const *argv[]) {
   const auto& key_to_bucket = pb::cfr::LoadOpponentBuckets();
   const pb::cfr::StrengthVector strength = pb::cfr::ComputeStrengthVector(key_to_bucket, "QcQd", "");
-  pb::cfr::GenerateSamples(10000, key_to_bucket);
+  pb::cfr::GenerateSamples(20000, key_to_bucket);
+
+  const auto& samples = pb::cfr::ReadSamples();
+  const auto& result = pb::cfr::kmeans(samples, 1000, 10);
+
+  const pb::cfr::Centroids& centroids = result.first;
+  const pb::cfr::Clusters& clusters = result.second;
+
+  for (int i = 0; i < clusters.size(); ++i) {
+    printf("Cluster %d size = %zu\n", i, clusters.at(i).size());
+    pb::cfr::Print(centroids.at(i));
+  }
+
+  pb::cfr::WriteCentroids(centroids);
 
   return 0;
 }
