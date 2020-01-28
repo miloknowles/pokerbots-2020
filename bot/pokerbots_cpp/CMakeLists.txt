@@ -48,7 +48,9 @@ add_library(${PROJECT_NAME}_cfr SHARED
   cfr.cpp
   cfr.hpp
   cfr_trainer.cpp
-  cfr_trainer.hpp)
+  cfr_trainer.hpp
+  hand_clustering.cpp
+  hand_clustering.hpp)
 target_link_libraries(${PROJECT_NAME}_cfr
   ${CMAKE_CURRENT_SOURCE_DIR}/libpbots_calc.so
   cpp_skeleton
@@ -96,7 +98,7 @@ endif()
 
 
 if(BUILD_CLUSTERING)
-  add_executable(hand_clustering hand_clustering.cpp)
+  add_executable(hand_clustering hand_clustering_main.cpp)
   target_link_libraries(hand_clustering
     ${Boost_LIBRARIES}
     ${PROJECT_NAME}_cfr)

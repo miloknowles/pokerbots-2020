@@ -1,7 +1,3 @@
-#include <string>
-#include <unordered_map>
-#include <unordered_set>
-#include <array>
 #include <fstream>
 #include <utility>
 #include <iostream>
@@ -10,14 +6,10 @@
 
 #include "cfr.hpp"
 #include "pbots_calc.h"
+#include "hand_clustering.hpp"
 
 namespace pb {
 namespace cfr {
-
-typedef std::array<float, 8> StrengthVector;
-typedef std::unordered_map<std::string, int> OpponentBuckets;
-typedef std::unordered_map<int, StrengthVector> Centroids;
-typedef std::unordered_map<int, std::vector<int>> Clusters;
 
 // Load in a map that converts 169 hands to one of 8 clusters.
 OpponentBuckets LoadOpponentBuckets() {
@@ -50,11 +42,6 @@ bool IsPossible(const std::string& hand, const std::string& board, const std::st
   for (int i = 0; i < (board.size() / 2); ++i) {
     dead.emplace(board.substr(2*i, 2));
   }
-  // std::cout << "Dead:" << std::endl;
-  // for (const std::string& s : dead) {
-  //   std::cout << s << " ";
-  // }
-  // std::cout << std::endl;
 
   // CASE 1: Pair of cards ==> need at least two of the remaining.
   if (key.size() == 2) {
@@ -158,14 +145,6 @@ void GenerateSamples(int N, const OpponentBuckets& buckets) {
   }
   out.close();
   std::cout << "Write samples to disk" << std::endl;
-}
-
-
-void Print(const StrengthVector& strength) {
-  for (const float s : strength) {
-    std::cout << s << " ";
-  }
-  std::cout << std::endl;
 }
 
 
@@ -302,26 +281,13 @@ void WriteCentroids(const Centroids& centroids) {
 }
 
 
-}
-}
-
-int main(int argc, char const *argv[]) {
-  const auto& key_to_bucket = pb::cfr::LoadOpponentBuckets();
-  const pb::cfr::StrengthVector strength = pb::cfr::ComputeStrengthVector(key_to_bucket, "QcQd", "");
-  pb::cfr::GenerateSamples(20000, key_to_bucket);
-
-  const auto& samples = pb::cfr::ReadSamples();
-  const auto& result = pb::cfr::kmeans(samples, 1000, 10);
-
-  const pb::cfr::Centroids& centroids = result.first;
-  const pb::cfr::Clusters& clusters = result.second;
-
-  for (int i = 0; i < clusters.size(); ++i) {
-    printf("Cluster %d size = %zu\n", i, clusters.at(i).size());
-    pb::cfr::Print(centroids.at(i));
+void Print(const StrengthVector& strength) {
+  for (const float s : strength) {
+    std::cout << s << " ";
   }
+  std::cout << std::endl;
+}
 
-  pb::cfr::WriteCentroids(centroids);
 
-  return 0;
+}
 }
