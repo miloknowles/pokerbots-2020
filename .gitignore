@@ -9,3 +9,4 @@ build/
 *.zip
 cfr/
 avg_strategy.txt
+_avg_strategy_medium.txt
