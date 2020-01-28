@@ -94,6 +94,20 @@ if(BUILD_CFR_EXECUTABLES)
     ${PROJECT_NAME}_cfr)
 endif()
 
+
+if(BUILD_CLUSTERING)
+  add_executable(hand_clustering hand_clustering.cpp)
+  target_link_libraries(hand_clustering
+    ${Boost_LIBRARIES}
+    ${PROJECT_NAME}_cfr)
+  
+  add_custom_command(
+    TARGET hand_clustering POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy
+            ${CMAKE_CURRENT_SOURCE_DIR}/opponent_clusters.txt
+            ${CMAKE_CURRENT_BINARY_DIR}/opponent_clusters.txt)
+endif()
+
 # Optionally build the python wrappers.
 # if (BUILD_PYTHON_WRAPPER)
 #   message(STATUS "BUILD_PYTHON_WRAPPER is ON, building the wrappers")
