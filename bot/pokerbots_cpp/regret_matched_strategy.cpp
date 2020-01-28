@@ -106,18 +106,26 @@ void RegretMatchedStrategy::Load(const std::string& filename) {
 }
 
 void RegretMatchedStrategyKmeans::AddRegret(const EvInfoSet& infoset, const ActionRegrets& r) {
-  assert(infoset.hand.size() == 4);
+  // for (const auto& it : centroids_) {
+  //   Print(it.second);
+  // }
+  // assert(infoset.hand.size() == 4);
   std::array<std::string, 19> b = BucketBetting16(infoset);
-  b[2] = BucketHandKmeans(centroids_, buckets_, infoset.hand, infoset.board);
+  // b[2] = BucketHandKmeans(centroids_, buckets_, infoset.hand, infoset.board);
+  b[2] = BucketHandKmeans(centroids_, buckets_, infoset.strength_vector);
   const std::string bucket = BucketJoin19(b);
   RegretMatchedStrategy::AddRegret(bucket, r);
 }
 
 
 ActionRegrets RegretMatchedStrategyKmeans::GetStrategy(const EvInfoSet& infoset) {
-  assert(infoset.hand.size() == 4);
+  // for (const auto& it : centroids_) {
+  //   Print(it.second);
+  // }
+  // assert(infoset.hand.size() == 4);
   std::array<std::string, 19> b = BucketBetting16(infoset);
-  b[2] = BucketHandKmeans(centroids_, buckets_, infoset.hand, infoset.board);
+  // b[2] = BucketHandKmeans(centroids_, buckets_, infoset.hand, infoset.board);
+  b[2] = BucketHandKmeans(centroids_, buckets_, infoset.strength_vector);
   const std::string bucket = BucketJoin19(b);
   return RegretMatchedStrategy::GetStrategy(bucket);
 }

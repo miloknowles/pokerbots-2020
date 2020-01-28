@@ -3,7 +3,7 @@
 namespace pb {
 namespace cfr {
 
-NodeInfo DoCfrIterationForPlayer(std::array<RegretMatchedStrategyKmeans, 2>& regrets,
+NodeInfo CfrTrainer::DoCfrIterationForPlayer(std::array<RegretMatchedStrategyKmeans, 2>& regrets,
                              std::array<RegretMatchedStrategyKmeans, 2>& strategies,
                              int t, int traverse_plyr, const Options& opt,
                              bool debug_print) {
@@ -14,7 +14,8 @@ NodeInfo DoCfrIterationForPlayer(std::array<RegretMatchedStrategyKmeans, 2>& reg
     RoundState round_state = CreateNewRound(sb_plyr_idx);
 
     std::array<double, 2> reach_probabilities = { 1.0, 1.0 };
-    PrecomputedEv precomputed_ev = MakePrecomputedEv(round_state);
+    // PrecomputedEv precomputed_ev = MakePrecomputedEv(round_state);
+    PrecomputedKmeansEv precomputed_ev = MakePrecomputedKmeansEv(round_state, buckets_);
 
     int rctr = 0;
 

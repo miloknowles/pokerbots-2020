@@ -29,12 +29,6 @@ struct Options {
 };
 
 
-NodeInfo DoCfrIterationForPlayer(std::array<RegretMatchedStrategyKmeans, 2>& regrets,
-                             std::array<RegretMatchedStrategyKmeans, 2>& strategies,
-                             int t, int traverse_plyr, const Options& opt,
-                             bool debug_print = false);
-
-
 class CfrTrainer {
  public:
   CfrTrainer(const Options& opt) : opt_(opt) {
@@ -110,7 +104,8 @@ class CfrTrainer {
       const int sb_plyr_idx = k % 2;
       RoundState round_state = CreateNewRound(sb_plyr_idx);
       std::array<double, 2> reach_probabilities = { 1.0, 1.0 };
-      PrecomputedEv precomputed_ev = MakePrecomputedEv(round_state);
+      // PrecomputedEv precomputed_ev = MakePrecomputedEv(round_state);
+      PrecomputedKmeansEv precomputed_ev = MakePrecomputedKmeansEv(round_state, buckets_);
       int rctr = 0;
 
       // Don't allow updates, no external sampling, skip unreachable actions.
@@ -140,11 +135,18 @@ class CfrTrainer {
     AppendToLog(line);
   }
 
+  NodeInfo DoCfrIterationForPlayer(std::array<RegretMatchedStrategyKmeans, 2>& regrets,
+                             std::array<RegretMatchedStrategyKmeans, 2>& strategies,
+                             int t, int traverse_plyr, const Options& opt,
+                             bool debug_print = false);
+
  private:
   Options opt_;
 
   std::array<RegretMatchedStrategyKmeans, 2> regrets_;
   std::array<RegretMatchedStrategyKmeans, 2> strategies_;
+
+  OpponentBuckets buckets_ = LoadOpponentBuckets();
 };
 
 }

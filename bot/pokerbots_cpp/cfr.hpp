@@ -18,7 +18,8 @@ std::pair<ActionVec, ActionMask> MakeActions(const RoundState& round_state, int 
 EvInfoSet MakeInfoSet(const RoundState& round_state, int active_plyr_idx, bool player_is_sb,
                       PrecomputedEv precomputed_ev);
 
-EvInfoSet MakeInfosetKmeans(const RoundState& round_state, int active_plyr_idx, bool player_is_sb);
+EvInfoSet MakeInfosetKmeans(const RoundState& round_state, int active_plyr_idx, bool player_is_sb,
+                            const PrecomputedKmeansEv& precomputed_ev);
 
 inline std::string ConvertCodeToCard(const int code) {
   std::string out = "xx";
@@ -34,6 +35,9 @@ ActionRegrets ApplyMaskAndUniform(const ActionRegrets& p, const ActionMask& mask
 
 
 PrecomputedEv MakePrecomputedEv(const RoundState& round_state);
+
+
+PrecomputedKmeansEv MakePrecomputedKmeansEv(const RoundState& round_state, const OpponentBuckets& buckets);
 
 
 inline float PbotsCalcEquity(
@@ -88,7 +92,7 @@ NodeInfo TraverseCfr(const RoundState& state,
                      std::array<RegretMatchedStrategyKmeans, 2>& strategies,
                      int t,
                      const std::array<double, 2>& reach_probabilities,
-                     const PrecomputedEv& precomputed_ev,
+                     const PrecomputedKmeansEv& precomputed_ev,
                      int* rctr,
                      bool allow_updates = true,
                      bool do_external_sampling = false,

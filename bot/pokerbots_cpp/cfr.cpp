@@ -84,7 +84,8 @@ EvInfoSet MakeInfoSet(const RoundState& round_state, int active_plyr_idx, bool p
   return EvInfoSet(ev, fh, player_is_sb ? 0 : 1, street_0123);
 }
 
-EvInfoSet MakeInfosetKmeans(const RoundState& round_state, int active_plyr_idx, bool player_is_sb) {
+EvInfoSet MakeInfosetKmeans(const RoundState& round_state, int active_plyr_idx, bool player_is_sb,
+                            const PrecomputedKmeansEv& precomputed_ev) {
   FixedHistory fh;
   std::fill(fh.begin(), fh.end(), 0);
 
@@ -103,11 +104,12 @@ EvInfoSet MakeInfosetKmeans(const RoundState& round_state, int active_plyr_idx, 
   const int street_0123 = GetStreet0123(round_state.street);
   EvInfoSet out(-1.0f, fh, player_is_sb ? 0 : 1, street_0123);
 
-  out.hand = round_state.hands[active_plyr_idx][0] + round_state.hands[active_plyr_idx][1];
-  out.board = "";
-  for (int i = 0; i < round_state.street; ++i) {
-    out.board += round_state.deck[i];
-  }
+  // out.hand = round_state.hands[active_plyr_idx][0] + round_state.hands[active_plyr_idx][1];
+  // out.board = "";
+  // for (int i = 0; i < round_state.street; ++i) {
+  //   out.board += round_state.deck[i];
+  // }
+  out.strength_vector = precomputed_ev.at(active_plyr_idx).at(street_0123);
 
   return out;
 }
@@ -146,6 +148,29 @@ PrecomputedEv MakePrecomputedEv(const RoundState& round_state) {
     const float ev2 = PbotsCalcEquity(h2 + ":xx", board, "", iters);
     out[0][s] = ev1;
     out[1][s] = ev2;
+  }
+
+  return out;
+}
+
+PrecomputedKmeansEv MakePrecomputedKmeansEv(const RoundState& round_state, const OpponentBuckets& buckets) {
+  PrecomputedKmeansEv out;
+
+  const std::string h1 = round_state.hands[0][0] + round_state.hands[0][1];
+  const std::string h2 = round_state.hands[1][0] + round_state.hands[1][1];
+
+  for (int s = 0; s < 4; ++s) {
+    std::string board = "";
+    if (s == 1) {
+      board += round_state.deck[0] + round_state.deck[1] + round_state.deck[2];
+    } else if (s == 2) {
+      board += round_state.deck[0] + round_state.deck[1] + round_state.deck[2] + round_state.deck[3];
+    } else if (s == 3) {
+      board += round_state.deck[0] + round_state.deck[1] + round_state.deck[2] + round_state.deck[3] + round_state.deck[4];
+    }
+
+    out[0][s] = ComputeStrengthVector(buckets, h1, board);
+    out[1][s] = ComputeStrengthVector(buckets, h2, board);
   }
 
   return out;
@@ -256,7 +281,7 @@ NodeInfo TraverseCfr(const RoundState& round_state,
                      std::array<RegretMatchedStrategyKmeans, 2>& strategies,
                      int t,
                      const std::array<double, 2>& reach_probabilities,
-                     const PrecomputedEv& precomputed_ev,
+                     const PrecomputedKmeansEv& precomputed_ev,
                      int* rctr,
                      bool allow_updates,
                      bool do_external_sampling,
@@ -281,7 +306,7 @@ NodeInfo TraverseCfr(const RoundState& round_state,
   const ActionMask mask = actions_and_mask.second;
 
   const EvInfoSet& infoset = MakeInfosetKmeans(
-      round_state, active_plyr_idx, active_plyr_idx == sb_plyr_idx);
+      round_state, active_plyr_idx, active_plyr_idx == sb_plyr_idx, precomputed_ev);
 
   // const EvInfoSet& infoset = MakeInfoSet(
       // round_state, active_plyr_idx, active_plyr_idx == sb_plyr_idx, precomputed_ev);

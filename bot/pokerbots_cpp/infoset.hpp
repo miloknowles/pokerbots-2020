@@ -22,6 +22,8 @@ typedef std::array<int, 6> ActionMask;
 typedef std::array<double, 6> ActionRegrets;
 typedef std::array<std::array<double, 2>, 6> ActionValues;
 
+typedef std::array<std::array<StrengthVector, 4>, 2> PrecomputedKmeansEv;
+
 
 inline void PrintRegrets(const ActionRegrets& r) {
   for (int i = 0; i < r.size(); ++i) {
@@ -68,6 +70,8 @@ struct EvInfoSet {
 
   std::string hand;
   std::string board;
+
+  StrengthVector strength_vector;
 };
 
 /*

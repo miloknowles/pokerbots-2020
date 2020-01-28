@@ -292,8 +292,15 @@ void Print(const StrengthVector& strength) {
 
 std::string BucketHandKmeans(const Centroids& centroids, const OpponentBuckets& buckets,
                              const std::string& hand, const std::string& board) {
+  assert(centroids.size() > 0);
   const StrengthVector& strength = ComputeStrengthVector(buckets, hand, board);
+  return BucketHandKmeans(centroids, buckets, strength);
+}
 
+
+std::string BucketHandKmeans(const Centroids& centroids, const OpponentBuckets& buckets,
+                             const StrengthVector& strength) {
+  assert(centroids.size() > 0);
   float min_dist = std::numeric_limits<float>::max();
   int min_dist_idx = 0;
   for (const auto& it : centroids) {
@@ -306,6 +313,7 @@ std::string BucketHandKmeans(const Centroids& centroids, const OpponentBuckets& 
 
   return "C" + std::to_string(min_dist_idx);
 }
+
 
 Centroids LoadOpponentCentroids() {
   std::cout << "Loading opponent centroids" << std::endl;

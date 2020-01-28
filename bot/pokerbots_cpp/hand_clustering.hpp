@@ -36,5 +36,8 @@ void Print(const StrengthVector& strength);
 std::string BucketHandKmeans(const Centroids& centroids, const OpponentBuckets& buckets,
                              const std::string& hand, const std::string& board);
 
+std::string BucketHandKmeans(const Centroids& centroids, const OpponentBuckets& buckets,
+                             const StrengthVector& strength);
+
 }
 }
