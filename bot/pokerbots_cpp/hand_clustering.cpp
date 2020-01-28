@@ -13,6 +13,7 @@ namespace cfr {
 
 // Load in a map that converts 169 hands to one of 8 clusters.
 OpponentBuckets LoadOpponentBuckets() {
+  std::cout << "Loading opponent buckets" << std::endl;
   OpponentBuckets out;
 
   std::string line;
@@ -307,6 +308,7 @@ std::string BucketHandKmeans(const Centroids& centroids, const OpponentBuckets& 
 }
 
 Centroids LoadOpponentCentroids() {
+  std::cout << "Loading opponent centroids" << std::endl;
   Centroids out;
 
   std::string line;
@@ -320,7 +322,7 @@ Centroids LoadOpponentCentroids() {
 
     StrengthVector v;
     for (int i = 1; i < 9; ++i) {
-      v.at(i) = std::stof(strs.at(i));
+      v.at(i-1) = std::stof(strs.at(i));
     }
 
     const int id = std::stoi(strs.at(0));

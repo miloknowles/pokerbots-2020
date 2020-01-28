@@ -106,7 +106,7 @@ void RegretMatchedStrategy::Load(const std::string& filename) {
 }
 
 void RegretMatchedStrategyKmeans::AddRegret(const EvInfoSet& infoset, const ActionRegrets& r) {
-  assert(infoset.hand.size() == 2);
+  assert(infoset.hand.size() == 4);
   std::array<std::string, 19> b = BucketBetting16(infoset);
   b[2] = BucketHandKmeans(centroids_, buckets_, infoset.hand, infoset.board);
   const std::string bucket = BucketJoin19(b);
@@ -115,7 +115,7 @@ void RegretMatchedStrategyKmeans::AddRegret(const EvInfoSet& infoset, const Acti
 
 
 ActionRegrets RegretMatchedStrategyKmeans::GetStrategy(const EvInfoSet& infoset) {
-  assert(infoset.hand.size() == 2);
+  assert(infoset.hand.size() == 4);
   std::array<std::string, 19> b = BucketBetting16(infoset);
   b[2] = BucketHandKmeans(centroids_, buckets_, infoset.hand, infoset.board);
   const std::string bucket = BucketJoin19(b);

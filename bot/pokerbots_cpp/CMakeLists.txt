@@ -100,6 +100,18 @@ if(BUILD_CFR_EXECUTABLES)
   target_link_libraries(cfr_kmeans
     ${Boost_LIBRARIES}
     ${PROJECT_NAME}_cfr)
+
+  add_custom_command(
+    TARGET cfr_kmeans POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy
+            ${CMAKE_CURRENT_SOURCE_DIR}/opponent_clusters.txt
+            ${CMAKE_CURRENT_BINARY_DIR}/opponent_clusters.txt)
+  
+  add_custom_command(
+    TARGET cfr_kmeans POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy
+            ${CMAKE_CURRENT_SOURCE_DIR}/cluster_centroids_10.txt
+            ${CMAKE_CURRENT_BINARY_DIR}/cluster_centroids_10.txt)
 endif()
 
 

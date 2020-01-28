@@ -42,6 +42,9 @@ class RegretMatchedStrategyKmeans : public RegretMatchedStrategy {
   RegretMatchedStrategyKmeans() : RegretMatchedStrategy(BucketMedium) {
     centroids_ = LoadOpponentCentroids();
     buckets_ = LoadOpponentBuckets();
+
+    printf("Loaded %zu centroids\n", centroids_.size());
+    printf("Loaded %zu opponent buckets\n", buckets_.size());
   }
 
   RegretMatchedStrategyKmeans(const BucketFunction&) : RegretMatchedStrategy(BucketMedium) {}
