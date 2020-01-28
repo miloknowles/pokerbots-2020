@@ -31,11 +31,6 @@ class CfrPlayer : public Bot {
       {0, 1}, {3, 2000}, {4, 2000}, {5, 1326}
     };
 
-    // Reduce EV a little bit when particle filter hasn't converged.
-    // std::unordered_map<int, float> ev_knockdowns_ = {
-    //   {500, 0.05}, {10000, 0.1}
-    // };
-
     int num_showdowns_seen_ = 0;
     int num_showdowns_converge_ = 50;
 
