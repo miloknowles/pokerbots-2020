@@ -262,6 +262,7 @@ Action CfrPlayer::get_action(GameState* game_state, RoundState* round_state, int
   // Do bucketing and regret matching to get an action.
   const cfr::EvInfoSet infoset = MakeInfoSet(history_, 0, is_small_blind_, EV, street);
   const std::string key = bucket_function_(infoset);
+  std::cout << key << std::endl;
 
   // If CFR never encountered this situation, revert to backup logic.
   if (!strategy_.HasBucket(key)) {

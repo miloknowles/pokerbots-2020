@@ -232,6 +232,9 @@ std::string BucketEv7(const EvInfoSet& infoset) {
     return "H8";
   } else if (infoset.ev < 0.9) {
     return "H9";
+  } else {
+    // NOTE: This is a bug, but should still function as intended... x just means H10.
+    return "x";
   }
 }
 
