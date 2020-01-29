@@ -131,5 +131,12 @@ bool RegretMatchedStrategyKmeans::HasBucket(const EvInfoSet& infoset) {
   return RegretMatchedStrategy::HasBucket(bucket);
 }
 
+std::string RegretMatchedStrategyKmeans::GetBucket(const EvInfoSet& infoset) {
+  std::array<std::string, 19> b = BucketBetting16(infoset);
+  b[2] = BucketHandKmeans(centroids_, buckets_, infoset.strength_vector);
+  const std::string bucket = BucketJoin19(b);
+  return bucket;
+}
+
 }
 }

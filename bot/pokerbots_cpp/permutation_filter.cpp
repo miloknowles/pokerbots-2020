@@ -470,6 +470,7 @@ cfr::StrengthVector PermutationFilter::ComputeStrengthRandom(const std::string& 
                                                               const cfr::OpponentBuckets& buckets) {
   Timer timer;
   cfr::StrengthVector strength;
+  std::fill(strength.begin(), strength.end(), 0);
 
   // Get indices of nonzero particles.
   std::vector<int> valid_idx;

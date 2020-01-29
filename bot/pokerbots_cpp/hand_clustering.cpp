@@ -84,6 +84,7 @@ StrengthVector ComputeStrengthVector(const OpponentBuckets& buckets, const std::
   StrengthVector strength;
   StrengthVector totals;
   std::fill(strength.begin(), strength.end(), 0);
+  std::fill(totals.begin(), totals.end(), 0);
 
   for (const auto& it : buckets) {
     std::string key = it.first;
@@ -103,7 +104,9 @@ StrengthVector ComputeStrengthVector(const OpponentBuckets& buckets, const std::
   }
 
   for (int i = 0; i < strength.size(); ++i) {
-    strength[i] /= totals[i];
+    if (totals[i] > 0) {
+      strength[i] /= totals[i];
+    }
   }
 
   return strength;

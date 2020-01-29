@@ -243,7 +243,7 @@ Action CfrPlayer::get_action(GameState* game_state, RoundState* round_state, int
     const std::string hand = my_cards[0] + my_cards[1];
 
     const cfr::StrengthVector& strength = pf_.ComputeStrengthRandom(hand, board_str, "", nsamples, buckets_);
-    street_strengths_.at(street) = strength;
+    street_strengths_.emplace(street, strength);
   }
 
   const cfr::StrengthVector& strength_this_street = street_strengths_.at(street);
@@ -256,6 +256,9 @@ Action CfrPlayer::get_action(GameState* game_state, RoundState* round_state, int
   // Do bucketing and regret matching to get an action.
   cfr::EvInfoSet infoset = MakeInfoSet(history_, 0, is_small_blind_, -1, street);
   infoset.strength_vector = strength_this_street;
+
+  const std::string bucket_string = strategy_.GetBucket(infoset);
+  std::cout << "BUCKET: " << bucket_string << std::endl;
 
   // If CFR never encountered this situation, revert to backup logic.
   if (!strategy_.HasBucket(infoset)) {

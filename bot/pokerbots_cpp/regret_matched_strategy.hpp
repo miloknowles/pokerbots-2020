@@ -58,6 +58,8 @@ class RegretMatchedStrategyKmeans : public RegretMatchedStrategy {
 
   bool HasBucket(const EvInfoSet& infoset);
 
+  std::string GetBucket(const EvInfoSet& infoset);
+
  private:
   Centroids centroids_;
   OpponentBuckets buckets_;
