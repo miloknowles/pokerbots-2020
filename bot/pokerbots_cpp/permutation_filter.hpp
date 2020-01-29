@@ -241,6 +241,14 @@ class PermutationFilter {
                         const int nsamples,
                         const int iters);
 
+  float ComputeEvRandom(const std::string& hand,
+                        const std::string& board,
+                        const std::string& dead,
+                        const int iters,
+                        const std::vector<Permutation>& sampled_perms);
+
+  std::vector<Permutation> SampleValid(int nsamples);
+
   void MaybeAddUnique(const Permutation& p) {
     std::string hash = "";
     for (int i = 0; i < p.size(); ++i) {

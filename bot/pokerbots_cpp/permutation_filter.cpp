@@ -447,4 +447,55 @@ float PermutationFilter::ComputeEvRandom(const std::string& hand,
   return (ev / static_cast<float>(nsamples));
 }
 
+std::vector<Permutation> PermutationFilter::SampleValid(int nsamples) {
+  std::vector<Permutation> out;
+
+  // Get indices of nonzero particles.
+  std::vector<int> valid_idx;
+  for (int i = 0; i < weights_.size(); ++i) {
+    if (weights_[i] > 0) { valid_idx.emplace_back(i); }
+  }
+  if (valid_idx.size() < nsamples) {
+    std::cout << "WARNING: not enough valid particles to sample" << std::endl;
+    return out;
+  }
+
+  std::uniform_int_distribution<> sampler(0, valid_idx.size()-1);
+
+  for (int si = 0; si < nsamples; ++si) {
+    const int unif_int = sampler(gen_);
+    const int rand_idx = valid_idx.at(unif_int);
+    const Permutation& perm = particles_.at(rand_idx);
+    out.emplace_back(perm);
+  }
+
+  return out;
+}
+
+float PermutationFilter::ComputeEvRandom(const std::string& hand,
+                      const std::string& board,
+                      const std::string& dead,
+                      const int iters,
+                      const std::vector<Permutation>& sampled_perms) {
+  Timer timer;
+  float ev = 0;
+
+  for (int si = 0; si < sampled_perms.size(); ++si) {
+    const Permutation& perm = sampled_perms.at(si);
+    const std::string& board_m = MapToTrueStrings(perm, board);
+
+    // For preflop, use lookup table.
+    if (board_m.size() == 0) {
+      ev += preflop_ev_.at(MapToTrueStrings(perm, hand));
+    } else {
+      const std::string& query_m = MapToTrueStrings(perm, hand) + ":xx";
+      const std::string& dead_m = MapToTrueStrings(perm, dead);
+      ev += PbotsCalcEquity(query_m, board_m, dead_m, iters);
+    }
+  }
+
+  UpdateProfile("ComputeEvRandom2", timer.Elapsed());
+  return (ev / static_cast<float>(sampled_perms.size()));
+}
+
 } // namespace pb

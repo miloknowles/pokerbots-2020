@@ -110,6 +110,7 @@ void CfrPlayer::handle_new_round(GameState* game_state, RoundState* round_state,
   printf("*** Big blind: %d\n", big_blind);
 
   street_ev_.clear();
+  sampled_perms_.clear();
   current_street_ = -1;
   history_ = HistoryTracker(big_blind);
 }
@@ -233,17 +234,23 @@ Action CfrPlayer::get_action(GameState* game_state, RoundState* round_state, int
 
   // If EV hasn't been computed for this street, do it here.
   if (street_ev_.count(street) == 0) {
+    // Sample new permutations for this street.
+    sampled_perms_ = pf_.SampleValid(did_converge ? 1 : compute_ev_samples_);
+
     std::string board_str;
     for (int i = 0; i < street; ++i) {
       board_str += board_cards[i];
     }
+
     // If converged, only sample ONE permutation.
-    int nsamples = compute_ev_samples_;
-    if (did_converge || street == 0) {
-      nsamples = 1;
-    }
+    int nsamples = did_converge ? 1 : compute_ev_samples_;
+    // if (did_converge || street == 0) {
+    //   nsamples = 1;
+    // }
+    assert(sampled_perms_.size() > 0);
+
     const float ev_this_street = pf_.ComputeEvRandom(
-        my_cards[0] + my_cards[1], board_str, "", nsamples, compute_ev_iters_.at(street));
+        my_cards[0] + my_cards[1], board_str, "", compute_ev_iters_.at(street), sampled_perms_);
 
     street_ev_[street] = ev_this_street;
   }

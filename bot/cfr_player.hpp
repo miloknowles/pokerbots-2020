@@ -42,6 +42,7 @@ class CfrPlayer : public Bot {
 
     // Keep track of some info for betting.
     std::unordered_map<int, float> street_ev_{};
+    std::vector<Permutation> sampled_perms_;
 
     std::random_device rd_{};
     std::mt19937 gen_{rd_()};
