@@ -306,7 +306,7 @@ NodeInfo TraverseCfr(const RoundState& round_state,
   if (allow_updates && active_plyr_idx == traverse_plyr) {
     const double counterfactual = reach_probabilities[inactive_plyr_idx];
     const double total_reach = reach_probabilities[0] * reach_probabilities[1];
-    strategies[active_plyr_idx].AddRegret(infoset, Multiply(action_probs, total_reach));
+    strategies[active_plyr_idx].AddRegret(infoset, Multiply(action_probs, static_cast<double>(t + 1 + 50) * total_reach));
     regrets[active_plyr_idx].AddRegret(infoset, Multiply(immediate_regrets, counterfactual));
   }
 
