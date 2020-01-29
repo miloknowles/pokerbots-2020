@@ -1,7 +1,7 @@
 # Needed to find pyconfig.h
 add_compile_options(-std=c++11)
 
-find_package(Boost REQUIRED COMPONENTS system program_options filesystem)
+# find_package(Boost REQUIRED COMPONENTS system program_options filesystem)
 include_directories(/usr/include/python3.5/)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/OMPEval/)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../cpp_skeleton)
@@ -34,37 +34,36 @@ add_library(cpp_skeleton
   ../cpp_skeleton/bot.hpp
   ../cpp_skeleton/runner.cpp
   ../cpp_skeleton/states.cpp)
-target_link_libraries(cpp_skeleton ${Boost_LIBRARIES})
+target_link_libraries(cpp_skeleton boost_filesystem boost_system boost_program_options) # ${Boost_LIBRARIES})
 set_target_properties(cpp_skeleton PROPERTIES LINKER_LANGUAGE CXX)
 
 #================ CFR LIBRARY =====================
 add_library(${PROJECT_NAME}_cfr SHARED
   infoset.cpp
-  # infoset.hpp
+  infoset.hpp
   regret_matched_strategy.cpp
-  # regret_matched_strategy.hpp
+  regret_matched_strategy.hpp
   engine_modified.cpp
-  # engine_modified.hpp
+  engine_modified.hpp
   cfr.cpp)
-  # cfr.hpp)
-  # cfr_trainer.cpp
-  # cfr_trainer.hpp)
 target_link_libraries(${PROJECT_NAME}_cfr
   ${CMAKE_CURRENT_SOURCE_DIR}/libpbots_calc.so
   cpp_skeleton
-  ${Boost_LIBRARIES}
+  boost_filesystem
+  boost_program_options
   omp)
 set_target_properties(${PROJECT_NAME}_cfr PROPERTIES LINKER_LANGUAGE CXX)
 
 #================= PLAYER LIBRARY ==================
 add_library(${PROJECT_NAME}_player SHARED
   permutation_filter.cpp
-  # permutation_filter.hpp
-  history_tracker.cpp)
-  # history_tracker.hpp)
+  permutation_filter.hpp
+  history_tracker.cpp
+  history_tracker.hpp)
 target_link_libraries(${PROJECT_NAME}_player
   omp
-  ${Boost_LIBRARIES}
+  boost_filesystem
+  boost_program_options
   ${CMAKE_CURRENT_SOURCE_DIR}/libpbots_calc.so)
 set_target_properties(${PROJECT_NAME}_player PROPERTIES LINKER_LANGUAGE CXX)
 
@@ -75,7 +74,8 @@ if(BUILD_CFR_EXECUTABLES)
     cfr_trainer.hpp
     cfr_main_small.cpp)
   target_link_libraries(cfr_small
-    ${Boost_LIBRARIES}
+    boost_filesystem
+    boost_program_options
     ${PROJECT_NAME}_cfr)
 
   add_executable(cfr_medium
@@ -83,7 +83,8 @@ if(BUILD_CFR_EXECUTABLES)
     cfr_trainer.hpp
     cfr_main_medium.cpp)
   target_link_libraries(cfr_medium
-    ${Boost_LIBRARIES}
+    boost_filesystem
+    boost_program_options
     ${PROJECT_NAME}_cfr)
 
   add_executable(cfr_large
@@ -91,7 +92,8 @@ if(BUILD_CFR_EXECUTABLES)
     cfr_trainer.hpp
     cfr_main_large.cpp)
   target_link_libraries(cfr_large
-    ${Boost_LIBRARIES}
+    boost_filesystem
+    boost_program_options
     ${PROJECT_NAME}_cfr)
 
   add_executable(cfr_10_16
@@ -99,7 +101,8 @@ if(BUILD_CFR_EXECUTABLES)
     cfr_trainer.hpp
     cfr_main_10_16.cpp)
   target_link_libraries(cfr_10_16
-    ${Boost_LIBRARIES}
+    boost_filesystem
+    boost_program_options
     ${PROJECT_NAME}_cfr)
 endif()
 
@@ -110,7 +113,8 @@ if(BUILD_CLUSTERING)
     hand_clustering.hpp
     hand_clustering_main.cpp)
   target_link_libraries(hand_clustering
-    ${Boost_LIBRARIES}
+    boost_filesystem
+    boost_program_options
     ${PROJECT_NAME}_cfr)
   
   add_custom_command(
