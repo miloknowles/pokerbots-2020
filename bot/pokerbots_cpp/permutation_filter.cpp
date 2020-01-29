@@ -305,7 +305,7 @@ void PermutationFilter::Update(const ShowdownResult& r) {
 
   // const int num_invalid_retries = std::min(5, static_cast<int>(5 * N_ / nonzero));
   const int num_invalid_retries = 5;
-  const int num_valid_retries = 1;
+  const int num_valid_retries = 2;
 
   for (int i = 0; i < particles_.size(); ++i) {
     // Skip particles that have zero weight (dead).

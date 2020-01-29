@@ -47,7 +47,8 @@ class CfrPlayer : public Bot {
     std::mt19937 gen_{rd_()};
     std::uniform_real_distribution<> real_{0, 1};
 
-    cfr::BucketFunction bucket_function_ = cfr::BucketLarge;
+    cfr::BucketFunction bucket_function_ = cfr::Bucket_10_16;
+    // cfr::BucketFunction bucket_function_ = cfr::BucketLarge;
     // cfr::BucketFunction bucket_function_ = cfr::BucketMedium;
     cfr::RegretMatchedStrategy strategy_{bucket_function_};
 
