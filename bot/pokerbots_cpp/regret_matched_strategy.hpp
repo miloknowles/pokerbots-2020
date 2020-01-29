@@ -56,6 +56,8 @@ class RegretMatchedStrategyKmeans : public RegretMatchedStrategy {
   void AddRegret(const EvInfoSet& infoset, const ActionRegrets& r);
   ActionRegrets GetStrategy(const EvInfoSet& infoset);
 
+  bool HasBucket(const EvInfoSet& infoset);
+
  private:
   Centroids centroids_;
   OpponentBuckets buckets_;

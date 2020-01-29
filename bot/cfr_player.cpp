@@ -109,7 +109,8 @@ void CfrPlayer::handle_new_round(GameState* game_state, RoundState* round_state,
   std::cout << "*** TIME REMAINING: " << game_clock << std::endl;
   printf("*** Big blind: %d\n", big_blind);
 
-  street_ev_.clear();
+  // street_ev_.clear();
+  street_strengths_.clear();
   current_street_ = -1;
   history_ = HistoryTracker(big_blind);
 }
@@ -232,41 +233,44 @@ Action CfrPlayer::get_action(GameState* game_state, RoundState* round_state, int
   printf("[GETACTION] CONVERGED=%d (unique=%d)\n", did_converge, pf_.Unique());
 
   // If EV hasn't been computed for this street, do it here.
-  if (street_ev_.count(street) == 0) {
+  if (street_strengths_.count(street) == 0) {
     std::string board_str;
     for (int i = 0; i < street; ++i) {
       board_str += board_cards[i];
     }
     // If converged, only sample ONE permutation.
     const int nsamples = did_converge ? 1 : compute_ev_samples_;
-    const float ev_this_street = pf_.ComputeEvRandom(
-        my_cards[0] + my_cards[1], board_str, "", nsamples, compute_ev_iters_.at(street));
-    
-    // if (pf_.Unique() > 10000) {
-    //   std::cout << "NOTE: Filter has > 10000 particles, knocking EV down 10%" << std::endl;
-    //   street_ev_[street] = (ev_this_street - 0.10);
-    // } else if (pf_.Unique() > 500) {
-    //   std::cout << "NOTE: Filter has > 500 particles, knocking EV down 5%" << std::endl;
-    //   street_ev_[street] = (ev_this_street - 0.05);
-    // } else {
-    //   street_ev_[street] = ev_this_street;
-    // }
-    street_ev_[street] = ev_this_street;
+    const std::string hand = my_cards[0] + my_cards[1];
+
+    const cfr::StrengthVector& strength = pf_.ComputeStrengthRandom(hand, board_str, "", nsamples, buckets_);
+    street_strengths_.at(street) = strength;
   }
-  const float EV = street_ev_.at(street);
+
+  const cfr::StrengthVector& strength_this_street = street_strengths_.at(street);
+  cfr::Print(strength_this_street);
 
   const int pot_size = my_contribution + opp_contribution;
-  printf("[GETACTION] round=%d | street=%d | ev=%f | pot_size=%d | continue_cost=%d |\n",
-      round_num, street, EV, pot_size, continue_cost);
+  printf("[GETACTION] round=%d | street=%d | pot_size=%d | continue_cost=%d |\n",
+      round_num, street, pot_size, continue_cost);
   
   // Do bucketing and regret matching to get an action.
-  const cfr::EvInfoSet infoset = MakeInfoSet(history_, 0, is_small_blind_, EV, street);
-  const std::string key = bucket_function_(infoset);
-  std::cout << key << std::endl;
+  cfr::EvInfoSet infoset = MakeInfoSet(history_, 0, is_small_blind_, -1, street);
+  infoset.strength_vector = strength_this_street;
 
   // If CFR never encountered this situation, revert to backup logic.
-  if (!strategy_.HasBucket(key)) {
-    std::cout << "WARNING: Couldn't find CFR bucket: " << key << std::endl;
+  if (!strategy_.HasBucket(infoset)) {
+    std::cout << "WARNING: Couldn't find CFR bucket" << std::endl;
+
+    std::string board_str;
+    for (int i = 0; i < street; ++i) {
+      board_str += board_cards[i];
+    }
+    // If converged, only sample ONE permutation.
+    const int nsamples = did_converge ? 1 : compute_ev_samples_;
+    const std::string hand = my_cards[0] + my_cards[1];
+
+    const float EV = pf_.ComputeEvRandom(hand, board_str, "", nsamples, compute_ev_iters_.at(street));
+    
     const int min_raise = round_state->raise_bounds()[0];
     const int max_raise = round_state->raise_bounds()[1];
     const bool is_bb = static_cast<bool>(active);
@@ -290,7 +294,6 @@ Action CfrPlayer::get_action(GameState* game_state, RoundState* round_state, int
     std::discrete_distribution<int> distribution(action_probs_masked.begin(), action_probs_masked.end());
     const int sampled_idx = distribution(gen_);
 
-    std::cout << key << std::endl;
     std::cout << "[CFR] Action probabilities=" << std::endl;
     PrintVector(std::vector<double>(action_probs_masked.begin(), action_probs_masked.end()));
 

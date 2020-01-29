@@ -13,7 +13,7 @@
 #include "./pokerbots_cpp/infoset.hpp"
 #include "./pokerbots_cpp/cfr.hpp"
 #include "./pokerbots_cpp/regret_matched_strategy.hpp"
-
+#include "./pokerbots_cpp/hand_clustering.hpp"
 
 namespace pb {
 
@@ -31,11 +31,6 @@ class CfrPlayer : public Bot {
       {0, 1}, {3, 2000}, {4, 2000}, {5, 1326}
     };
 
-    // Reduce EV a little bit when particle filter hasn't converged.
-    // std::unordered_map<int, float> ev_knockdowns_ = {
-    //   {500, 0.05}, {10000, 0.1}
-    // };
-
     int num_showdowns_seen_ = 0;
     int num_showdowns_converge_ = 50;
 
@@ -46,7 +41,8 @@ class CfrPlayer : public Bot {
     HistoryTracker history_{false};
 
     // Keep track of some info for betting.
-    std::unordered_map<int, float> street_ev_{};
+    // std::unordered_map<int, float> street_ev_{};
+    std::unordered_map<int, cfr::StrengthVector> street_strengths_{};
 
     std::random_device rd_{};
     std::mt19937 gen_{rd_()};
@@ -54,7 +50,11 @@ class CfrPlayer : public Bot {
 
     cfr::BucketFunction bucket_function_ = cfr::BucketLarge;
     // cfr::BucketFunction bucket_function_ = cfr::BucketMedium;
-    cfr::RegretMatchedStrategy strategy_{bucket_function_};
+    // cfr::RegretMatchedStrategy strategy_{bucket_function_};
+    cfr::RegretMatchedStrategyKmeans strategy_{};
+
+    cfr::OpponentBuckets buckets_ = cfr::LoadOpponentBuckets();
+    cfr::Centroids centroids_ = cfr::LoadOpponentCentroids();
 
   public:
     /**

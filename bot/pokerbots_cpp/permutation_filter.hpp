@@ -3,7 +3,6 @@
 #include <vector>
 #include <map>
 #include <unordered_map>
-// #include <unordered_set>
 #include <array>
 #include <iostream>
 #include <string>
@@ -15,7 +14,8 @@
 #include <chrono>
 
 #include <omp/HandEvaluator.h>
-// #include <omp/EquityCalculator.h>
+
+#include "hand_clustering.hpp"
 
 namespace pb {
 
@@ -240,6 +240,12 @@ class PermutationFilter {
                         const std::string& dead,
                         const int nsamples,
                         const int iters);
+
+  cfr::StrengthVector ComputeStrengthRandom(const std::string& hand,
+                                            const std::string& board,
+                                            const std::string& dead,
+                                            const int nsamples,
+                                            const cfr::OpponentBuckets& buckets);
 
   void MaybeAddUnique(const Permutation& p) {
     std::string hash = "";

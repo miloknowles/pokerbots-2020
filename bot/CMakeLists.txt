@@ -41,3 +41,15 @@ add_custom_command(
   COMMAND ${CMAKE_COMMAND} -E copy
           ${CMAKE_SOURCE_DIR}/avg_strategy.txt
           ${CMAKE_CURRENT_BINARY_DIR}/avg_strategy.txt)
+
+add_custom_command(
+  TARGET cpp_player POST_BUILD
+  COMMAND ${CMAKE_COMMAND} -E copy
+          ${CMAKE_CURRENT_SOURCE_DIR}/opponent_clusters.txt
+          ${CMAKE_CURRENT_BINARY_DIR}/opponent_clusters.txt)
+
+add_custom_command(
+  TARGET cpp_player POST_BUILD
+  COMMAND ${CMAKE_COMMAND} -E copy
+          ${CMAKE_CURRENT_SOURCE_DIR}/cluster_centroids_10.txt
+          ${CMAKE_CURRENT_BINARY_DIR}/cluster_centroids_10.txt)

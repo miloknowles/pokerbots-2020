@@ -305,7 +305,7 @@ void PermutationFilter::Update(const ShowdownResult& r) {
 
   // const int num_invalid_retries = std::min(5, static_cast<int>(5 * N_ / nonzero));
   const int num_invalid_retries = 5;
-  const int num_valid_retries = 1;
+  const int num_valid_retries = 2;
 
   for (int i = 0; i < particles_.size(); ++i) {
     // Skip particles that have zero weight (dead).
@@ -445,6 +445,60 @@ float PermutationFilter::ComputeEvRandom(const std::string& hand,
 
   UpdateProfile("ComputeEvRandom", timer.Elapsed());
   return (ev / static_cast<float>(nsamples));
+}
+
+static cfr::StrengthVector Add(const cfr::StrengthVector& v1, const cfr::StrengthVector& v2) {
+  cfr::StrengthVector out = v1;
+  for (int i = 0; i < v2.size(); ++i) {
+    out[i] += v2[i];
+  }
+  return out;
+}
+
+static cfr::StrengthVector Divide(const cfr::StrengthVector& v, float c) {
+  cfr::StrengthVector out = v;
+  for (int i = 0; i < v.size(); ++i) {
+    out[i] /= c;
+  }
+  return out;
+}
+
+cfr::StrengthVector PermutationFilter::ComputeStrengthRandom(const std::string& hand,
+                                                              const std::string& board,
+                                                              const std::string& dead,
+                                                              const int nsamples,
+                                                              const cfr::OpponentBuckets& buckets) {
+  Timer timer;
+  cfr::StrengthVector strength;
+
+  // Get indices of nonzero particles.
+  std::vector<int> valid_idx;
+  for (int i = 0; i < weights_.size(); ++i) {
+    if (weights_[i] > 0) { valid_idx.emplace_back(i); }
+  }
+  if (valid_idx.size() < nsamples) {
+    std::cout << "WARNING: not enough valid particles to sample" << std::endl;
+    cfr::StrengthVector out;
+    std::fill(out.begin(), out.end(), 0);
+    return out;
+  }
+
+  std::uniform_int_distribution<> sampler(0, valid_idx.size()-1);
+
+  for (int si = 0; si < nsamples; ++si) {
+    const int unif_int = sampler(gen_);
+    const int rand_idx = valid_idx.at(unif_int);
+    const Permutation& perm = particles_.at(rand_idx);
+    const std::string& board_m = MapToTrueStrings(perm, board);
+    const std::string& hand_m = MapToTrueStrings(perm, hand);
+    const std::string& dead_m = MapToTrueStrings(perm, dead);
+
+    const cfr::StrengthVector& sampled_strength = cfr::ComputeStrengthVector(buckets, hand_m, board_m);
+    strength = Add(sampled_strength, strength);
+  }
+
+  UpdateProfile("ComputeStrengthRandom", timer.Elapsed());
+  return Divide(strength, static_cast<float>(nsamples));
 }
 
 } // namespace pb
