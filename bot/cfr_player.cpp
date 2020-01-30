@@ -27,6 +27,13 @@ static int MakeRelativeBet(const float frac, const int pot_size, const int min_r
   return clamped;
 }
 
+static Action AddNoiseToBet(const Action& action, int min_raise, int max_raise) {
+  const int mult = (rand() % 2 == 0) ? -1 : 1;
+  const int noise = mult * (rand() % 3);
+  printf("Adding noise: %d\n", noise);
+  return RaiseAction(std::min(max_raise, std::max(min_raise, action.amount + noise)));
+}
+
 
 std::pair<cfr::ActionVec, cfr::ActionMask> MakeActions(RoundState* round_state, int active, const HistoryTracker& tracker) {
   const int legal_actions = round_state->legal_actions();
@@ -190,6 +197,40 @@ void CfrPlayer::MaybePrintNewStreet(int street) {
   }
 }
 
+static cfr::ActionRegrets ApplyMaskAndUniformSquash(const cfr::ActionRegrets& p, const cfr::ActionMask& mask) {
+  double denom = 0;
+  int valid = 0;
+  cfr::ActionRegrets out;
+
+  for (int i = 0; i < p.size(); ++i) {
+    const double masked = p[i] * static_cast<double>(mask[i]);
+    denom += masked;
+    out[i] = masked;
+    valid += mask[i];
+  }
+
+  // If the sum of regrets <= 0, return uniform dist over valid actions.
+  if (denom <= 1e-3) {
+    for (int i = 0; i < p.size(); ++i) {
+      out[i] = static_cast<double>(mask[i]) / static_cast<double>(valid);
+    }
+    return out;
+
+  // Otherwise normalize by sum.
+  } else {
+    for (int i = 0; i < p.size(); ++i) {
+      out[i] /= denom;
+    }
+
+    // Squash anything below 0.05.
+    for (int i = 0; i < p.size(); ++i) {
+      out[i] = out[i] < 0.05 ? 0 : out[i];
+    }
+
+    return out;
+  }
+}
+
 /**
  * Where the magic happens - your code should implement this function.
  * Called any time the engine needs an action from your bot.
@@ -282,6 +323,9 @@ Action CfrPlayer::get_action(GameState* game_state, RoundState* round_state, int
 
     const cfr::ActionRegrets& action_probs = strategy_.GetStrategy(infoset);
     const cfr::ActionRegrets& action_probs_masked = cfr::ApplyMaskAndUniform(action_probs, actions_and_mask.second);
+
+    // const cfr::ActionRegrets action_probs_masked = ApplyMaskAndUniformSquash(action_probs, actions_and_mask.second);
+
     std::discrete_distribution<int> distribution(action_probs_masked.begin(), action_probs_masked.end());
     const int sampled_idx = distribution(gen_);
 
@@ -292,6 +336,35 @@ Action CfrPlayer::get_action(GameState* game_state, RoundState* round_state, int
     const cfr::ActionVec& actions = actions_and_mask.first;
     const Action chosen_action = actions.at(sampled_idx);
     printf("[CFR] Sampled action %d\n", sampled_idx);
+
+    // if (chosen_action.action_type == RAISE_ACTION_TYPE) {
+    //   std::cout << "adding noise" << std::endl;
+    //   const int min_raise = round_state->raise_bounds()[0];
+    //   const int max_raise = round_state->raise_bounds()[1];
+    //   return AddNoiseToBet(chosen_action, min_raise, max_raise);
+    // }
+    if (street >= 3) {
+
+    }
+
+    // If it's after the flop and an action would put us all in, do the less extreme action.
+    if (street >= 3) {
+      if (chosen_action.action_type == CALL_ACTION_TYPE) {
+        const bool is_all_in = (my_contribution + continue_cost) == 200;
+        if (EV <= 0.80 && is_all_in) {
+          std::cout << "[TOO RISKY] Call would put me all in, EV <= 0.80 so FOLDING" << std::endl;
+          return FoldAction();
+        }
+      } else if (chosen_action.action_type == RAISE_ACTION_TYPE) {
+        const bool is_all_in = (chosen_action.amount + my_contribution) == 200;
+        if (EV <= 0.80 && is_all_in) {
+          std::cout << "[TOO RISKY] Raise would put me all in, EV <= 0.80 so CHECK/CALLING" << std::endl;
+          const bool check_is_allowed = CHECK_ACTION_TYPE & legal_actions;
+          return check_is_allowed ? CheckAction() : CallAction();
+        }
+      }
+    }
+
     return chosen_action;
   }
 }
